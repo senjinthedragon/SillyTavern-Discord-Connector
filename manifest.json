@@ -1,0 +1,11 @@
+{
+  "display_name": "Discord Connector",
+  "loading_order": 9,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Senjin the Dragon <senjin@hatchling.org>",
+  "version": "1.0.0",
+  "homePage": "https://github.com/senjinthedragon/SillyTavern-Discord-Connector"
+}

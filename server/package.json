@@ -1,0 +1,17 @@
+{
+  "name": "sillytavern-discord-bridge",
+  "version": "1.0.0",
+  "description": "Discord bridge server for SillyTavern",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "undici": "^6.0.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

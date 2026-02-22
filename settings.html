@@ -1,0 +1,49 @@
+<!-- settings.html -->
+<div class="discord-connector-settings">
+  <div class="inline-drawer">
+    <div class="inline-drawer-toggle inline-drawer-header">
+      <b>Discord Connector Settings</b>
+      <div
+        class="inline-drawer-icon fa-solid fa-circle-chevron-down down"
+      ></div>
+    </div>
+    <div class="inline-drawer-content">
+      <div class="discord-connector_block flex-container">
+        <label for="discord_bridge_url">Bridge Server WebSocket URL</label>
+        <input
+          type="text"
+          id="discord_bridge_url"
+          class="text_pole"
+          placeholder="e.g. ws://127.0.0.1:2333"
+        />
+        <div
+          id="discord_connection_status"
+          style="margin-top: 10px; font-weight: bold"
+        >
+          Status: Click the Connect button to connect
+        </div>
+      </div>
+      <div class="discord-connector_block flex-container">
+        <input
+          id="discord_connect_button"
+          class="menu_button"
+          type="button"
+          value="Connect"
+        />
+        <input
+          id="discord_disconnect_button"
+          class="menu_button"
+          type="button"
+          value="Disconnect"
+        />
+      </div>
+      <div class="discord-connector_block flex-container">
+        <label class="checkbox_label" for="discord_auto_connect">
+          <input type="checkbox" id="discord_auto_connect" />
+          <span>Automatically connect on page load</span>
+        </label>
+      </div>
+      <hr class="sysHR" />
+    </div>
+  </div>
+</div>
