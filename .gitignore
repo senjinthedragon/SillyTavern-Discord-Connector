@@ -16,3 +16,4 @@ server/config.js
 server/config.local.js
 server/*.local.js
 server/.env
+server/.restart_protection
