@@ -12,4 +12,10 @@ module.exports = {
   // Leave as an empty array to allow all users.
   // To get a user ID: enable Developer Mode in Discord, then right-click a user and select "Copy ID".
   allowedUserIds: [], // e.g., ['123456789012345678', '987654321098765432']
+
+  // Set to true to enable verbose terminal logging
+  debug: false,
+
+  // Timezone for log timestamps
+  timezone: "Europe/Amsterdam",
 };
