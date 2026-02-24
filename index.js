@@ -90,14 +90,22 @@ function connect() {
           "[BRIDGE DEBUG] User message sent to ST, starting generation",
         );
 
-        // Stream forwarding callback
+        // Each character turn gets a unique stream session ID so server.js
+        // can track their Discord messages independently without overwriting.
+        let currentStreamId = null;
+        let currentCharacterName = null;
+
+        // Stream forwarding callback — fires on every token during generation
         const streamCallback = (cumulativeText) => {
+          if (!currentStreamId) return; // no active session yet, skip
           messageState.isStreaming = true;
           if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(
               JSON.stringify({
                 type: "stream_chunk",
                 chatId: messageState.chatId,
+                streamId: currentStreamId,
+                characterName: currentCharacterName, // null in solo, name in group
                 text: cumulativeText,
               }),
             );
@@ -107,96 +115,206 @@ function connect() {
         // Register stream listener
         eventSource.on(event_types.STREAM_TOKEN_RECEIVED, streamCallback);
 
-        // Cleanup function (removes listener, sends stream_end if needed)
+        // sendStreamEnd: finalises the current character's streaming message.
+        // In GROUP chat: sends stream_end so server.js deletes the stream message
+        //   and reposts it clean (no [edited] marker) with the character's name.
+        // In SOLO chat: sends stream_end WITHOUT delete/repost — the final debounce
+        //   edit IS the message, and we don't want a name header on solo messages.
+        const sendStreamEnd = () => {
+          if (
+            messageState.isStreaming &&
+            currentStreamId &&
+            ws &&
+            ws.readyState === WebSocket.OPEN
+          ) {
+            const ctx = SillyTavern.getContext();
+            const isGroup = !!ctx.groupId;
+            ws.send(
+              JSON.stringify({
+                type: "stream_end",
+                chatId: messageState.chatId,
+                streamId: currentStreamId,
+                characterName: isGroup ? currentCharacterName : null,
+              }),
+            );
+          }
+          messageState.isStreaming = false;
+          currentStreamId = null;
+        };
+
+        // collectAndSendReplies: walks the chat array backwards from the end,
+        // collecting all consecutive non-user messages, and sends them as the
+        // final ai_reply payload. Works for both solo (1 message) and group (N).
+        const collectAndSendReplies = () => {
+          if (!messageState.chatId || !ws || ws.readyState !== WebSocket.OPEN)
+            return;
+          const context = SillyTavern.getContext();
+          const chat = context.chat;
+          if (!chat || chat.length < 2) return;
+
+          const aiMessages = [];
+          for (let i = chat.length - 1; i >= 0; i--) {
+            const msg = chat[i];
+            if (msg.is_user) break;
+            if (msg.mes && msg.mes.trim()) {
+              aiMessages.unshift({
+                name: msg.name || "",
+                text: msg.mes.trim(),
+              });
+            }
+          }
+
+          if (aiMessages.length > 0) {
+            console.log(
+              "[BRIDGE DEBUG]",
+              aiMessages.length,
+              "AI message(s):",
+              aiMessages
+                .map((m) => `${m.name} (${m.text.length} chars)`)
+                .join(", "),
+            );
+            ws.send(
+              JSON.stringify({
+                type: "ai_reply",
+                chatId: messageState.chatId,
+                messages: aiMessages,
+              }),
+            );
+            console.log("[BRIDGE DEBUG] ai_reply sent");
+          } else {
+            console.warn("[WARN] No valid AI message found in chat array");
+            ws.send(
+              JSON.stringify({
+                type: "error_message",
+                chatId: messageState.chatId,
+                text: "The wolf thought long... but his words stayed hidden. Try again, pet?",
+              }),
+            );
+          }
+        };
+
+        // GENERATION_STARTED fires at the beginning of each character's turn.
+        // Assign a fresh streamId so this character gets its own Discord message.
+        const onGenerationStarted = () => {
+          currentStreamId = `${messageState.chatId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+          // Only capture character name in group chat — solo chat never shows names.
+          const ctx = SillyTavern.getContext();
+          currentCharacterName = ctx.groupId ? ctx.name2 || null : null;
+          console.log(
+            `[BRIDGE DEBUG] GENERATION_STARTED — streamId: ${currentStreamId}, character: ${currentCharacterName || "(solo)"}`,
+          );
+        };
+        eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
+
+        // GENERATION_ENDED fires once per character (including every turn in group chat).
+        // We use it to close the current character's stream message on Discord so the
+        // next character can start a fresh one. In solo chat this also triggers the
+        // final ai_reply (group_wrapper_finished won't fire for solo).
+        let generationCount = 0;
+        const onGenerationEnded = () => {
+          generationCount++;
+          console.log(`[BRIDGE DEBUG] GENERATION_ENDED #${generationCount}`);
+          sendStreamEnd(); // finalise this character's stream message on Discord
+
+          // Detect solo vs group: in group chat, group_wrapper_finished fires after
+          // all characters and will send the ai_reply. In solo chat it never fires,
+          // so we send the ai_reply here after a short delay to ensure the chat array
+          // is fully written before we read it.
+          const context = SillyTavern.getContext();
+          const isGroup = !!context.groupId;
+          if (!isGroup) {
+            console.log(
+              "[BRIDGE DEBUG] Solo chat — sending ai_reply from GENERATION_ENDED",
+            );
+            eventSource.removeListener(
+              event_types.GENERATION_STARTED,
+              onGenerationStarted,
+            );
+            eventSource.removeListener(
+              event_types.GENERATION_ENDED,
+              onGenerationEnded,
+            );
+            eventSource.removeListener(GROUP_WRAPPER_FINISHED, onGroupFinished);
+            eventSource.removeListener(
+              event_types.GENERATION_STOPPED,
+              onGenerationStopped,
+            );
+            setTimeout(collectAndSendReplies, 100);
+          }
+        };
+        eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
+
+        // Use string fallback in case this key isn't exported in older ST versions
+        const GROUP_WRAPPER_FINISHED =
+          event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
+
+        // GROUP_WRAPPER_FINISHED fires once when ALL characters in a group have
+        // finished. This is where we collect every character's reply and send the
+        // full ai_reply array to Discord.
+        const onGroupFinished = () => {
+          console.log(
+            "[BRIDGE DEBUG] GROUP_WRAPPER_FINISHED — collecting all replies",
+          );
+          eventSource.removeListener(
+            event_types.GENERATION_STARTED,
+            onGenerationStarted,
+          );
+          eventSource.removeListener(
+            event_types.GENERATION_ENDED,
+            onGenerationEnded,
+          );
+          eventSource.removeListener(GROUP_WRAPPER_FINISHED, onGroupFinished);
+          eventSource.removeListener(
+            event_types.GENERATION_STOPPED,
+            onGenerationStopped,
+          );
+          setTimeout(collectAndSendReplies, 100);
+        };
+        eventSource.on(GROUP_WRAPPER_FINISHED, onGroupFinished);
+
+        // Full cleanup: remove ALL listeners and send stream_end if mid-stream.
+        // Defined before onGenerationStopped (which calls it) but after all other
+        // handlers so their const bindings are in scope when cleanup() runs.
         const cleanup = () => {
           eventSource.removeListener(
             event_types.STREAM_TOKEN_RECEIVED,
             streamCallback,
           );
-          if (
-            messageState.isStreaming &&
-            ws &&
-            ws.readyState === WebSocket.OPEN
-          ) {
-            ws.send(
-              JSON.stringify({
-                type: "stream_end",
-                chatId: messageState.chatId,
-              }),
-            );
-          }
-          messageState.isStreaming = false;
+          eventSource.removeListener(
+            event_types.GENERATION_STARTED,
+            onGenerationStarted,
+          );
+          eventSource.removeListener(
+            event_types.GENERATION_ENDED,
+            onGenerationEnded,
+          );
+          eventSource.removeListener(GROUP_WRAPPER_FINISHED, onGroupFinished);
+          eventSource.removeListener(
+            event_types.GENERATION_STOPPED,
+            onGenerationStopped,
+          );
+          sendStreamEnd();
         };
 
-        // One-shot listeners for end/stop
-        eventSource.once(event_types.GENERATION_ENDED, cleanup);
-        eventSource.once(event_types.GENERATION_STOPPED, cleanup);
-
-        // Main generation completion handler
-        eventSource.once(event_types.GENERATION_ENDED, () => {
-          console.log("[BRIDGE DEBUG] GENERATION_ENDED – reading chat array");
-
-          if (!messageState.chatId || !ws || ws.readyState !== WebSocket.OPEN) {
-            console.warn("[WARN] Message state invalid or WS closed");
-            cleanup();
-            return;
-          }
-
-          const context = SillyTavern.getContext();
-          const chat = context.chat;
-
-          if (!chat || chat.length < 2) {
-            console.warn("[WARN] Chat too short – no reply possible yet");
-            cleanup();
-            return;
-          }
-
-          // Find last non-user message with content
-          let lastAIMessage = null;
-          for (let i = chat.length - 1; i >= 0; i--) {
-            const msg = chat[i];
-            if (!msg.is_user && msg.mes && msg.mes.trim()) {
-              lastAIMessage = msg.mes.trim();
-              console.log(
-                "[BRIDGE DEBUG] Sending AI message from:",
-                msg.name || "Unknown",
-              );
-              break;
-            }
-          }
-
-          if (lastAIMessage) {
-            console.log(
-              "[BRIDGE DEBUG] AI reply found in chat. Length:",
-              lastAIMessage.length,
-            );
-            console.log(
-              "[BRIDGE DEBUG] Preview:",
-              lastAIMessage.substring(0, 150) +
-                (lastAIMessage.length > 150 ? "..." : ""),
-            );
-
-            ws.send(
-              JSON.stringify({
-                type: "ai_reply",
-                chatId: messageState.chatId,
-                text: lastAIMessage,
-              }),
-            );
-            console.log("[BRIDGE DEBUG] ai_reply sent – clean delivery");
-          } else {
-            console.warn("[WARN] No valid AI message in chat array");
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(
-                JSON.stringify({
-                  type: "error_message",
-                  chatId: messageState.chatId,
-                  text: "The wolf thought long... but his words stayed hidden. Try again, pet?",
-                }),
-              );
-            }
-          }
-        });
+        // GENERATION_STOPPED: user aborted — clean up and remove all listeners
+        const onGenerationStopped = () => {
+          console.log("[BRIDGE DEBUG] GENERATION_STOPPED — aborting");
+          eventSource.removeListener(
+            event_types.GENERATION_STARTED,
+            onGenerationStarted,
+          );
+          eventSource.removeListener(
+            event_types.GENERATION_ENDED,
+            onGenerationEnded,
+          );
+          eventSource.removeListener(GROUP_WRAPPER_FINISHED, onGroupFinished);
+          eventSource.removeListener(
+            event_types.GENERATION_STOPPED,
+            onGenerationStopped,
+          );
+          cleanup();
+        };
+        eventSource.once(event_types.GENERATION_STOPPED, onGenerationStopped);
 
         // Trigger generation
         try {

@@ -102,11 +102,10 @@ client.on("error", (error) =>
 );
 
 // ---------------------------------------------------------------------------
-// Per-channel operation queue
-// Ensures all Discord API calls for a channel run one at a time, preventing
-// race conditions where concurrent sends/edits create duplicate messages.
+// Per-channel queue — used ONLY for message sends and deletes (ordering ops).
+// Stream edits bypass this entirely and use a per-session debounce timer.
 // ---------------------------------------------------------------------------
-const channelQueues = {}; // { channelId: Promise }
+const channelQueues = {};
 
 function enqueue(channelId, fn) {
   const prev = channelQueues[channelId] || Promise.resolve();
@@ -115,12 +114,11 @@ function enqueue(channelId, fn) {
     .catch((err) => {
       logWithTimestamp(
         "error",
-        `[QUEUE] Error in queued operation for ${channelId}:`,
+        `[QUEUE] Error for channel ${channelId}:`,
         err.message,
       );
     });
   channelQueues[channelId] = next;
-  // Clean up resolved queue reference to avoid memory leak on idle channels
   next.then(() => {
     if (channelQueues[channelId] === next) delete channelQueues[channelId];
   });
@@ -128,15 +126,126 @@ function enqueue(channelId, fn) {
 }
 
 // ---------------------------------------------------------------------------
-// Stream session state
-// { channelId: { streamMessage: Message|null, lastText: string, streamDone: boolean } }
+// Stream sessions — keyed by streamId (unique per character turn).
+//
+// Each session:
+//   streamMessage  Discord Message being edited in-place (null until first send)
+//   pendingText    Latest text to show; updated on every incoming chunk
+//   editInFlight   True while an async edit API call is running
+//   nextEdit       Pending edit scheduled for after the in-flight one completes
+//   streamDone     True once stream_end has taken over
 // ---------------------------------------------------------------------------
 const streamSessions = {};
-const streamHandled = new Set(); // channels where stream_end already posted the final reply
 
-// Minimum ms between Discord edit calls per channel.
-// Discord's rate limit is ~5 edits/5s per message; 1200ms gives comfortable headroom.
+// Minimum ms between Discord edit API calls per stream session.
+// Discord allows ~5 edits/5s per message. 1200ms gives comfortable headroom
+// while still showing visible streaming progress to the user.
 const STREAM_THROTTLE_MS = 1200;
+
+// Channels where stream_end already posted the final reply.
+const streamHandled = new Set();
+
+// ---------------------------------------------------------------------------
+// sendLong: splits text across multiple Discord messages at word/newline
+// boundaries if it exceeds Discord's 2000-character hard limit.
+// ---------------------------------------------------------------------------
+async function sendLong(channel, text) {
+  const MAX = 1900;
+  if (text.length <= MAX) {
+    await channel.send(text);
+    return;
+  }
+  let remaining = text;
+  while (remaining.length > 0) {
+    if (remaining.length <= MAX) {
+      await channel.send(remaining);
+      break;
+    }
+    let splitAt = remaining.lastIndexOf("\n", MAX);
+    if (splitAt <= 0) splitAt = remaining.lastIndexOf(" ", MAX);
+    if (splitAt <= 0) splitAt = MAX;
+    await channel.send(remaining.slice(0, splitAt).trimEnd());
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// scheduleEdit: throttled Discord edit for a stream session.
+//
+// Called on every incoming chunk. Uses a self-chaining throttle pattern:
+//   - If no edit is in flight, fires immediately.
+//   - If an edit IS in flight, schedules exactly one follow-up to run when
+//     the current edit completes — using whatever the latest text is at that
+//     moment. This prevents queue buildup while ensuring the final state is
+//     always shown.
+// ---------------------------------------------------------------------------
+function scheduleEdit(session, channel, streamId) {
+  // Always update pendingText — caller does this before calling us,
+  // but nextEdit closure needs to capture it at execution time via session ref.
+
+  if (session.editInFlight) {
+    // An edit is already running. Mark that we want another one after it,
+    // but don't stack more than one pending — the next one will pick up
+    // whatever text is current when it runs.
+    session.nextEdit = true;
+    return;
+  }
+
+  const now = Date.now();
+  const msSinceLast = now - (session.lastEditAt || 0);
+  const delay = Math.max(0, STREAM_THROTTLE_MS - msSinceLast);
+
+  session.editInFlight = true;
+
+  setTimeout(async () => {
+    if (session.streamDone) {
+      session.editInFlight = false;
+      return;
+    }
+
+    const text = session.pendingText;
+    session.lastEditAt = Date.now();
+
+    try {
+      if (session.streamMessage) {
+        // Editing: name header is already in the message, just update the body.
+        // Re-prepend the header so it stays present through every edit.
+        const editText = session.characterName
+          ? `**${session.characterName}**\n${text}`
+          : text;
+        await session.streamMessage.edit(editText);
+        logWithTimestamp(
+          "log",
+          `[STREAM] Edited ${session.streamMessage.id} (${editText.length} chars)`,
+        );
+      } else {
+        // First send: prepend bold name header for group chat
+        const sendText = session.characterName
+          ? `**${session.characterName}**\n${text}`
+          : text;
+        const sent = await channel.send(sendText);
+        session.streamMessage = sent;
+        logWithTimestamp(
+          "log",
+          `[STREAM] Created stream message ${sent.id} for ${streamId}`,
+        );
+      }
+    } catch (err) {
+      logWithTimestamp(
+        "warn",
+        `[STREAM] Edit/send failed for ${streamId}: ${err.message}`,
+      );
+    }
+
+    session.editInFlight = false;
+
+    // If new chunks arrived while we were editing, fire one more edit now
+    if (session.nextEdit && !session.streamDone) {
+      session.nextEdit = false;
+      scheduleEdit(session, channel, streamId);
+    }
+  }, delay);
+}
 
 // ---------------------------------------------------------------------------
 // WebSocket server
@@ -163,91 +272,88 @@ wss.on("connection", (ws) => {
         break;
 
       // -----------------------------------------------------------------------
-      // stream_chunk: throttle edits and always edit-in-place.
-      // We only ever create ONE message per stream session (on the very first
-      // chunk), then edit it on every subsequent chunk.
+      // stream_chunk: store latest text and schedule a debounced Discord edit.
+      // Multiple rapid tokens collapse into a single edit when they go quiet.
       // -----------------------------------------------------------------------
       case "stream_chunk": {
-        const chunkText = (data?.text || "").trim();
-        if (!chunkText) break;
+        const rawChunk = (data?.text || "").trim();
+        const streamId = data?.streamId || channelId;
+        if (!rawChunk) break;
 
-        // Initialise session if this is the first chunk for this channel
-        if (!streamSessions[channelId]) {
-          streamSessions[channelId] = {
+        // Strip "CharacterName: " prefix if present in group chat streaming
+        const chunkText = rawChunk.replace(/^[A-Za-z0-9 ]{1,50}: /, "");
+        const characterName = data.characterName || null;
+
+        if (!streamSessions[streamId]) {
+          streamSessions[streamId] = {
             streamMessage: null,
-            lastText: "",
+            pendingText: "",
+            characterName, // stored once; used to prefix the first message
+            editInFlight: false,
+            nextEdit: false,
             lastEditAt: 0,
             streamDone: false,
           };
         }
 
-        const session = streamSessions[channelId];
-
-        // If the session was already finalised by ai_reply, ignore stale chunks
+        const session = streamSessions[streamId];
         if (session.streamDone) break;
 
-        // Store the latest text; the queued operation below will use whatever
-        // is current at the time it actually runs (skips intermediate states
-        // if Discord is falling behind — avoids piling up a queue of edits).
-        session.lastText = chunkText;
-
-        // Throttle: skip scheduling a new edit if one was dispatched very recently
-        const now = Date.now();
-        if (
-          now - session.lastEditAt < STREAM_THROTTLE_MS &&
-          session.streamMessage
-        ) {
-          break;
-        }
-        session.lastEditAt = now;
-
-        enqueue(channelId, async () => {
-          // Re-read session state at execution time (it may have been finalised)
-          const s = streamSessions[channelId];
-          if (!s || s.streamDone) return;
-
-          const textToShow = s.lastText;
-          if (!textToShow) return;
-
-          if (s.streamMessage) {
-            // Edit the single existing message
-            await s.streamMessage.edit(textToShow);
-            logWithTimestamp(
-              "log",
-              `[STREAM] Edited message ${s.streamMessage.id} (${textToShow.length} chars)`,
-            );
-          } else {
-            // First chunk — create the one and only stream message
-            const sent = await channel.send(textToShow);
-            s.streamMessage = sent;
-            logWithTimestamp(
-              "log",
-              `[STREAM] Created stream message ${sent.id}`,
-            );
-          }
-        });
+        session.pendingText = chunkText;
+        scheduleEdit(session, channel, streamId);
         break;
       }
 
       // -----------------------------------------------------------------------
-      // stream_end: all chunks have arrived — the last stored text IS the
-      // complete message. Delete the stream-built message (which carries the
-      // [edited] marker) and immediately post it as a clean, fresh message.
-      // No need to wait for ai_reply; that event fires much later and would
-      // cause the 20-30 second delay the user sees.
+      // stream_end: generation for this character is complete.
+      // Cancel any pending debounce timer, then delete the stream message and
+      // post the final text as a clean fresh message (no [edited] marker).
+      // Goes through the channel queue to keep character order consistent.
       // -----------------------------------------------------------------------
-      case "stream_end":
+      case "stream_end": {
+        const streamId = data?.streamId || channelId;
+
+        // Signal the throttle to stop scheduling new edits — stream_end takes over
+        const preSession = streamSessions[streamId];
+        if (preSession) {
+          preSession.nextEdit = false; // discard any pending follow-up edit
+        }
+
         enqueue(channelId, async () => {
-          const s = streamSessions[channelId];
+          const s = streamSessions[streamId];
           if (!s) return;
 
           s.streamDone = true;
-          const finalText = s.lastText;
+          s.nextEdit = false;
 
+          // Wait for any in-flight throttle edit to complete before we touch the message
+          if (s.editInFlight) {
+            await new Promise((resolve) => {
+              const poll = setInterval(() => {
+                if (!s.editInFlight) {
+                  clearInterval(poll);
+                  resolve();
+                }
+              }, 50);
+            });
+          }
+
+          const rawFinal = (s.pendingText || "").replace(
+            /^[A-Za-z0-9 ]{1,50}: /,
+            "",
+          );
+          const charName = data.characterName || null;
+          const keepMessage = !!data.keepMessage; // solo chat: keep stream message as-is
+
+          // Both solo and group: delete the stream message (which has the [edited]
+          // marker) and repost as a clean final message. Group chat also prepends
+          // the bold character name header.
+          const finalText =
+            charName && rawFinal ? `**${charName}**\n${rawFinal}` : rawFinal;
           if (s.streamMessage && finalText) {
             logWithTimestamp(
               "log",
-              `[STREAM] stream_end — deleting stream message and posting clean final reply`,
+              `[STREAM] stream_end ${streamId} — replacing with clean final`,
             );
             await s.streamMessage.delete().catch((err) => {
               logWithTimestamp(
@@ -255,32 +361,33 @@ wss.on("connection", (ws) => {
                 `[STREAM] Could not delete stream message: ${err.message}`,
               );
             });
-            await channel.send(finalText);
-            logWithTimestamp(
-              "log",
-              `[STREAM] Clean final reply sent for channel ${channelId}`,
-            );
+            await sendLong(channel, finalText);
           } else if (finalText) {
-            // Stream ended but no message was ever sent (edge case) — send fresh
-            await channel.send(finalText);
+            // Throttle never fired (very short response) — send fresh
+            await sendLong(channel, finalText);
           }
 
-          delete streamSessions[channelId];
-          streamHandled.add(channelId); // mark so ai_reply knows not to send again
+          delete streamSessions[streamId];
+          streamHandled.add(channelId);
         });
         break;
+      }
 
       // -----------------------------------------------------------------------
-      // ai_reply: the complete final text, sent by SillyTavern after generation.
+      // ai_reply: complete text(s) sent by SillyTavern after generation ends.
       //
-      // If streaming was used, stream_end already did the delete-and-replace,
-      // so the session will be gone and there is nothing left to do here.
-      // ai_reply only acts when there was no streaming (session never existed),
-      // sending the reply as a plain fresh message.
+      // Streaming path: stream_end already posted each character's message and
+      // flagged the channel — skip entirely.
+      //
+      // Non-streaming path: post each character as a separate Discord message,
+      // with a bold name header in group chats.
       // -----------------------------------------------------------------------
       case "ai_reply": {
-        const replyText = (data?.text || "").trim();
-        if (!replyText) {
+        const messages =
+          data?.messages || (data?.text ? [{ name: "", text: data.text }] : []);
+        const validMessages = messages.filter((m) => m?.text?.trim());
+
+        if (validMessages.length === 0) {
           channel
             .send("...the wolf lost his words for a second. Try again?")
             .catch(() => {});
@@ -288,34 +395,27 @@ wss.on("connection", (ws) => {
         }
 
         enqueue(channelId, async () => {
-          // If stream_end already posted the final reply, nothing to do here
           if (streamHandled.has(channelId)) {
             logWithTimestamp(
               "log",
-              `[AI_REPLY] Streaming already handled channel ${channelId} — skipping`,
+              `[AI_REPLY] Streaming already handled ${channelId} — skipping`,
             );
-            streamHandled.delete(channelId); // clean up the flag
+            streamHandled.delete(channelId);
             return;
           }
 
-          const s = streamSessions[channelId];
-          if (s) {
-            // Session still alive — stream_end hasn't fired yet (very rare race).
-            // Mark done and bail; stream_end will post the final reply.
+          const isGroup = validMessages.length > 1;
+          for (const msg of validMessages) {
+            const text = msg.text.trim();
+            const formatted =
+              isGroup && msg.name ? `**${msg.name}**\n${text}` : text;
             logWithTimestamp(
-              "warn",
-              `[AI_REPLY] Session still alive — deferring to stream_end`,
+              "log",
+              `[AI_REPLY] Sending${isGroup ? ` (${msg.name})` : ""} to ${channelId}`,
             );
-            return;
+            await sendLong(channel, formatted);
           }
-
-          // No session and not flagged — non-streaming mode, send fresh
-          logWithTimestamp(
-            "log",
-            `[AI_REPLY] No stream session — sending fresh reply to channel ${channelId}`,
-          );
-          await channel.send(replyText);
-          logWithTimestamp("log", `[AI_REPLY] Done for channel ${channelId}`);
+          logWithTimestamp("log", `[AI_REPLY] Done for ${channelId}`);
         });
         break;
       }
@@ -325,7 +425,7 @@ wss.on("connection", (ws) => {
         const errorText = (data?.text || "").trim();
         if (!errorText) break;
         enqueue(channelId, async () => {
-          await channel.send(errorText);
+          await sendLong(channel, errorText);
         });
         break;
       }
