@@ -1,87 +1,130 @@
-// server.js
+/**
+ * server.js — SillyTavern Discord Connector: Bridge Server
+ *
+ * Runs as a standalone Node.js process alongside SillyTavern. Serves two
+ * roles simultaneously:
+ *
+ *   1. Discord bot — receives messages from Discord users and forwards them
+ *      to SillyTavern, then posts AI responses back to the originating channel.
+ *
+ *   2. WebSocket server — maintains a persistent connection to the SillyTavern
+ *      extension (index.js) running in the browser, acting as the transport
+ *      layer between the two applications.
+ *
+ * Streaming uses a self-chaining throttle: edits fire at most once per
+ * STREAM_THROTTLE_MS, naturally collapsing rapid token bursts without building
+ * a backlog. When generation ends the streaming message is deleted and reposted
+ * cleanly to remove Discord's [edited] marker.
+ *
+ * Message ordering for sends/deletes is preserved via a per-channel async queue.
+ * Stream edits bypass this queue intentionally to stay real-time.
+ */
+
+"use strict";
+
 const { Client, GatewayIntentBits } = require("discord.js");
 const WebSocket = require("ws");
 const fs = require("fs");
 const path = require("path");
 const { setGlobalDispatcher, Agent } = require("undici");
+
+// Force IPv4 and extend the connection timeout for slow networks / large responses.
 setGlobalDispatcher(
   new Agent({
-    connect: {
-      timeout: 60000,
-      family: 4,
-      autoSelectFamily: false,
-    },
+    connect: { timeout: 60000, family: 4, autoSelectFamily: false },
   }),
 );
 
-// Log a message with a human-readable local timestamp prefix
-function logWithTimestamp(level, ...args) {
-  const now = new Date();
-  const timestamp = now.toLocaleString("en-US", {
-    timeZone: "Europe/Amsterdam",
-  });
-  const prefix = `[${timestamp}]`;
-  switch (level) {
-    case "error":
-      console.error(prefix, ...args);
-      break;
-    case "warn":
-      console.warn(prefix, ...args);
-      break;
-    default:
-      console.log(prefix, ...args);
-  }
-}
-
-// Restart loop protection
-const RESTART_PROTECTION_FILE = path.join(__dirname, ".restart_protection");
-const MAX_RESTARTS = 3;
-const RESTART_WINDOW_MS = 60000;
-function checkRestartProtection() {
-  try {
-    if (fs.existsSync(RESTART_PROTECTION_FILE)) {
-      const data = JSON.parse(fs.readFileSync(RESTART_PROTECTION_FILE, "utf8"));
-      const now = Date.now();
-      data.restarts = data.restarts.filter(
-        (time) => now - time < RESTART_WINDOW_MS,
-      );
-      data.restarts.push(now);
-      if (data.restarts.length > MAX_RESTARTS) {
-        logWithTimestamp(
-          "error",
-          `Restart loop detected! ${data.restarts.length} restarts in ${RESTART_WINDOW_MS / 1000}s. Exiting.`,
-        );
-        process.exit(1);
-      }
-      fs.writeFileSync(RESTART_PROTECTION_FILE, JSON.stringify(data));
-    } else {
-      fs.writeFileSync(
-        RESTART_PROTECTION_FILE,
-        JSON.stringify({ restarts: [Date.now()] }),
-      );
-    }
-  } catch (error) {
-    logWithTimestamp("error", "Restart protection check failed:", error);
-  }
-}
-checkRestartProtection();
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
 
 const configPath = path.join(__dirname, "./config.js");
 if (!fs.existsSync(configPath)) {
-  logWithTimestamp(
-    "error",
-    "Missing config.js! Copy config.example.js and fill in your settings.",
+  console.error(
+    "[ERROR] Missing config.js — copy config.example.js and fill in your settings.",
   );
   process.exit(1);
 }
+
 const config = require("./config");
+const DEBUG = !!config.debug;
 const token = config.discordToken;
 const wssPort = config.wssPort;
 
 if (token === "YOUR_DISCORD_BOT_TOKEN_HERE") {
-  logWithTimestamp("error", "Set your Discord Bot Token in config.js!");
+  console.error("[ERROR] Set your Discord Bot Token in config.js!");
   process.exit(1);
 }
+
+// ---------------------------------------------------------------------------
+// Logging
+//
+// All output goes through log() rather than console.log() directly.
+// In production (DEBUG = false) only warnings and errors are printed, keeping
+// the terminal clean for end users. Debug-level messages are suppressed.
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {"log"|"warn"|"error"} level
+ * @param {...any} args
+ */
+function log(level, ...args) {
+  if (level === "log" && !DEBUG) return;
+
+  const timestamp = new Date().toLocaleString("en-US", {
+    timeZone: config.timezone || "UTC",
+  });
+
+  switch (level) {
+    case "error":
+      console.error(`[${timestamp}]`, ...args);
+      break;
+    case "warn":
+      console.warn(`[${timestamp}]`, ...args);
+      break;
+    default:
+      console.log(`[${timestamp}]`, ...args);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Crash-loop protection
+//
+// Tracks restart timestamps in a local file. If the process restarts more than
+// MAX_RESTARTS times within RESTART_WINDOW_MS it exits permanently, preventing
+// runaway loops from spamming Discord or exhausting system resources.
+// ---------------------------------------------------------------------------
+
+const RESTART_PROTECTION_FILE = path.join(__dirname, ".restart_protection");
+const MAX_RESTARTS = 3;
+const RESTART_WINDOW_MS = 60_000;
+
+(function checkRestartProtection() {
+  try {
+    let data = { restarts: [] };
+    if (fs.existsSync(RESTART_PROTECTION_FILE)) {
+      data = JSON.parse(fs.readFileSync(RESTART_PROTECTION_FILE, "utf8"));
+    }
+    const now = Date.now();
+    data.restarts = data.restarts.filter((t) => now - t < RESTART_WINDOW_MS);
+    data.restarts.push(now);
+    fs.writeFileSync(RESTART_PROTECTION_FILE, JSON.stringify(data));
+
+    if (data.restarts.length > MAX_RESTARTS) {
+      console.error(
+        `[ERROR] Crash loop detected (${data.restarts.length} restarts in ${RESTART_WINDOW_MS / 1000}s). Exiting.`,
+      );
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error("[ERROR] Restart protection check failed:", err);
+  }
+})();
+
+// ---------------------------------------------------------------------------
+// Discord client
+// ---------------------------------------------------------------------------
 
 const client = new Client({
   intents: [
@@ -93,18 +136,22 @@ const client = new Client({
 });
 
 client.login(token);
-logWithTimestamp("log", "Logging into Discord...");
 client.on("ready", () =>
-  logWithTimestamp("log", `Discord Bot logged in as ${client.user.tag}`),
+  console.log(`[Discord] Logged in as ${client.user.tag}`),
 );
-client.on("error", (error) =>
-  logWithTimestamp("error", "Discord client error:", error),
-);
+client.on("error", (err) => log("error", "[Discord] Client error:", err));
 
 // ---------------------------------------------------------------------------
-// Per-channel queue — used ONLY for message sends and deletes (ordering ops).
-// Stream edits bypass this entirely and use a per-session debounce timer.
+// Per-channel async queue
+//
+// Serialises message sends and deletes within a channel to preserve arrival
+// order. Each entry is a link in a Promise chain; the slot is freed
+// automatically once the tail resolves.
+//
+// Stream edits do NOT go through this queue — they fire directly to remain
+// real-time. Only stream_end (final post) and ai_reply use the queue.
 // ---------------------------------------------------------------------------
+
 const channelQueues = {};
 
 function enqueue(channelId, fn) {
@@ -112,11 +159,7 @@ function enqueue(channelId, fn) {
   const next = prev
     .then(() => fn())
     .catch((err) => {
-      logWithTimestamp(
-        "error",
-        `[QUEUE] Error for channel ${channelId}:`,
-        err.message,
-      );
+      log("error", `[Queue] Error in channel ${channelId}:`, err.message);
     });
   channelQueues[channelId] = next;
   next.then(() => {
@@ -126,35 +169,40 @@ function enqueue(channelId, fn) {
 }
 
 // ---------------------------------------------------------------------------
-// Stream sessions — keyed by streamId (unique per character turn).
-//
-// Each session:
-//   streamMessage  Discord Message being edited in-place (null until first send)
-//   pendingText    Latest text to show; updated on every incoming chunk
-//   editInFlight   True while an async edit API call is running
-//   nextEdit       Pending edit scheduled for after the in-flight one completes
-//   streamDone     True once stream_end has taken over
+// Streaming
 // ---------------------------------------------------------------------------
+
+/**
+ * Active stream sessions, keyed by streamId (a unique ID per character turn).
+ *
+ * Session properties:
+ *   streamMessage  {Message|null}  The Discord message being edited in-place.
+ *   pendingText    {string}        Latest cumulative text received from SillyTavern.
+ *   characterName  {string|null}   Character's display name (group chat only; null for solo).
+ *   editInFlight   {boolean}       True while a Discord API edit call is in progress.
+ *   nextEdit       {boolean}       Signals that another edit should fire after the current one.
+ *   lastEditAt     {number}        Timestamp of the last completed edit (ms since epoch).
+ *   streamDone     {boolean}       Set by stream_end to prevent further edits.
+ */
 const streamSessions = {};
 
-// Minimum ms between Discord edit API calls per stream session.
-// Discord allows ~5 edits/5s per message. 1200ms gives comfortable headroom
-// while still showing visible streaming progress to the user.
+// Minimum interval between Discord edits per message.
+// Discord allows roughly 5 edits per 5 seconds per message; 1200 ms is safe.
 const STREAM_THROTTLE_MS = 1200;
 
-// Channels where stream_end already posted the final reply.
+// Channels where stream_end has already posted the final message. The
+// subsequent ai_reply sent by SillyTavern is skipped for these channels.
 const streamHandled = new Set();
 
-// ---------------------------------------------------------------------------
-// sendLong: splits text across multiple Discord messages at word/newline
-// boundaries if it exceeds Discord's 2000-character hard limit.
-// ---------------------------------------------------------------------------
+/**
+ * Splits text that exceeds Discord's 2000-character limit into multiple
+ * sequential messages, preferring paragraph then word boundaries.
+ *
+ * @param {import("discord.js").TextChannel} channel
+ * @param {string} text
+ */
 async function sendLong(channel, text) {
   const MAX = 1900;
-  if (text.length <= MAX) {
-    await channel.send(text);
-    return;
-  }
   let remaining = text;
   while (remaining.length > 0) {
     if (remaining.length <= MAX) {
@@ -169,32 +217,31 @@ async function sendLong(channel, text) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// scheduleEdit: throttled Discord edit for a stream session.
-//
-// Called on every incoming chunk. Uses a self-chaining throttle pattern:
-//   - If no edit is in flight, fires immediately.
-//   - If an edit IS in flight, schedules exactly one follow-up to run when
-//     the current edit completes — using whatever the latest text is at that
-//     moment. This prevents queue buildup while ensuring the final state is
-//     always shown.
-// ---------------------------------------------------------------------------
+/**
+ * Schedules a throttled Discord edit for an active stream session.
+ *
+ * Self-chaining throttle pattern:
+ *   - If no edit is in flight, one starts immediately (after the throttle delay).
+ *   - If an edit is in flight, nextEdit is set so exactly one follow-up fires
+ *     when the current one completes, using whatever text is current at that moment.
+ *
+ * This prevents stale intermediate edits from queuing up while still ensuring
+ * the latest text is always shown after each burst of tokens.
+ *
+ * @param {object} session - Active stream session.
+ * @param {import("discord.js").TextChannel} channel
+ * @param {string} streamId
+ */
 function scheduleEdit(session, channel, streamId) {
-  // Always update pendingText — caller does this before calling us,
-  // but nextEdit closure needs to capture it at execution time via session ref.
-
   if (session.editInFlight) {
-    // An edit is already running. Mark that we want another one after it,
-    // but don't stack more than one pending — the next one will pick up
-    // whatever text is current when it runs.
     session.nextEdit = true;
     return;
   }
 
-  const now = Date.now();
-  const msSinceLast = now - (session.lastEditAt || 0);
-  const delay = Math.max(0, STREAM_THROTTLE_MS - msSinceLast);
-
+  const delay = Math.max(
+    0,
+    STREAM_THROTTLE_MS - (Date.now() - session.lastEditAt),
+  );
   session.editInFlight = true;
 
   setTimeout(async () => {
@@ -206,40 +253,32 @@ function scheduleEdit(session, channel, streamId) {
     const text = session.pendingText;
     session.lastEditAt = Date.now();
 
+    // In group chat, the character name header is prepended on every edit so
+    // it remains visible throughout the entire streaming build-up.
+    const displayText = session.characterName
+      ? `**${session.characterName}**\n${text}`
+      : text;
+
     try {
       if (session.streamMessage) {
-        // Editing: name header is already in the message, just update the body.
-        // Re-prepend the header so it stays present through every edit.
-        const editText = session.characterName
-          ? `**${session.characterName}**\n${text}`
-          : text;
-        await session.streamMessage.edit(editText);
-        logWithTimestamp(
+        await session.streamMessage.edit(displayText);
+        log(
           "log",
-          `[STREAM] Edited ${session.streamMessage.id} (${editText.length} chars)`,
+          `[Stream] Edited ${session.streamMessage.id} (${displayText.length} chars)`,
         );
       } else {
-        // First send: prepend bold name header for group chat
-        const sendText = session.characterName
-          ? `**${session.characterName}**\n${text}`
-          : text;
-        const sent = await channel.send(sendText);
-        session.streamMessage = sent;
-        logWithTimestamp(
+        session.streamMessage = await channel.send(displayText);
+        log(
           "log",
-          `[STREAM] Created stream message ${sent.id} for ${streamId}`,
+          `[Stream] Created message ${session.streamMessage.id} for ${streamId}`,
         );
       }
     } catch (err) {
-      logWithTimestamp(
-        "warn",
-        `[STREAM] Edit/send failed for ${streamId}: ${err.message}`,
-      );
+      log("warn", `[Stream] Edit failed for ${streamId}: ${err.message}`);
     }
 
     session.editInFlight = false;
 
-    // If new chunks arrived while we were editing, fire one more edit now
     if (session.nextEdit && !session.streamDone) {
       session.nextEdit = false;
       scheduleEdit(session, channel, streamId);
@@ -250,13 +289,14 @@ function scheduleEdit(session, channel, streamId) {
 // ---------------------------------------------------------------------------
 // WebSocket server
 // ---------------------------------------------------------------------------
+
 const wss = new WebSocket.Server({ port: wssPort });
-logWithTimestamp("log", `WS server listening on port ${wssPort}...`);
+console.log(`[Bridge] WebSocket server listening on port ${wssPort}`);
 
 let sillyTavernClient = null;
 
 wss.on("connection", (ws) => {
-  logWithTimestamp("log", "SillyTavern connected via WS");
+  console.log("[Bridge] SillyTavern connected");
   sillyTavernClient = ws;
 
   ws.on("message", async (message) => {
@@ -266,29 +306,31 @@ wss.on("connection", (ws) => {
     if (!channel) return;
 
     switch (data.type) {
-      // -----------------------------------------------------------------------
+      // Show the Discord typing indicator while SillyTavern is generating.
       case "typing_action":
         channel.sendTyping().catch(() => {});
         break;
 
       // -----------------------------------------------------------------------
-      // stream_chunk: store latest text and schedule a debounced Discord edit.
-      // Multiple rapid tokens collapse into a single edit when they go quiet.
+      // stream_chunk — a cumulative token update from an active generation.
+      //
+      // The text field is the full response so far (not just the new token).
+      // We store it as pendingText and schedule a throttled edit. A leading
+      // "CharacterName: " prefix that SillyTavern injects in group chat mode
+      // is stripped; the name is sourced from the explicit characterName field.
       // -----------------------------------------------------------------------
       case "stream_chunk": {
         const rawChunk = (data?.text || "").trim();
         const streamId = data?.streamId || channelId;
         if (!rawChunk) break;
 
-        // Strip "CharacterName: " prefix if present in group chat streaming
         const chunkText = rawChunk.replace(/^[A-Za-z0-9 ]{1,50}: /, "");
-        const characterName = data.characterName || null;
 
         if (!streamSessions[streamId]) {
           streamSessions[streamId] = {
             streamMessage: null,
             pendingText: "",
-            characterName, // stored once; used to prefix the first message
+            characterName: data.characterName || null,
             editInFlight: false,
             nextEdit: false,
             lastEditAt: 0,
@@ -305,28 +347,31 @@ wss.on("connection", (ws) => {
       }
 
       // -----------------------------------------------------------------------
-      // stream_end: generation for this character is complete.
-      // Cancel any pending debounce timer, then delete the stream message and
-      // post the final text as a clean fresh message (no [edited] marker).
-      // Goes through the channel queue to keep character order consistent.
+      // stream_end — generation for this character is complete.
+      //
+      // Halts the throttle, waits for any in-flight edit to settle, then
+      // deletes the streaming message and reposts the final text cleanly,
+      // removing Discord's [edited] marker. Group chat replies include the
+      // bold character name header.
+      //
+      // Routed through the channel queue so multi-character group replies
+      // arrive in the correct turn order.
       // -----------------------------------------------------------------------
       case "stream_end": {
         const streamId = data?.streamId || channelId;
 
-        // Signal the throttle to stop scheduling new edits — stream_end takes over
+        // Halt the throttle immediately so no further edits are scheduled.
         const preSession = streamSessions[streamId];
         if (preSession) {
-          preSession.nextEdit = false; // discard any pending follow-up edit
+          preSession.streamDone = true;
+          preSession.nextEdit = false;
         }
 
         enqueue(channelId, async () => {
           const s = streamSessions[streamId];
           if (!s) return;
 
-          s.streamDone = true;
-          s.nextEdit = false;
-
-          // Wait for any in-flight throttle edit to complete before we touch the message
+          // Wait for any in-flight edit to complete before touching the message.
           if (s.editInFlight) {
             await new Promise((resolve) => {
               const poll = setInterval(() => {
@@ -343,28 +388,21 @@ wss.on("connection", (ws) => {
             "",
           );
           const charName = data.characterName || null;
-          const keepMessage = !!data.keepMessage; // solo chat: keep stream message as-is
+          const finalText = charName
+            ? `**${charName}**\n${rawFinal}`
+            : rawFinal;
 
-          // Both solo and group: delete the stream message (which has the [edited]
-          // marker) and repost as a clean final message. Group chat also prepends
-          // the bold character name header.
-          const finalText =
-            charName && rawFinal ? `**${charName}**\n${rawFinal}` : rawFinal;
-          if (s.streamMessage && finalText) {
-            logWithTimestamp(
-              "log",
-              `[STREAM] stream_end ${streamId} — replacing with clean final`,
-            );
-            await s.streamMessage.delete().catch((err) => {
-              logWithTimestamp(
-                "warn",
-                `[STREAM] Could not delete stream message: ${err.message}`,
-              );
-            });
+          if (finalText) {
+            if (s.streamMessage) {
+              await s.streamMessage.delete().catch((err) => {
+                log(
+                  "warn",
+                  `[Stream] Could not delete stream message: ${err.message}`,
+                );
+              });
+            }
             await sendLong(channel, finalText);
-          } else if (finalText) {
-            // Throttle never fired (very short response) — send fresh
-            await sendLong(channel, finalText);
+            log("log", `[Stream] Posted final message for ${streamId}`);
           }
 
           delete streamSessions[streamId];
@@ -374,13 +412,11 @@ wss.on("connection", (ws) => {
       }
 
       // -----------------------------------------------------------------------
-      // ai_reply: complete text(s) sent by SillyTavern after generation ends.
+      // ai_reply — the complete response(s) received after generation ends.
       //
-      // Streaming path: stream_end already posted each character's message and
-      // flagged the channel — skip entirely.
-      //
-      // Non-streaming path: post each character as a separate Discord message,
-      // with a bold name header in group chats.
+      // Streaming path: stream_end already handled posting; skip this.
+      // Non-streaming path: post each character's reply as a separate Discord
+      // message, with a bold name header for group chats.
       // -----------------------------------------------------------------------
       case "ai_reply": {
         const messages =
@@ -389,87 +425,80 @@ wss.on("connection", (ws) => {
 
         if (validMessages.length === 0) {
           channel
-            .send("...the wolf lost his words for a second. Try again?")
+            .send(
+              "...something went wrong and the response was empty. Try again?",
+            )
             .catch(() => {});
           break;
         }
 
         enqueue(channelId, async () => {
           if (streamHandled.has(channelId)) {
-            logWithTimestamp(
-              "log",
-              `[AI_REPLY] Streaming already handled ${channelId} — skipping`,
-            );
             streamHandled.delete(channelId);
             return;
           }
 
           const isGroup = validMessages.length > 1;
           for (const msg of validMessages) {
-            const text = msg.text.trim();
             const formatted =
-              isGroup && msg.name ? `**${msg.name}**\n${text}` : text;
-            logWithTimestamp(
-              "log",
-              `[AI_REPLY] Sending${isGroup ? ` (${msg.name})` : ""} to ${channelId}`,
-            );
+              isGroup && msg.name
+                ? `**${msg.name}**\n${msg.text.trim()}`
+                : msg.text.trim();
             await sendLong(channel, formatted);
           }
-          logWithTimestamp("log", `[AI_REPLY] Done for ${channelId}`);
         });
         break;
       }
 
-      // -----------------------------------------------------------------------
+      // Forward error messages from the extension to Discord.
       case "error_message": {
         const errorText = (data?.text || "").trim();
-        if (!errorText) break;
-        enqueue(channelId, async () => {
-          await sendLong(channel, errorText);
-        });
+        if (errorText) enqueue(channelId, () => sendLong(channel, errorText));
         break;
       }
 
       default:
-        logWithTimestamp("warn", "Unknown WS message type:", data.type);
+        log("warn", "[Bridge] Unknown message type:", data.type);
     }
   });
 
   ws.on("close", () => {
     sillyTavernClient = null;
-    logWithTimestamp("log", "SillyTavern WS disconnected");
+    console.log("[Bridge] SillyTavern disconnected");
   });
 });
 
 // ---------------------------------------------------------------------------
 // Incoming Discord messages → forward to SillyTavern
+//
+// Regular text becomes a user_message (triggers AI generation).
+// Messages starting with "/" become execute_command (handled by the extension).
 // ---------------------------------------------------------------------------
+
 client.on("messageCreate", (message) => {
   if (message.author.bot) return;
   if (
-    config.allowedUserIds.length > 0 &&
+    config.allowedUserIds?.length > 0 &&
     !config.allowedUserIds.includes(message.author.id)
   )
     return;
 
-  const chatId = message.channel.id;
+  if (!sillyTavernClient) {
+    message.reply("Bridge is not connected to SillyTavern.").catch(() => {});
+    return;
+  }
 
-  if (message.content.startsWith("/")) {
-    const [command, ...args] = message.content.slice(1).split(" ");
-    if (sillyTavernClient) {
-      sillyTavernClient.send(
-        JSON.stringify({ type: "execute_command", command, args, chatId }),
-      );
-    } else {
-      message.reply("Bridge not connected to SillyTavern.");
-    }
+  const chatId = message.channel.id;
+  const content = message.content;
+
+  if (content.startsWith("/")) {
+    const [command, ...args] = content.slice(1).split(" ");
+    sillyTavernClient.send(
+      JSON.stringify({ type: "execute_command", command, args, chatId }),
+    );
   } else {
-    if (sillyTavernClient) {
-      sillyTavernClient.send(
-        JSON.stringify({ type: "user_message", text: message.content, chatId }),
-      );
-    } else {
-      message.reply("Bridge not connected to SillyTavern.");
-    }
+    sillyTavernClient.send(
+      JSON.stringify({ type: "user_message", text: content, chatId }),
+    );
   }
 });

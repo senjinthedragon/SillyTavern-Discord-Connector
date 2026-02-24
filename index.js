@@ -1,11 +1,33 @@
-// index.js
-// Destructure only the properties that actually exist on the object returned by getContext()
-const {
-  extensionSettings,
-  deleteLastMessage, // Import the function for deleting the last message in chat
-  saveSettingsDebounced, // Import the debounced settings save function
-} = SillyTavern.getContext();
-// Import all required public API functions from SillyTavern's core script
+/**
+ * index.js — SillyTavern Discord Connector: Browser Extension
+ *
+ * Runs inside SillyTavern as a third-party extension. Bridges the SillyTavern
+ * UI and the bridge server (server.js) over a WebSocket connection.
+ *
+ * Responsibilities:
+ *   - Receives user messages from Discord (via the bridge) and injects them
+ *     into SillyTavern as if typed by the user.
+ *   - Hooks SillyTavern's generation lifecycle events to forward streaming
+ *     tokens and final replies back to the bridge for posting on Discord.
+ *   - Handles slash commands from Discord (/help, /listchars, /switchchar, etc.)
+ *     by interacting with SillyTavern's character and chat APIs.
+ *
+ * Streaming architecture:
+ *   Each character turn is assigned a unique streamId at GENERATION_STARTED.
+ *   STREAM_TOKEN_RECEIVED events forward cumulative text to the bridge, which
+ *   throttles Discord edits to respect rate limits. When GENERATION_ENDED fires,
+ *   a stream_end message tells the bridge to replace the streaming message with
+ *   a clean final copy. Group chats include the character's name; solo chats do not.
+ *
+ * Listener hygiene:
+ *   All per-message event listeners are registered inside the user_message
+ *   handler and removed in every exit path (normal completion, stop, error)
+ *   to prevent leaking across conversation switches or chat mode changes.
+ */
+
+const { extensionSettings, deleteLastMessage, saveSettingsDebounced } =
+  SillyTavern.getContext();
+
 import {
   eventSource,
   event_types,
@@ -17,65 +39,70 @@ import {
   Generate,
   setExternalAbortController,
 } from "../../../../script.js";
+
 const MODULE_NAME = "SillyTavern-Discord-Connector";
 const DEFAULT_SETTINGS = {
   bridgeUrl: "ws://127.0.0.1:2333",
   autoConnect: true,
 };
-let ws = null; // Active WebSocket instance
 
-// --- Utility Functions ---
+let ws = null;
+
+// ---------------------------------------------------------------------------
+// Settings helpers
+// ---------------------------------------------------------------------------
+
 function getSettings() {
   if (!extensionSettings[MODULE_NAME]) {
     extensionSettings[MODULE_NAME] = { ...DEFAULT_SETTINGS };
   }
   return extensionSettings[MODULE_NAME];
 }
+
 function updateStatus(message, color) {
-  const statusEl = document.getElementById("discord_connection_status");
-  if (statusEl) {
-    statusEl.textContent = `Status: ${message}`;
-    statusEl.style.color = color;
+  const el = document.getElementById("discord_connection_status");
+  if (el) {
+    el.textContent = `Status: ${message}`;
+    el.style.color = color;
   }
 }
-function reloadPage() {
-  window.location.reload();
-}
-// ---
-// Establishes a WebSocket connection to the bridge server
+
+// ---------------------------------------------------------------------------
+// WebSocket connection
+// ---------------------------------------------------------------------------
+
 function connect() {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    console.log("[Discord Bridge] Already connected.");
-    return;
-  }
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+
   const settings = getSettings();
   if (!settings.bridgeUrl) {
     updateStatus("URL not set!", "red");
     return;
   }
+
   updateStatus("Connecting...", "orange");
-  console.log(`[Discord Bridge] Connecting to ${settings.bridgeUrl}...`);
   ws = new WebSocket(settings.bridgeUrl);
-  ws.onopen = () => {
-    console.log("[Discord Bridge] Connection established!");
-    updateStatus("Connected", "green");
-  };
+
+  ws.onopen = () => updateStatus("Connected", "green");
+
   ws.onmessage = async (event) => {
     let data;
     try {
       data = JSON.parse(event.data);
 
+      // ------------------------------------------------------------------
+      // user_message — a Discord user sent a message; generate a response.
+      // ------------------------------------------------------------------
       if (data.type === "user_message") {
-        console.log("[Discord Bridge] Received user message.", data);
-
-        // Create per-message state (kills race condition)
+        // Per-message state object prevents race conditions between overlapping
+        // requests (e.g. a slow generation and a fast follow-up message).
         const messageState = {
           chatId: data.chatId,
           isStreaming: false,
         };
 
-        // Send typing indicator immediately
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        // Show the typing indicator in Discord immediately.
+        if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
               type: "typing_action",
@@ -84,51 +111,40 @@ function connect() {
           );
         }
 
-        // Inject user message
         await sendMessageAsUser(data.text);
-        console.log(
-          "[BRIDGE DEBUG] User message sent to ST, starting generation",
-        );
 
-        // Each character turn gets a unique stream session ID so server.js
-        // can track their Discord messages independently without overwriting.
+        // Unique ID for this character's streaming session. Assigned fresh at
+        // GENERATION_STARTED so each character in a group gets their own slot.
         let currentStreamId = null;
         let currentCharacterName = null;
 
-        // Stream forwarding callback — fires on every token during generation
+        // Forward every cumulative token update to the bridge for throttled Discord edits.
         const streamCallback = (cumulativeText) => {
-          if (!currentStreamId) return; // no active session yet, skip
+          if (!currentStreamId || ws?.readyState !== WebSocket.OPEN) return;
           messageState.isStreaming = true;
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(
-              JSON.stringify({
-                type: "stream_chunk",
-                chatId: messageState.chatId,
-                streamId: currentStreamId,
-                characterName: currentCharacterName, // null in solo, name in group
-                text: cumulativeText,
-              }),
-            );
-          }
+          ws.send(
+            JSON.stringify({
+              type: "stream_chunk",
+              chatId: messageState.chatId,
+              streamId: currentStreamId,
+              characterName: currentCharacterName,
+              text: cumulativeText,
+            }),
+          );
         };
-
-        // Register stream listener
         eventSource.on(event_types.STREAM_TOKEN_RECEIVED, streamCallback);
 
-        // sendStreamEnd: finalises the current character's streaming message.
-        // In GROUP chat: sends stream_end so server.js deletes the stream message
-        //   and reposts it clean (no [edited] marker) with the character's name.
-        // In SOLO chat: sends stream_end WITHOUT delete/repost — the final debounce
-        //   edit IS the message, and we don't want a name header on solo messages.
+        // Tell the bridge that this character's generation is done. The bridge
+        // will delete the streaming message and repost it cleanly. In group chat
+        // the character name is included so it can be shown as a bold header;
+        // solo chat omits it.
         const sendStreamEnd = () => {
           if (
             messageState.isStreaming &&
             currentStreamId &&
-            ws &&
-            ws.readyState === WebSocket.OPEN
+            ws?.readyState === WebSocket.OPEN
           ) {
-            const ctx = SillyTavern.getContext();
-            const isGroup = !!ctx.groupId;
+            const isGroup = !!SillyTavern.getContext().groupId;
             ws.send(
               JSON.stringify({
                 type: "stream_end",
@@ -142,37 +158,26 @@ function connect() {
           currentStreamId = null;
         };
 
-        // collectAndSendReplies: walks the chat array backwards from the end,
-        // collecting all consecutive non-user messages, and sends them as the
-        // final ai_reply payload. Works for both solo (1 message) and group (N).
+        // Walk the chat array backwards to collect all consecutive AI messages
+        // since the last user turn. Sends them as an ai_reply payload so the
+        // bridge can post them on Discord (non-streaming path only).
         const collectAndSendReplies = () => {
-          if (!messageState.chatId || !ws || ws.readyState !== WebSocket.OPEN)
-            return;
-          const context = SillyTavern.getContext();
-          const chat = context.chat;
+          if (!messageState.chatId || ws?.readyState !== WebSocket.OPEN) return;
+          const { chat } = SillyTavern.getContext();
           if (!chat || chat.length < 2) return;
 
           const aiMessages = [];
           for (let i = chat.length - 1; i >= 0; i--) {
             const msg = chat[i];
             if (msg.is_user) break;
-            if (msg.mes && msg.mes.trim()) {
+            if (msg.mes?.trim())
               aiMessages.unshift({
                 name: msg.name || "",
                 text: msg.mes.trim(),
               });
-            }
           }
 
           if (aiMessages.length > 0) {
-            console.log(
-              "[BRIDGE DEBUG]",
-              aiMessages.length,
-              "AI message(s):",
-              aiMessages
-                .map((m) => `${m.name} (${m.text.length} chars)`)
-                .join(", "),
-            );
             ws.send(
               JSON.stringify({
                 type: "ai_reply",
@@ -180,52 +185,35 @@ function connect() {
                 messages: aiMessages,
               }),
             );
-            console.log("[BRIDGE DEBUG] ai_reply sent");
           } else {
-            console.warn("[WARN] No valid AI message found in chat array");
             ws.send(
               JSON.stringify({
                 type: "error_message",
                 chatId: messageState.chatId,
-                text: "The wolf thought long... but his words stayed hidden. Try again, pet?",
+                text: "Something went wrong and no response was found. Try again?",
               }),
             );
           }
         };
 
-        // GENERATION_STARTED fires at the beginning of each character's turn.
-        // Assign a fresh streamId so this character gets its own Discord message.
+        // Assign a new streamId at the start of each character's turn so the
+        // bridge can maintain separate streaming messages per character.
         const onGenerationStarted = () => {
           currentStreamId = `${messageState.chatId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-          // Only capture character name in group chat — solo chat never shows names.
           const ctx = SillyTavern.getContext();
+          // Only capture the name in group chat; solo messages have no name header.
           currentCharacterName = ctx.groupId ? ctx.name2 || null : null;
-          console.log(
-            `[BRIDGE DEBUG] GENERATION_STARTED — streamId: ${currentStreamId}, character: ${currentCharacterName || "(solo)"}`,
-          );
         };
         eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted);
 
-        // GENERATION_ENDED fires once per character (including every turn in group chat).
-        // We use it to close the current character's stream message on Discord so the
-        // next character can start a fresh one. In solo chat this also triggers the
-        // final ai_reply (group_wrapper_finished won't fire for solo).
-        let generationCount = 0;
+        // Fires once per character turn. Closes their stream message on Discord.
+        // In solo chat (GROUP_WRAPPER_FINISHED never fires) also triggers the
+        // final ai_reply after a brief delay to let the chat array settle.
         const onGenerationEnded = () => {
-          generationCount++;
-          console.log(`[BRIDGE DEBUG] GENERATION_ENDED #${generationCount}`);
-          sendStreamEnd(); // finalise this character's stream message on Discord
+          sendStreamEnd();
 
-          // Detect solo vs group: in group chat, group_wrapper_finished fires after
-          // all characters and will send the ai_reply. In solo chat it never fires,
-          // so we send the ai_reply here after a short delay to ensure the chat array
-          // is fully written before we read it.
-          const context = SillyTavern.getContext();
-          const isGroup = !!context.groupId;
+          const isGroup = !!SillyTavern.getContext().groupId;
           if (!isGroup) {
-            console.log(
-              "[BRIDGE DEBUG] Solo chat — sending ai_reply from GENERATION_ENDED",
-            );
             eventSource.removeListener(
               event_types.GENERATION_STARTED,
               onGenerationStarted,
@@ -244,17 +232,13 @@ function connect() {
         };
         eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
 
-        // Use string fallback in case this key isn't exported in older ST versions
+        // String fallback in case this event isn't exported in older ST versions.
         const GROUP_WRAPPER_FINISHED =
           event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
 
-        // GROUP_WRAPPER_FINISHED fires once when ALL characters in a group have
-        // finished. This is where we collect every character's reply and send the
-        // full ai_reply array to Discord.
+        // Fires once after all group members have finished. Collects all replies
+        // and sends them as a single ai_reply payload.
         const onGroupFinished = () => {
-          console.log(
-            "[BRIDGE DEBUG] GROUP_WRAPPER_FINISHED — collecting all replies",
-          );
           eventSource.removeListener(
             event_types.GENERATION_STARTED,
             onGenerationStarted,
@@ -272,9 +256,8 @@ function connect() {
         };
         eventSource.on(GROUP_WRAPPER_FINISHED, onGroupFinished);
 
-        // Full cleanup: remove ALL listeners and send stream_end if mid-stream.
-        // Defined before onGenerationStopped (which calls it) but after all other
-        // handlers so their const bindings are in scope when cleanup() runs.
+        // Removes all listeners and closes any open stream. Defined after all
+        // handler consts so their bindings are in scope when this runs.
         const cleanup = () => {
           eventSource.removeListener(
             event_types.STREAM_TOKEN_RECEIVED,
@@ -296,9 +279,8 @@ function connect() {
           sendStreamEnd();
         };
 
-        // GENERATION_STOPPED: user aborted — clean up and remove all listeners
+        // User aborted generation — clean up without sending a reply.
         const onGenerationStopped = () => {
-          console.log("[BRIDGE DEBUG] GENERATION_STOPPED — aborting");
           eventSource.removeListener(
             event_types.GENERATION_STARTED,
             onGenerationStarted,
@@ -316,47 +298,43 @@ function connect() {
         };
         eventSource.once(event_types.GENERATION_STOPPED, onGenerationStopped);
 
-        // Trigger generation
         try {
           const abortController = new AbortController();
           setExternalAbortController(abortController);
           await Generate("normal", { signal: abortController.signal });
         } catch (error) {
-          console.error("[Discord Bridge] Generate error:", error);
+          console.error("[Discord Bridge] Generation error:", error);
           await deleteLastMessage();
-          console.log("[Discord Bridge] Removed failed user message");
 
-          const errorMessage = `Sorry, an error occurred while generating.\nYour last message retracted — try again.\n\nError: ${error.message || "Unknown"}`;
-          if (ws && ws.readyState === WebSocket.OPEN) {
+          if (ws?.readyState === WebSocket.OPEN) {
             ws.send(
               JSON.stringify({
                 type: "error_message",
                 chatId: messageState.chatId,
-                text: errorMessage,
+                text: `Generation failed. Your message was retracted — try again.\n\nError: ${error.message || "Unknown"}`,
               }),
             );
           }
-
           cleanup();
         }
-
         return;
       }
-      // --- System Command Handling ---
+
+      // ------------------------------------------------------------------
+      // system_command — internal signals from the bridge server.
+      // ------------------------------------------------------------------
       if (data.type === "system_command") {
-        console.log("[Discord Bridge] Received system command.", data);
         if (data.command === "reload_ui_only") {
-          console.log("[Discord Bridge] Reloading UI...");
-          setTimeout(reloadPage, 500);
+          setTimeout(() => window.location.reload(), 500);
         }
         return;
       }
-      // --- Execute Command Handling ---
-      if (data.type === "execute_command") {
-        console.log("[Discord Bridge] Received command to execute.", data);
 
-        // Send typing indicator for commands too
-        if (ws && ws.readyState === WebSocket.OPEN) {
+      // ------------------------------------------------------------------
+      // execute_command — slash commands forwarded from Discord.
+      // ------------------------------------------------------------------
+      if (data.type === "execute_command") {
+        if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({ type: "typing_action", chatId: data.chatId }),
           );
@@ -364,48 +342,43 @@ function connect() {
 
         let replyText = "Command execution failed, try again later.";
         const context = SillyTavern.getContext();
-        let commandSuccess = false;
 
         try {
           switch (data.command) {
             case "new":
               await doNewChat({ deleteCurrentChat: false });
               replyText = "New chat started.";
-              commandSuccess = true;
               break;
 
             case "listchars": {
-              const characters = context.characters.filter(
-                (char) => char.name && char.name.trim() !== "",
-              ); // skip empty/unnamed
-              if (characters.length === 0) {
-                replyText = "No available characters found.";
-              } else {
-                replyText = "Available characters list:\n\n";
-                characters.forEach((char, index) => {
-                  replyText += `${index + 1}. /switchchar_${index + 1} - ${char.name}\n`;
-                });
-                replyText +=
-                  "\nUse /switchchar_number or /switchchar character_name to switch.";
-              }
-              commandSuccess = true;
+              const characters = context.characters.filter((c) =>
+                c.name?.trim(),
+              );
+              replyText =
+                characters.length === 0
+                  ? "No available characters found."
+                  : "Available characters:\n\n" +
+                    characters
+                      .map(
+                        (c, i) => `${i + 1}. /switchchar_${i + 1} - ${c.name}`,
+                      )
+                      .join("\n") +
+                    "\n\nUse /switchchar_number or /switchchar character_name to switch.";
               break;
             }
 
             case "switchchar": {
-              if (!data.args || data.args.length === 0) {
-                replyText =
-                  "Please provide character name or number. Usage: /switchchar <name> or /switchchar_number";
+              if (!data.args?.length) {
+                replyText = "Usage: /switchchar <name> or /switchchar_number";
                 break;
               }
               const targetName = data.args.join(" ");
-              const characters = context.characters;
-              const targetChar = characters.find((c) => c.name === targetName);
-              if (targetChar) {
-                const charIndex = characters.indexOf(targetChar);
-                await selectCharacterById(charIndex);
-                replyText = `Switched to character "${targetName}" successfully.`;
-                commandSuccess = true;
+              const target = context.characters.find(
+                (c) => c.name === targetName,
+              );
+              if (target) {
+                await selectCharacterById(context.characters.indexOf(target));
+                replyText = `Switched to "${targetName}".`;
               } else {
                 replyText = `Character "${targetName}" not found.`;
               }
@@ -420,35 +393,31 @@ function connect() {
               const chatFiles = await getPastCharacterChats(
                 context.characterId,
               );
-              if (chatFiles.length > 0) {
-                replyText = "Current character's chat history:\n\n";
-                chatFiles.forEach((chat, index) => {
-                  const chatName = chat.file_name.replace(".jsonl", "");
-                  replyText += `${index + 1}. /switchchat_${index + 1} - ${chatName}\n`;
-                });
-                replyText +=
-                  "\nUse /switchchat_number or /switchchat chat_name to switch.";
-              } else {
-                replyText = "No chat history for current character.";
-              }
-              commandSuccess = true;
+              replyText =
+                chatFiles.length === 0
+                  ? "No chat history for current character."
+                  : "Chat history:\n\n" +
+                    chatFiles
+                      .map(
+                        (c, i) =>
+                          `${i + 1}. /switchchat_${i + 1} - ${c.file_name.replace(".jsonl", "")}`,
+                      )
+                      .join("\n") +
+                    "\n\nUse /switchchat_number or /switchchat chat_name to switch.";
               break;
             }
 
             case "switchchat": {
-              if (!data.args || data.args.length === 0) {
-                replyText =
-                  "Please provide chat name. Usage: /switchchat <chat_name>";
+              if (!data.args?.length) {
+                replyText = "Usage: /switchchat <name>";
                 break;
               }
               const targetChatFile = data.args.join(" ");
               try {
                 await openCharacterChat(targetChatFile);
                 replyText = `Loaded chat: ${targetChatFile}`;
-                commandSuccess = true;
-              } catch (err) {
-                console.error(err);
-                replyText = `Failed to load chat "${targetChatFile}". Make sure the name is exact.`;
+              } catch {
+                replyText = `Failed to load chat "${targetChatFile}". Check the name is exact.`;
               }
               break;
             }
@@ -456,31 +425,27 @@ function connect() {
             case "help":
               replyText =
                 "Available commands:\n" +
-                "/new - Start a new chat\n" +
-                "/listchars - List all characters\n" +
-                "/switchchar <name> or /switchchar_# - Switch to character\n" +
-                "/listchats - List chat history for current character\n" +
-                "/switchchat <name> or /switchchat_# - Load past chat\n" +
-                "Tip: Use numbers from the lists for quick switches.";
-              commandSuccess = true;
+                "/new — Start a new chat\n" +
+                "/listchars — List all characters\n" +
+                "/switchchar <name> or /switchchar_# — Switch character\n" +
+                "/listchats — List chat history for current character\n" +
+                "/switchchat <name> or /switchchat_# — Load a past chat";
               break;
 
             default: {
-              // Handle numbered shortcuts like switchchar_1, switchchat_2
+              // Handle numbered shortcuts: switchchar_1, switchchat_2, etc.
               const charMatch = data.command.match(/^switchchar_(\d+)$/);
               if (charMatch) {
                 const index = parseInt(charMatch[1]) - 1;
-                const characters = context.characters.filter(
-                  (char) => char.name && char.name.trim() !== "",
+                const characters = context.characters.filter((c) =>
+                  c.name?.trim(),
                 );
                 if (index >= 0 && index < characters.length) {
-                  const targetChar = characters[index];
-                  const charIndex = context.characters.indexOf(targetChar);
-                  await selectCharacterById(charIndex);
-                  replyText = `Switched to character "${targetChar.name}".`;
-                  commandSuccess = true;
+                  const target = characters[index];
+                  await selectCharacterById(context.characters.indexOf(target));
+                  replyText = `Switched to "${target.name}".`;
                 } else {
-                  replyText = `Invalid character number: ${index + 1}. Use /listchars to see options.`;
+                  replyText = `Invalid number: ${index + 1}. Use /listchars to see options.`;
                 }
                 break;
               }
@@ -496,18 +461,18 @@ function connect() {
                   context.characterId,
                 );
                 if (index >= 0 && index < chatFiles.length) {
-                  const targetChat = chatFiles[index];
-                  const chatName = targetChat.file_name.replace(".jsonl", "");
+                  const chatName = chatFiles[index].file_name.replace(
+                    ".jsonl",
+                    "",
+                  );
                   try {
                     await openCharacterChat(chatName);
                     replyText = `Loaded chat: ${chatName}`;
-                    commandSuccess = true;
-                  } catch (err) {
-                    console.error(err);
+                  } catch {
                     replyText = "Failed to load chat.";
                   }
                 } else {
-                  replyText = `Invalid chat number: ${index + 1}. Use /listchats to see options.`;
+                  replyText = `Invalid number: ${index + 1}. Use /listchats to see options.`;
                 }
                 break;
               }
@@ -516,12 +481,11 @@ function connect() {
             }
           }
         } catch (error) {
-          console.error("[Discord Bridge] Command execution error:", error);
+          console.error("[Discord Bridge] Command error:", error);
           replyText = `Error executing command: ${error.message || "Unknown error"}`;
         }
 
-        // Send command result back to Discord
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
               type: "ai_reply",
@@ -530,12 +494,11 @@ function connect() {
             }),
           );
         }
-
         return;
       }
     } catch (error) {
-      console.error("[Discord Bridge] Request processing error:", error);
-      if (data && data.chatId && ws && ws.readyState === WebSocket.OPEN) {
+      console.error("[Discord Bridge] Message handling error:", error);
+      if (data?.chatId && ws?.readyState === WebSocket.OPEN) {
         ws.send(
           JSON.stringify({
             type: "error_message",
@@ -546,67 +509,52 @@ function connect() {
       }
     }
   };
+
   ws.onclose = () => {
-    console.log("[Discord Bridge] Connection closed.");
     updateStatus("Disconnected", "red");
     ws = null;
   };
+
   ws.onerror = (error) => {
     console.error("[Discord Bridge] WebSocket error:", error);
     updateStatus("Connection error", "red");
     ws = null;
   };
 }
+
 function disconnect() {
-  if (ws) {
-    ws.close();
-  }
+  ws?.close();
 }
-// Entry point — runs when the extension is loaded by SillyTavern
+
+// ---------------------------------------------------------------------------
+// Extension entry point
+// ---------------------------------------------------------------------------
+
 jQuery(async () => {
-  console.log("[Discord Bridge] Attempting to load settings UI...");
-  // <--- GLOBAL DEBUG LISTENERS GO HERE --->
-  eventSource.on(event_types.GENERATION_STARTED, () => {
-    console.log("[BRIDGE DEBUG] GENERATION_STARTED fired");
-  });
-  eventSource.on(event_types.STREAM_TOKEN_RECEIVED, (token) => {
-    console.log(
-      "[BRIDGE DEBUG] STREAM_TOKEN_RECEIVED - token length:",
-      token?.length || 0,
-    );
-  });
-  // <--- END GLOBAL DEBUG LISTENERS --->
   try {
-    // Load and inject the settings panel HTML into SillyTavern's extension settings area
     const settingsHtml = await $.get(
       `/scripts/extensions/third-party/${MODULE_NAME}/settings.html`,
     );
     $("#extensions_settings").append(settingsHtml);
-    console.log("[Discord Bridge] Settings UI successfully injected.");
+
     const settings = getSettings();
-    // Populate UI fields with saved settings
     $("#discord_bridge_url").val(settings.bridgeUrl);
     $("#discord_auto_connect").prop("checked", settings.autoConnect);
-    // Persist bridge URL changes as the user types
+
     $("#discord_bridge_url").on("input", () => {
-      const settings = getSettings();
-      settings.bridgeUrl = $("#discord_bridge_url").val();
+      getSettings().bridgeUrl = $("#discord_bridge_url").val();
       saveSettingsDebounced();
     });
-    // Persist auto-connect toggle changes
+
     $("#discord_auto_connect").on("change", () => {
-      const settings = getSettings();
-      settings.autoConnect = $("#discord_auto_connect").prop("checked");
+      getSettings().autoConnect = $("#discord_auto_connect").prop("checked");
       saveSettingsDebounced();
     });
+
     $("#discord_connect_button").on("click", connect);
     $("#discord_disconnect_button").on("click", disconnect);
-    // Automatically connect on load if the setting is enabled
-    if (settings.autoConnect) {
-      connect();
-    }
-    // Note: The GENERATION_ENDED listener is registered per-message inside the
-    // user_message handler above, so it re-arms itself on every generation cycle.
+
+    if (settings.autoConnect) connect();
   } catch (error) {
     console.error("[Discord Bridge] Failed to load settings UI:", error);
   }
