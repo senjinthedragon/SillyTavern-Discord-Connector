@@ -24,7 +24,7 @@ Bridge your SillyTavern character to Discord for real-time roleplay. Messages se
 - Copy the bot token for the next step
 - Invite the bot to your server using the OAuth2 URL generator:
   - Scopes: `bot`
-  - Permissions: `Send Messages`, `Read Message History`
+  - Permissions: `Send Messages`, `Read Message History`, `Manage Messages`
 
 ### 3. Configure the server
 ```bash
