@@ -80,9 +80,8 @@ To get a Discord channel ID: enable Developer Mode in Discord settings, then rig
 
 To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode
 
-**SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.
-
-ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.**
+**SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.**
+**ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.**
 
 ### 4. Start the bridge server
 
