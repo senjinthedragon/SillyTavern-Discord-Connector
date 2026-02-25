@@ -16,47 +16,95 @@ If this tool adds value to your roleplay experience, please consider:
 
 - [SillyTavern](https://github.com/SillyTavern/SillyTavern) (latest recommended)
 - [Node.js](https://nodejs.org/) v18 or higher
-- A Discord bot token with the **Message Content** privileged intent enabled
+- A Discord bot token with the **Message Content** privileged intent enabled (see step 2)
+- A Discord server with a channel where you want to send messages. You can set this up yourself, for free, with Discord. It's at the bottom of your server list, **Add a Server** (the little icon with a + sign)
 
 ## Quick Start
 
+**Note for Mobile/Android Users: You only need to perform these steps on the computer running your SillyTavern server. Once the bridge is running, you can chat from your phone using the standard Discord app.**
+
 ### 1. Install the extension
 
-- In SillyTavern → Extensions tab → Install from URL
+- In SillyTavern → **Extensions** menu (The stack of cubes) → **Install extension**
 - Paste: `https://github.com/senjinthedragon/SillyTavern-Discord-Connector`
-- Enable the extension in the list
+- Click **Install for all users** or **Install just for me**
+The **Discord Connector Settings** should now appear in your extensions list.
 
 ### 2. Create your Discord bot
 
 - Go to https://discord.com/developers/applications
-- Click **New Application** → **Bot** → **Add Bot**
-- Under **Privileged Gateway Intents**, enable **Message Content Intent** (required)
-- Copy the bot token for the next step
-- Invite the bot to your server using the OAuth2 URL generator:
-  - Scopes: `bot`
-  - Permissions: `Send Messages`, `Read Message History`, `Manage Messages`
+- Click **New Application**, give it a name (`SillyTavern Bridge` for example), check the box and click **Create**
+- Go to the **Bot** tab:
+  - Customize your bot. You can give it an **Icon**, **Banner** and **Username**
+  - **Reset**/**Copy** your Token and store it somewhere safe. (The long line of random letters and numbers)
+  - Under **Privileged Gateway Intents**, enable **Message Content Intent**
+- Go to the **OAuth2** tab:
+  - Under **OAuth2 URL generator**:
+    - **Scopes**: `bot`
+    - **Bot Permissions**: `Send Messages`, `Read Message History`, `Manage Messages`
+    - Leave **Integration Type** set to **Guild Install**
+    - Copy the **Generated URL** and open it with a browser to invite your bot to your Discord server
 
-### 3. Configure the server
+### 3. Configure the SillyTavern Bridge Server
+
+These folders and files can be found in your SillyTavern extensions folder which you can commonly find in the following locations:
+- **Windows**: [Your SillyTavern Folder]\data\default-user\extensions\SillyTavern-Discord-Connector\server
+- **Linux/Mac**: ~/.local/share/sillytavern/default-user/extensions/SillyTavern-Discord-Connector/server
+- **Docker**: /home/node/app/data/default-user/extensions/SillyTavern-Discord-Connector
+
+**Windows**
+Copy or rename `config.example.js` to `config.js`
+
+**Linux/Mac**
 ```bash
-cd server
 cp config.example.js config.js
 ```
 
 Edit `config.js`:
 ```javascript
-discordToken: 'YOUR_BOT_TOKEN_HERE',
+discordToken: 'YOUR_BOT_TOKEN_HERE', // The one you copied to a safe place in part 2
 wssPort: 2333, // must match the bridge URL in the extension settings
-allowedUserIds: [], // add your Discord user ID here to make the bot private
-allowedChannelIds: [], // add your Discord channel ID here to make the bot only respond to users in specific channels
+allowedUserIds: [], // (optional) add your Discord user ID here to make the bot private
+allowedChannelIds: [], // (optional) add your Discord channel ID here to make the bot only respond to users in specific channels
+debug: false, // set this to true to enable verbose debug logging
+timezone: "Europe/Amsterdam", // (optional) set this to your timezone (TZ identifier), you can find a list of all timezones at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 ```
 
-To get your Discord user ID: enable Developer Mode in Discord settings, then right-click your username and select **Copy ID**.
+To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.
+To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.
+To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode
+
+[!CAUTION]
+SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.
+ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.
 
 ### 4. Start the bridge server
+
+**Windows**
+Right click inside the explorer window at the server directory, the same one from the previous step, and select **Open Command Prompt Here** or **Open Terminal**.
+
+**Linux/Mac**
+Open your terminal and cd into the server directory listed in the previous step
+
+**Both**
+Type and press enter to run the following commands:
 ```bash
-cd server
 npm install
 node server.js
+```
+
+This will run the Bridge Server required to make Discord and SillyTavern talk to each other. You need to run the server every time and **keep this window open** for it to work.
+You can simplify this if you have the knowledge by creating a batch or shell script to do this or set it up to run automatically on system start or when you start SillyTavern.
+
+**Example batch script for Windows**
+Create a `start-bridge.bat` file in the server folder (make sure it doesn't end with .txt) and write the following into this file by opening it in a text editor. You can then create a shortcut to the .bat file and place it on your desktop or next to your SillyTavern starter.
+```bash
+@echo off
+echo Checking dependencies...
+call npm install
+echo Starting bridge server...
+node server.js
+pause
 ```
 
 ### 5. Connect the extension
