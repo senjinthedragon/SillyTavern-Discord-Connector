@@ -320,17 +320,24 @@ wss.on("connection", (ws) => {
       // is stripped; the name is sourced from the explicit characterName field.
       // -----------------------------------------------------------------------
       case "stream_chunk": {
-        const rawChunk = (data?.text || "").trim();
         const streamId = data?.streamId || channelId;
-        if (!rawChunk) break;
+        const rawText = data?.text || "";
+        if (!rawText.trim()) break;
 
-        const chunkText = rawChunk.replace(/^[A-Za-z0-9 ]{1,50}: /, "");
+        const activeName = data.characterName || null;
+        let processedText = rawText;
+
+        if (activeName) {
+          const escapedName = activeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const namePrefixRegex = new RegExp(`^${escapedName}:\\s*`, 'i');
+          processedText = rawText.replace(namePrefixRegex, "");
+        }
 
         if (!streamSessions[streamId]) {
           streamSessions[streamId] = {
             streamMessage: null,
             pendingText: "",
-            characterName: data.characterName || null,
+            characterName: activeName,
             editInFlight: false,
             nextEdit: false,
             lastEditAt: 0,
@@ -341,7 +348,8 @@ wss.on("connection", (ws) => {
         const session = streamSessions[streamId];
         if (session.streamDone) break;
 
-        session.pendingText = chunkText;
+        session.pendingText = processedText;
+        
         scheduleEdit(session, channel, streamId);
         break;
       }
@@ -383,16 +391,23 @@ wss.on("connection", (ws) => {
             });
           }
 
-          const rawFinal = (s.pendingText || "").replace(
-            /^[A-Za-z0-9 ]{1,50}: /,
-            "",
-          );
-          const charName = data.characterName || null;
-          const finalText = charName
-            ? `**${charName}**\n${rawFinal}`
-            : rawFinal;
+          // --- Dynamic Name Stripping Logic ---
+          const rawText = s.pendingText || "";
+          const activeName = data.characterName || null;
+          let processedText = rawText;
 
-          if (finalText) {
+          if (activeName) {
+            const escapedName = activeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const namePrefixRegex = new RegExp(`^${escapedName}:\\s*`, 'i');
+            processedText = rawText.replace(namePrefixRegex, "");
+          }
+          // ------------------------------------
+
+          const finalText = activeName
+            ? `**${activeName}**\n${processedText}`
+            : processedText;
+
+          if (finalText.trim()) {
             if (s.streamMessage) {
               await s.streamMessage.delete().catch((err) => {
                 log(
