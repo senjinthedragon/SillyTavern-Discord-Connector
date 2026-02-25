@@ -13,6 +13,11 @@ module.exports = {
   // To get a user ID: enable Developer Mode in Discord, then right-click a user and select "Copy ID".
   allowedUserIds: [], // e.g., ['123456789012345678', '987654321098765432']
 
+  // Allowlist of Discord channel IDs permitted to interact with the bot.
+  // Leave as an empty array to allow all channels.
+  // To get a channel ID: enable Developer Mode in Discord, then right-click a channel and select "Copy ID".
+  allowedChannelIds: [], // e.g., ['123456789012345678', '987654321098765432']
+
   // Set to true to enable verbose terminal logging
   debug: false,
 
