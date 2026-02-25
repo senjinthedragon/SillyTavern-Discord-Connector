@@ -40,6 +40,8 @@ import {
   setExternalAbortController,
 } from "../../../../script.js";
 
+import { executeSlashCommandsWithOptions } from "../../../../scripts/slash-commands.js";
+
 const MODULE_NAME = "SillyTavern-Discord-Connector";
 
 // Resolved once at load time. The string fallback covers older ST versions
@@ -431,11 +433,9 @@ function connect() {
                 break;
               }
               const targetName = data.args.join(" ");
-              const target = (context.groups || []).find(
-                (g) => g.name === targetName,
-              );
+              const target = (context.groups || []).find((g) => g.name === targetName);
               if (target) {
-                await openGroupChat(target.id);
+                await executeSlashCommandsWithOptions(`/go ${target.name}`);
                 replyText = `Switched to group "${targetName}".`;
               } else {
                 replyText = `Group "${targetName}" not found.`;
@@ -538,7 +538,20 @@ function connect() {
                 break;
               }
 
-              replyText = `Unknown command: /${data.command}. Try /help for available commands.`;
+              const groupMatch = data.command.match(/^switchgroup_(\d+)$/);
+              if (groupMatch) {
+                const index  = parseInt(groupMatch[1]) - 1;
+                const groups = context.groups || [];
+                if (index >= 0 && index < groups.length) {
+                  await executeSlashCommandsWithOptions(`/go ${groups[index].name}`);
+                  replyText = `Switched to group "${groups[index].name}".`;
+                } else {
+                  replyText = `Invalid number: ${index + 1}. Use /listgroups to see options.`;
+                }
+                break;
+              }
+
+              replyText = `Unknown command: /${data.command}. Try /sthelp for available commands.`;
             }
           }
         } catch (error) {
