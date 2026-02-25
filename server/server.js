@@ -1,13 +1,13 @@
 /**
- * server.js — SillyTavern Discord Connector: Bridge Server
+ * server.js - SillyTavern Discord Connector: Bridge Server
  *
  * Runs as a standalone Node.js process alongside SillyTavern. Serves two
  * roles simultaneously:
  *
- *   1. Discord bot — receives messages from Discord users and forwards them
+ *   1. Discord bot - receives messages from Discord users and forwards them
  *      to SillyTavern, then posts AI responses back to the originating channel.
  *
- *   2. WebSocket server — maintains a persistent connection to the SillyTavern
+ *   2. WebSocket server - maintains a persistent connection to the SillyTavern
  *      extension (index.js) running in the browser, acting as the transport
  *      layer between the two applications.
  *
@@ -42,7 +42,7 @@ setGlobalDispatcher(
 const configPath = path.join(__dirname, "./config.js");
 if (!fs.existsSync(configPath)) {
   console.error(
-    "[ERROR] Missing config.js — copy config.example.js and fill in your settings.",
+    "[ERROR] Missing config.js - copy config.example.js and fill in your settings.",
   );
   process.exit(1);
 }
@@ -148,7 +148,7 @@ client.on("error", (err) => log("error", "[Discord] Client error:", err));
 // order. Each entry is a link in a Promise chain; the slot is freed
 // automatically once the tail resolves.
 //
-// Stream edits do NOT go through this queue — they fire directly to remain
+// Stream edits do NOT go through this queue - they fire directly to remain
 // real-time. Only stream_end (final post) and ai_reply use the queue.
 // ---------------------------------------------------------------------------
 
@@ -301,7 +301,7 @@ if (userCount > 0) {
 } else {
   log(
     "warn",
-    "[Security] No allowedUserIds set — bot accepts messages from any user.",
+    "[Security] No allowedUserIds set - bot accepts messages from any user.",
   );
 }
 
@@ -310,7 +310,7 @@ if (channelCount > 0) {
 } else {
   log(
     "warn",
-    "[Security] No allowedChannelIds set — bot accepts messages from any channel.",
+    "[Security] No allowedChannelIds set - bot accepts messages from any channel.",
   );
 }
 
@@ -338,7 +338,7 @@ wss.on("connection", (ws) => {
         break;
 
       // -----------------------------------------------------------------------
-      // stream_chunk — a cumulative token update from an active generation.
+      // stream_chunk - a cumulative token update from an active generation.
       //
       // The text field is the full response so far (not just the new token).
       // We store it as pendingText and schedule a throttled edit. A leading
@@ -381,7 +381,7 @@ wss.on("connection", (ws) => {
       }
 
       // -----------------------------------------------------------------------
-      // stream_end — generation for this character is complete.
+      // stream_end - generation for this character is complete.
       //
       // Halts the throttle, waits for any in-flight edit to settle, then
       // deletes the streaming message and reposts the final text cleanly,
@@ -460,7 +460,7 @@ wss.on("connection", (ws) => {
       }
 
       // -----------------------------------------------------------------------
-      // ai_reply — the complete response(s) received after generation ends.
+      // ai_reply - the complete response(s) received after generation ends.
       //
       // Streaming path: stream_end already handled posting; skip this.
       // Non-streaming path: post each character's reply as a separate Discord

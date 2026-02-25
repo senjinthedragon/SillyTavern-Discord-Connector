@@ -1,6 +1,6 @@
 // config.example.js (copy or rename this file to config.js and fill in your settings)
 module.exports = {
-  // Your Discord Bot Token — obtain this from the Discord Developer Portal.
+  // Your Discord Bot Token - obtain this from the Discord Developer Portal.
   // Make sure the "Message Content" Privileged Intent is enabled for your bot.
   discordToken: "YOUR_DISCORD_BOT_TOKEN_HERE",
 

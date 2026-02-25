@@ -1,5 +1,5 @@
 /**
- * index.js — SillyTavern Discord Connector: Browser Extension
+ * index.js - SillyTavern Discord Connector: Browser Extension
  *
  * Runs inside SillyTavern as a third-party extension. Bridges the SillyTavern
  * UI and the bridge server (server.js) over a WebSocket connection.
@@ -120,7 +120,7 @@ function connect() {
       if (data.type === "heartbeat") return; // Ignore heartbeat responses
 
       // ------------------------------------------------------------------
-      // user_message — a Discord user sent a message; generate a response.
+      // user_message - a Discord user sent a message; generate a response.
       // ------------------------------------------------------------------
       if (data.type === "user_message") {
         // Per-message state object prevents race conditions between overlapping
@@ -304,7 +304,7 @@ function connect() {
           sendStreamEnd();
         };
 
-        // User aborted generation — clean up without sending a reply.
+        // User aborted generation - clean up without sending a reply.
         const onGenerationStopped = () => {
           eventSource.removeListener(
             event_types.GENERATION_STARTED,
@@ -336,7 +336,7 @@ function connect() {
               JSON.stringify({
                 type: "error_message",
                 chatId: messageState.chatId,
-                text: `Generation failed. Your message was retracted — try again.\n\nError: ${error.message || "Unknown"}`,
+                text: `Generation failed. Your message was retracted - try again.\n\nError: ${error.message || "Unknown"}`,
               }),
             );
           }
@@ -346,7 +346,7 @@ function connect() {
       }
 
       // ------------------------------------------------------------------
-      // system_command — internal signals from the bridge server.
+      // system_command - internal signals from the bridge server.
       // ------------------------------------------------------------------
       if (data.type === "system_command") {
         if (data.command === "reload_ui_only") {
@@ -356,7 +356,7 @@ function connect() {
       }
 
       // ------------------------------------------------------------------
-      // execute_command — slash commands forwarded from Discord.
+      // execute_command - slash commands forwarded from Discord.
       // ------------------------------------------------------------------
       if (data.type === "execute_command") {
         if (ws?.readyState === WebSocket.OPEN) {
@@ -483,14 +483,14 @@ function connect() {
             case "sthelp":
               replyText =
                 "Available commands:\n" +
-                "/sthelp — Show this help message\n" +
-                "/newchat — Start a new chat\n" +
-                "/listchars — List all characters\n" +
-                "/switchchar <name> or /switchchar_# — Switch character\n" +
+                "/sthelp - Show this help message\n" +
+                "/newchat - Start a new chat\n" +
+                "/listchars - List all characters\n" +
+                "/switchchar <name> or /switchchar_# - Switch character\n" +
                 "/listgroups - List all groups\n" +
                 "/switchgroup <name> or /switchgroup_# - Switch group\n" +
-                "/listchats — List chat history for current character\n" +
-                "/switchchat <name> or /switchchat_# — Load a past chat";
+                "/listchats - List chat history for current character\n" +
+                "/switchchat <name> or /switchchat_# - Load a past chat";
               break;
 
             default: {

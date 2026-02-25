@@ -63,7 +63,7 @@ node server.js
 
 - In SillyTavern, open the **Discord Connector** panel in the Extensions tab
 - The bridge URL should match your `wssPort` (default: `ws://127.0.0.1:2333`)
-- Click **Connect** — or enable **Auto-connect** to connect on every page load
+- Click **Connect** - or enable **Auto-connect** to connect on every page load
 - Select a character in SillyTavern and start chatting in Discord
 
 ## Commands
@@ -86,13 +86,13 @@ Use these slash commands in Discord to control the session:
 
 ## How It Works
 
-The extension runs inside SillyTavern's browser environment and connects to a local Node.js WebSocket server. When a Discord message arrives, the server forwards it to SillyTavern, which generates a response using your active character and AI settings. The reply is sent back through the bridge and posted to Discord. Streaming is supported — the Discord message updates in real time as the AI generates.
+The extension runs inside SillyTavern's browser environment and connects to a local Node.js WebSocket server. When a Discord message arrives, the server forwards it to SillyTavern, which generates a response using your active character and AI settings. The reply is sent back through the bridge and posted to Discord. Streaming is supported - the Discord message updates in real time as the AI generates.
 
 ## Troubleshooting
 
 **Bot doesn't respond:** Check that the bridge server is running, the extension shows "Connected" in green, and a character is selected in SillyTavern.
 
-**Message Content Intent error:** This intent must be explicitly enabled in the Discord Developer Portal under your bot's settings — it is not on by default.
+**Message Content Intent error:** This intent must be explicitly enabled in the Discord Developer Portal under your bot's settings - it is not on by default.
 
 **Port conflict:** If port 2333 is in use, change `wssPort` in `config.js` and update the bridge URL in the extension settings to match.
 
