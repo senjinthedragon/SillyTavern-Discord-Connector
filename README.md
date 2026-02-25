@@ -47,6 +47,7 @@ Edit `config.js`:
 discordToken: 'YOUR_BOT_TOKEN_HERE',
 wssPort: 2333, // must match the bridge URL in the extension settings
 allowedUserIds: [], // add your Discord user ID here to make the bot private
+allowedChannelIds: [], // add your Discord channel ID here to make the bot only respond to users in specific channels
 ```
 
 To get your Discord user ID: enable Developer Mode in Discord settings, then right-click your username and select **Copy ID**.
