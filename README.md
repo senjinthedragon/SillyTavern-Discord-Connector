@@ -71,8 +71,8 @@ Use these slash commands in Discord to control the session:
 
 | Command | Description |
 |---|---|
-| `/help` | Show available commands |
-| `/new` | Start a fresh chat with the current character |
+| `/sthelp` | Show available commands |
+| `/newchat` | Start a fresh chat with the current character |
 | `/listchars` | List all available characters |
 | `/switchchar <name>` | Switch to a character by name |
 | `/switchchar_#` | Switch to a character by number from `/listchars` |

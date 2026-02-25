@@ -9,7 +9,7 @@
  *     into SillyTavern as if typed by the user.
  *   - Hooks SillyTavern's generation lifecycle events to forward streaming
  *     tokens and final replies back to the bridge for posting on Discord.
- *   - Handles slash commands from Discord (/schelp, /listchars, /switchchar, etc.)
+ *   - Handles slash commands from Discord (/sthelp, /listchars, /switchchar, etc.)
  *     by interacting with SillyTavern's character and chat APIs.
  *
  * Streaming architecture:
@@ -422,10 +422,10 @@ function connect() {
               break;
             }
 
-            case "schelp":
+            case "sthelp":
               replyText =
                 "Available commands:\n" +
-                "/schelp — Show this help message\n" +
+                "/sthelp — Show this help message\n" +
                 "/newchat — Start a new chat\n" +
                 "/listchars — List all characters\n" +
                 "/switchchar <name> or /switchchar_# — Switch character\n" +
