@@ -293,6 +293,13 @@ function scheduleEdit(session, channel, streamId) {
 const wss = new WebSocket.Server({ port: wssPort });
 console.log(`[Bridge] WebSocket server listening on port ${wssPort}`);
 
+const userCount = config.allowedUserIds?.length || 0;
+if (userCount > 0) {
+  log("log", `[Security] Restricted to ${userCount} authorized user(s).`);
+} else {
+  log("warn", `[Security] No allowedUserIds specified. The bot is currently PUBLIC.`);
+}
+
 let sillyTavernClient = null;
 
 wss.on("connection", (ws) => {
