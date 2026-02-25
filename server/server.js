@@ -305,6 +305,11 @@ wss.on("connection", (ws) => {
     const channel = client.channels.cache.get(channelId);
     if (!channel) return;
 
+    if (data.type === "heartbeat") {
+      ws.send(JSON.stringify({ type: "heartbeat" })); // Echo back
+      return;
+    }
+
     switch (data.type) {
       // Show the Discord typing indicator while SillyTavern is generating.
       case "typing_action":
