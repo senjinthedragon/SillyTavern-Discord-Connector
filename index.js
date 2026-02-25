@@ -47,6 +47,8 @@ const DEFAULT_SETTINGS = {
 };
 
 let ws = null;
+let reconnectTimeout = null;
+let heartbeatInterval = null;
 
 // ---------------------------------------------------------------------------
 // Settings helpers
@@ -72,7 +74,9 @@ function updateStatus(message, color) {
 // ---------------------------------------------------------------------------
 
 function connect() {
-  if (ws && ws.readyState === WebSocket.OPEN) return;
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
 
   const settings = getSettings();
   if (!settings.bridgeUrl) {
@@ -80,15 +84,32 @@ function connect() {
     return;
   }
 
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+
   updateStatus("Connecting...", "orange");
   ws = new WebSocket(settings.bridgeUrl);
 
-  ws.onopen = () => updateStatus("Connected", "green");
+  ws.onopen = () => {
+    updateStatus("Connected", "green");
+    console.log("[Discord Bridge] Connected to bridge server");
+
+    // Start Heartbeat: Ping the server every 30 seconds to keep the connection alive
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(() => {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "heartbeat" }));
+      }
+    }, 30000);
+  };
 
   ws.onmessage = async (event) => {
     let data;
     try {
       data = JSON.parse(event.data);
+      if (data.type === "heartbeat") return; // Ignore heartbeat responses
 
       // ------------------------------------------------------------------
       // user_message — a Discord user sent a message; generate a response.
@@ -514,6 +535,27 @@ function connect() {
   ws.onclose = () => {
     updateStatus("Disconnected", "red");
     ws = null;
+
+    // Stop Heartbeat
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
+
+    // Auto-reconnect logic
+    const settings = getSettings();
+    if (settings.autoConnect) {
+      console.log("[Discord Bridge] Connection lost. Retrying in 5 seconds...");
+      updateStatus("Reconnecting...", "orange");
+
+      // Prevent multiple parallel reconnect loops
+      if (!reconnectTimeout) {
+        reconnectTimeout = setTimeout(() => {
+          reconnectTimeout = null;
+          connect();
+        }, 5000);
+      }
+    }
   };
 
   ws.onerror = (error) => {
