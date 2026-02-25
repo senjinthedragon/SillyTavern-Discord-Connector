@@ -616,7 +616,6 @@ function connect() {
   ws.onerror = (error) => {
     console.error("[Discord Bridge] WebSocket error:", error);
     updateStatus("Connection error", "red");
-    ws = null;
   };
 }
 
