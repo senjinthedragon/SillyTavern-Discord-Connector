@@ -27,7 +27,8 @@ If this tool adds value to your roleplay experience, please consider:
 
 - In SillyTavern → **Extensions** menu (The stack of cubes) → **Install extension**
 - Paste: `https://github.com/senjinthedragon/SillyTavern-Discord-Connector`
-- Click **Install for all users** or **Install just for me**
+- Click **Install for all users** or **Install just for me**.
+
 The **Discord Connector Settings** should now appear in your extensions list.
 
 ### 2. Create your Discord bot
@@ -52,13 +53,16 @@ These folders and files can be found in your SillyTavern extensions folder which
 - **Linux/Mac**: ~/.local/share/sillytavern/default-user/extensions/SillyTavern-Discord-Connector/server
 - **Docker**: /home/node/app/data/default-user/extensions/SillyTavern-Discord-Connector
 
-**Windows**
+**Windows**:
+
 Copy or rename `config.example.js` to `config.js`
 
-**Linux/Mac**
+**Linux/Mac**:
 ```bash
 cp config.example.js config.js
 ```
+
+**Both**:
 
 Edit `config.js`:
 ```javascript
@@ -71,22 +75,27 @@ timezone: "Europe/Amsterdam", // (optional) set this to your timezone (TZ identi
 ```
 
 To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.
+
 To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.
+
 To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode
 
-[!CAUTION]
-SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.
-ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.
+**SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.
+
+ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.**
 
 ### 4. Start the bridge server
 
-**Windows**
+**Windows**:
+
 Right click inside the explorer window at the server directory, the same one from the previous step, and select **Open Command Prompt Here** or **Open Terminal**.
 
-**Linux/Mac**
+**Linux/Mac**:
+
 Open your terminal and cd into the server directory listed in the previous step
 
-**Both**
+**Both**:
+
 Type and press enter to run the following commands:
 ```bash
 npm install
@@ -97,6 +106,7 @@ This will run the Bridge Server required to make Discord and SillyTavern talk to
 You can simplify this if you have the knowledge by creating a batch or shell script to do this or set it up to run automatically on system start or when you start SillyTavern.
 
 **Example batch script for Windows**
+
 Create a `start-bridge.bat` file in the server folder (make sure it doesn't end with .txt) and write the following into this file by opening it in a text editor. You can then create a shortcut to the .bat file and place it on your desktop or next to your SillyTavern starter.
 ```bash
 @echo off
