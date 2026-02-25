@@ -297,7 +297,10 @@ const userCount = config.allowedUserIds?.length || 0;
 if (userCount > 0) {
   log("log", `[Security] Restricted to ${userCount} authorized user(s).`);
 } else {
-  log("warn", `[Security] No allowedUserIds specified. The bot is currently PUBLIC.`);
+  log(
+    "warn",
+    `[Security] No allowedUserIds specified. The bot is currently PUBLIC.`,
+  );
 }
 
 let sillyTavernClient = null;
@@ -340,8 +343,8 @@ wss.on("connection", (ws) => {
         let processedText = rawText;
 
         if (activeName) {
-          const escapedName = activeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const namePrefixRegex = new RegExp(`^${escapedName}:\\s*`, 'i');
+          const escapedName = activeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const namePrefixRegex = new RegExp(`^${escapedName}:\\s*`, "i");
           processedText = rawText.replace(namePrefixRegex, "");
         }
 
@@ -361,7 +364,7 @@ wss.on("connection", (ws) => {
         if (session.streamDone) break;
 
         session.pendingText = processedText;
-        
+
         scheduleEdit(session, channel, streamId);
         break;
       }
@@ -409,8 +412,11 @@ wss.on("connection", (ws) => {
           let processedText = rawText;
 
           if (activeName) {
-            const escapedName = activeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const namePrefixRegex = new RegExp(`^${escapedName}:\\s*`, 'i');
+            const escapedName = activeName.replace(
+              /[.*+?^${}()|[\]\\]/g,
+              "\\$&",
+            );
+            const namePrefixRegex = new RegExp(`^${escapedName}:\\s*`, "i");
             processedText = rawText.replace(namePrefixRegex, "");
           }
           // ------------------------------------

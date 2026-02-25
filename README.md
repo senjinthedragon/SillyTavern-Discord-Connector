@@ -76,6 +76,9 @@ Use these slash commands in Discord to control the session:
 | `/listchars` | List all available characters |
 | `/switchchar <name>` | Switch to a character by name |
 | `/switchchar_#` | Switch to a character by number from `/listchars` |
+| `/listgroups` | List all available groups |
+| `/switchgroup <name>` | Switch to a group by name |
+| `/switchgroup_#` | Switch to a group by number from `/listgroups` |
 | `/listchats` | List saved chats for the current character |
 | `/switchchat <name>` | Load a saved chat by name |
 | `/switchchat_#` | Load a saved chat by number from `/listchats` |

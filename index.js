@@ -40,6 +40,8 @@ import {
   setExternalAbortController,
 } from "../../../../script.js";
 
+import { executeSlashCommandsWithOptions } from "../../../../scripts/slash-commands.js";
+
 const MODULE_NAME = "SillyTavern-Discord-Connector";
 const DEFAULT_SETTINGS = {
   bridgeUrl: "ws://127.0.0.1:2333",
@@ -74,7 +76,10 @@ function updateStatus(message, color) {
 // ---------------------------------------------------------------------------
 
 function connect() {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+  if (
+    ws &&
+    (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
+  ) {
     return;
   }
 
@@ -121,6 +126,10 @@ function connect() {
           chatId: data.chatId,
           isStreaming: false,
         };
+
+        // String fallback in case this event isn't exported in older ST versions.
+        const GROUP_WRAPPER_FINISHED =
+          event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
 
         // Show the typing indicator in Discord immediately.
         if (ws?.readyState === WebSocket.OPEN) {
@@ -252,10 +261,6 @@ function connect() {
           }
         };
         eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
-
-        // String fallback in case this event isn't exported in older ST versions.
-        const GROUP_WRAPPER_FINISHED =
-          event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
 
         // Fires once after all group members have finished. Collects all replies
         // and sends them as a single ai_reply payload.
@@ -406,6 +411,39 @@ function connect() {
               break;
             }
 
+            case "listgroups": {
+              const allGroups = context.groups || [];
+              replyText =
+                allGroups.length === 0
+                  ? "No groups found."
+                  : "Available groups:\n\n" +
+                    allGroups
+                      .map(
+                        (g, i) => `${i + 1}. /switchgroup_${i + 1} - ${g.name}`,
+                      )
+                      .join("\n") +
+                    "\n\nUse /switchgroup_number or /switchgroup group_name to switch.";
+              break;
+            }
+
+            case "switchgroup": {
+              if (!data.args?.length) {
+                replyText = "Usage: /switchgroup <name> or /switchgroup_number";
+                break;
+              }
+              const targetName = data.args.join(" ");
+              const target = (context.groups || []).find(
+                (g) => g.name === targetName,
+              );
+              if (target) {
+                await executeSlashCommandsWithOptions(`/go ${target.name}`);
+                replyText = `Switched to group "${targetName}".`;
+              } else {
+                replyText = `Group "${targetName}" not found.`;
+              }
+              break;
+            }
+
             case "listchats": {
               if (context.characterId === undefined) {
                 replyText = "Please select a character first.";
@@ -450,6 +488,8 @@ function connect() {
                 "/newchat — Start a new chat\n" +
                 "/listchars — List all characters\n" +
                 "/switchchar <name> or /switchchar_# — Switch character\n" +
+                "/listgroups - List all groups\n" +
+                "/switchgroup <name> or /switchgroup_# - Switch group\n" +
                 "/listchats — List chat history for current character\n" +
                 "/switchchat <name> or /switchchat_# — Load a past chat";
               break;
@@ -499,7 +539,22 @@ function connect() {
                 break;
               }
 
-              replyText = `Unknown command: /${data.command}. Try /help for available commands.`;
+              const groupMatch = data.command.match(/^switchgroup_(\d+)$/);
+              if (groupMatch) {
+                const index = parseInt(groupMatch[1]) - 1;
+                const groups = context.groups || [];
+                if (index >= 0 && index < groups.length) {
+                  await executeSlashCommandsWithOptions(
+                    `/go ${groups[index].name}`,
+                  );
+                  replyText = `Switched to group "${groups[index].name}".`;
+                } else {
+                  replyText = `Invalid number: ${index + 1}. Use /listgroups to see options.`;
+                }
+                break;
+              }
+
+              replyText = `Unknown command: /${data.command}. Try /sthelp for available commands.`;
             }
           }
         } catch (error) {
