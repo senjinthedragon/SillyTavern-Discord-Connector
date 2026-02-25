@@ -10,7 +10,7 @@ If this tool adds value to your roleplay experience, please consider:
 * **[Buying me a coffee on Ko-fi](https://ko-fi.com/senjinthedragon)** (One-time tips, no platform fees)
 * **Starring this repository** to help others find it.
 
-*Future updates planned: Image generation/post support and group chat integration.*
+*Future updates planned: Image generation/post support.*
 
 ## Requirements
 
