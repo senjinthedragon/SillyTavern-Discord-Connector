@@ -2,8 +2,6 @@
 
 Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming support.
 
----
-
 ## ☕ Support the Developer
 
 I am a solo developer building this bridge to make mobile RP better for the community. I maintain this project in my free time, and as I'm currently navigating some financial challenges, any support is deeply appreciated.
@@ -13,8 +11,6 @@ If this tool adds value to your roleplay experience, please consider:
 * **Starring this repository** to help others find it.
 
 *Future updates planned: Image generation/post support and group chat integration.*
-
----
 
 ## Requirements
 
