@@ -294,12 +294,23 @@ const wss = new WebSocket.Server({ port: wssPort });
 console.log(`[Bridge] WebSocket server listening on port ${wssPort}`);
 
 const userCount = config.allowedUserIds?.length || 0;
+const channelCount = config.allowedChannelIds?.length || 0;
+
 if (userCount > 0) {
   log("log", `[Security] Restricted to ${userCount} authorized user(s).`);
 } else {
   log(
     "warn",
-    `[Security] No allowedUserIds specified. The bot is currently PUBLIC.`,
+    "[Security] No allowedUserIds set — bot accepts messages from any user.",
+  );
+}
+
+if (channelCount > 0) {
+  log("log", `[Security] Restricted to ${channelCount} authorized channel(s).`);
+} else {
+  log(
+    "warn",
+    "[Security] No allowedChannelIds set — bot accepts messages from any channel.",
   );
 }
 
@@ -440,6 +451,10 @@ wss.on("connection", (ws) => {
 
           delete streamSessions[streamId];
           streamHandled.add(channelId);
+          // Safety valve: if ai_reply never arrives to consume this flag
+          // (e.g. non-streaming mode was off, or the message was dropped),
+          // remove it after a short window so future replies aren't silently swallowed.
+          setTimeout(() => streamHandled.delete(channelId), 10_000);
         });
         break;
       }
@@ -498,6 +513,25 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     sillyTavernClient = null;
     console.log("[Bridge] SillyTavern disconnected");
+
+    // Clean up any state left over from the broken session so it doesn't
+    // interfere with the next connection. Orphaned stream sessions (where
+    // stream_end never arrived) would otherwise block future edits, and a
+    // stale streamHandled entry would silently swallow the next ai_reply
+    // for that channel.
+    for (const streamId of Object.keys(streamSessions)) {
+      const s = streamSessions[streamId];
+      if (s.editTimer) clearTimeout(s.editTimer);
+      delete streamSessions[streamId];
+    }
+    streamHandled.clear();
+
+    // Drain the channel queues by replacing each with a resolved promise.
+    // Any tasks still pending in them will never complete since the WS is
+    // gone, so holding onto them would just waste memory.
+    for (const channelId of Object.keys(channelQueues)) {
+      delete channelQueues[channelId];
+    }
   });
 });
 
@@ -506,6 +540,10 @@ wss.on("connection", (ws) => {
 //
 // Regular text becomes a user_message (triggers AI generation).
 // Messages starting with "/" become execute_command (handled by the extension).
+//
+// Access is gated by allowedUserIds and allowedChannelIds in config.js.
+// Either list can be left empty to allow all users / all channels respectively,
+// but leaving both empty means the bot is fully public.
 // ---------------------------------------------------------------------------
 
 client.on("messageCreate", (message) => {
@@ -513,6 +551,11 @@ client.on("messageCreate", (message) => {
   if (
     config.allowedUserIds?.length > 0 &&
     !config.allowedUserIds.includes(message.author.id)
+  )
+    return;
+  if (
+    config.allowedChannelIds?.length > 0 &&
+    !config.allowedChannelIds.includes(message.channel.id)
   )
     return;
 

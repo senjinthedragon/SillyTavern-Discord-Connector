@@ -40,9 +40,12 @@ import {
   setExternalAbortController,
 } from "../../../../script.js";
 
-import { executeSlashCommandsWithOptions } from "../../../../scripts/slash-commands.js";
-
 const MODULE_NAME = "SillyTavern-Discord-Connector";
+
+// Resolved once at load time. The string fallback covers older ST versions
+// that don't export this event type by name.
+const GROUP_WRAPPER_FINISHED =
+  event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
 const DEFAULT_SETTINGS = {
   bridgeUrl: "ws://127.0.0.1:2333",
   autoConnect: true,
@@ -126,10 +129,6 @@ function connect() {
           chatId: data.chatId,
           isStreaming: false,
         };
-
-        // String fallback in case this event isn't exported in older ST versions.
-        const GROUP_WRAPPER_FINISHED =
-          event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
 
         // Show the typing indicator in Discord immediately.
         if (ws?.readyState === WebSocket.OPEN) {
@@ -436,7 +435,7 @@ function connect() {
                 (g) => g.name === targetName,
               );
               if (target) {
-                await executeSlashCommandsWithOptions(`/go ${target.name}`);
+                await openGroupChat(target.id);
                 replyText = `Switched to group "${targetName}".`;
               } else {
                 replyText = `Group "${targetName}" not found.`;
@@ -539,22 +538,7 @@ function connect() {
                 break;
               }
 
-              const groupMatch = data.command.match(/^switchgroup_(\d+)$/);
-              if (groupMatch) {
-                const index = parseInt(groupMatch[1]) - 1;
-                const groups = context.groups || [];
-                if (index >= 0 && index < groups.length) {
-                  await executeSlashCommandsWithOptions(
-                    `/go ${groups[index].name}`,
-                  );
-                  replyText = `Switched to group "${groups[index].name}".`;
-                } else {
-                  replyText = `Invalid number: ${index + 1}. Use /listgroups to see options.`;
-                }
-                break;
-              }
-
-              replyText = `Unknown command: /${data.command}. Try /sthelp for available commands.`;
+              replyText = `Unknown command: /${data.command}. Try /help for available commands.`;
             }
           }
         } catch (error) {
