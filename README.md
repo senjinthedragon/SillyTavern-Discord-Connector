@@ -75,7 +75,7 @@ timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 > [!TIP]
 > To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
 > To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
-> To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode
+> To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode\
 > You can find a list of all supported timezones [here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
 
 > [!CAUTION]
