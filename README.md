@@ -40,9 +40,11 @@ The **Discord Connector Settings** should now appear in your extensions list.
 - Go to the **OAuth2** tab:
   - Under **OAuth2 URL generator**:
     - **Scopes**: `bot`
-    - **Bot Permissions**: `Send Messages`, `Read Message History`, `Manage Messages`
+    - **Bot Permissions**: `Send Messages`, `Read Message History`, `Manage Messages`[^1]
     - Leave **Integration Type** set to **Guild Install**
     - Copy the **Generated URL** and open it with a browser to invite your bot to your Discord server
+
+[^1]: `Manage Messages` is used to delete the streaming message and repost it cleanly.
 
 ### 3. Configure the SillyTavern Bridge Server
 
@@ -70,12 +72,13 @@ debug: false, // set this to true to enable verbose debug logging
 timezone: "Europe/Amsterdam", // (optional) set this to your timezone (TZ identifier), you can find a list of all timezones at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 ```
 
-To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
-To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
-To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode
+> [!TIP]
+> To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
+> To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
+> To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode
 
 > [!CAUTION]
-> SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.
+> SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.\
 > ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.
 
 ### 4. Start the bridge server
