@@ -1,0 +1,6 @@
+@echo off
+echo Checking dependencies...
+call npm install
+echo Starting bridge server...
+node server.js
+pause
