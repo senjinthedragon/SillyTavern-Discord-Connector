@@ -12,6 +12,14 @@
  *   - Handles slash commands from Discord (/sthelp, /listchars, /switchchar, etc.)
  *     by interacting with SillyTavern's character and chat APIs.
  *
+ * Autocomplete requests (get_autocomplete) are handled separately from normal
+ * commands. The bridge sends a requestId and the list type ("characters",
+ * "groups", or "chats"); the extension queries SillyTavern's live context,
+ * filters by the user's partial input, and replies with autocomplete_response.
+ * Chat lists require an async getPastCharacterChats call; all other lists are
+ * read synchronously from context. Results are capped at 25 entries, which is
+ * Discord's hard limit for autocomplete choices.
+ *
  * Streaming architecture:
  *   Each character turn is assigned a unique streamId at GENERATION_STARTED.
  *   STREAM_TOKEN_RECEIVED events forward cumulative text to the bridge, which
@@ -353,6 +361,74 @@ function connect() {
       if (data.type === "system_command") {
         if (data.command === "reload_ui_only") {
           setTimeout(() => window.location.reload(), 500);
+        }
+        return;
+      }
+
+      // ------------------------------------------------------------------
+      // get_autocomplete - the bridge is asking for a live list to populate
+      // a Discord autocomplete dropdown while the user is typing.
+      //
+      // data.list    "characters" | "groups" | "chats"
+      // data.query   The partial string the user has typed so far. Used to
+      //              filter results so the most relevant names appear first.
+      //              An empty string returns all entries (up to 25).
+      // data.requestId  Echoed back in the response so the bridge can match
+      //              this reply to the correct parked interaction.
+      //
+      // Results are filtered case-insensitively against query and truncated
+      // to 25 entries before sending, since Discord rejects any autocomplete
+      // response with more than 25 choices.
+      // ------------------------------------------------------------------
+      if (data.type === "get_autocomplete") {
+        let choices = [];
+        try {
+          const context = SillyTavern.getContext();
+          const query = (data.query || "").toLowerCase();
+
+          if (data.list === "characters") {
+            choices = context.characters
+              .map((c) => c.name)
+              .filter(
+                (name) => name?.trim() && name.toLowerCase().includes(query),
+              );
+          } else if (data.list === "groups") {
+            choices = (context.groups || [])
+              .map((g) => g.name)
+              .filter(
+                (name) => name?.trim() && name.toLowerCase().includes(query),
+              );
+          } else if (data.list === "chats") {
+            // Chat history is per-character, so the list is only meaningful
+            // when a character is currently selected. If none is selected,
+            // choices stays empty and the dropdown will show nothing, which
+            // is the correct behaviour - there is nothing to switch to.
+            if (context.characterId !== undefined) {
+              const chatFiles = await getPastCharacterChats(
+                context.characterId,
+              );
+              choices = chatFiles
+                .map((c) => c.file_name.replace(".jsonl", ""))
+                .filter(
+                  (name) => name?.trim() && name.toLowerCase().includes(query),
+                );
+            }
+          }
+        } catch (err) {
+          // On any unexpected error, fall through with an empty choices array.
+          // The bridge will respond to Discord with an empty dropdown rather
+          // than timing out, which is a better user experience than a spinner.
+          console.error("[Discord Bridge] Autocomplete error:", err);
+        }
+
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "autocomplete_response",
+              requestId: data.requestId,
+              choices: choices.slice(0, 25),
+            }),
+          );
         }
         return;
       }

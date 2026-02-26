@@ -18,11 +18,23 @@
  *
  * Message ordering for sends/deletes is preserved via a per-channel async queue.
  * Stream edits bypass this queue intentionally to stay real-time.
+ *
+ * Slash command autocomplete uses an on-demand request/response pattern over
+ * the existing WebSocket: the bridge sends a get_autocomplete packet when
+ * Discord fires an autocomplete interaction, the extension responds with the
+ * live list from SillyTavern's context, and the bridge forwards it to Discord
+ * within the 3-second autocomplete window.
  */
 
 "use strict";
 
-const { Client, GatewayIntentBits, Events } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  Events,
+  REST,
+  Routes,
+} = require("discord.js");
 const WebSocket = require("ws");
 const fs = require("fs");
 const path = require("path");
@@ -135,10 +147,122 @@ const client = new Client({
   ],
 });
 
+// ---------------------------------------------------------------------------
+// Slash command definitions
+//
+// Defines the commands that Discord will surface in the "/" autocomplete menu.
+// The "name" of each entry is forwarded verbatim as the command field of an
+// execute_command packet to the extension, so names must exactly match the
+// cases in index.js's switch statement.
+//
+// Registered via a PUT to Routes.applicationCommands on every ClientReady.
+// The PUT is a full overwrite (not an append), so this array is always the
+// authoritative list - adding or removing an entry here takes effect on the
+// next bot restart with no manual cleanup required.
+//
+// Numbered shortcut commands (/switchchar_1, /switchgroup_2, /switchchat_3,
+// etc.) are intentionally absent. Discord requires all slash command names to
+// be declared statically at registration time, but these variants are
+// unbounded - their upper limit depends on how many characters, groups, or
+// chat files the user has installed in SillyTavern. They remain fully usable
+// as plain text messages: the messageCreate handler forwards any message
+// starting with "/" as an execute_command regardless of whether a matching
+// slash command was registered. Users can type "/switchchar_3" directly;
+// /listchars, /listgroups, and /listchats each include the numbered shortcuts
+// in their output to guide users to the right number.
+// ---------------------------------------------------------------------------
+
+const SLASH_COMMANDS = [
+  {
+    name: "sthelp",
+    description: "Show all available bridge commands",
+  },
+  {
+    name: "newchat",
+    description: "Start a fresh chat with the current character",
+  },
+  {
+    name: "listchars",
+    description:
+      "List all characters (includes numbered shortcuts for text use)",
+  },
+  {
+    name: "switchchar",
+    description: "Switch to a character by exact name",
+    options: [
+      {
+        name: "name",
+        type: 3, // STRING
+        description: "The exact character name to switch to",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
+    name: "listgroups",
+    description: "List all groups (includes numbered shortcuts for text use)",
+  },
+  {
+    name: "switchgroup",
+    description: "Switch to a group by exact name",
+    options: [
+      {
+        name: "name",
+        type: 3, // STRING
+        description: "The exact group name to switch to",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
+    name: "listchats",
+    description:
+      "List chat history for the current character (includes numbered shortcuts)",
+  },
+  {
+    name: "switchchat",
+    description: "Load a past chat by name (without the .jsonl extension)",
+    options: [
+      {
+        name: "name",
+        type: 3, // STRING
+        description: "The exact chat filename to load (omit .jsonl)",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+];
+
 client.login(token);
-client.on(Events.ClientReady, (c) =>
-  console.log(`[Discord] Ready! Logged in as ${c.user.tag}`),
-);
+
+client.on(Events.ClientReady, async (c) => {
+  console.log(`[Discord] Ready! Logged in as ${c.user.tag}`);
+
+  // Push the slash command list to Discord on every startup. Using PUT with
+  // Routes.applicationCommands does a full overwrite of the bot's global
+  // command set, which is safe to run repeatedly - it's idempotent and fast
+  // (one API call). Global commands propagate to all servers the bot is in
+  // but can take up to an hour to appear in Discord clients.
+  //
+  // For instant registration scoped to a single server during development,
+  // replace the route with:
+  //   Routes.applicationGuildCommands(c.user.id, "YOUR_GUILD_ID_HERE")
+  // Guild commands appear immediately but only work in that one server.
+  const rest = new REST({ version: "10" }).setToken(token);
+  try {
+    console.log("[Discord] Registering slash commands...");
+    await rest.put(Routes.applicationCommands(c.user.id), {
+      body: SLASH_COMMANDS,
+    });
+    console.log("[Discord] Slash commands registered successfully.");
+  } catch (err) {
+    log("error", "[Discord] Failed to register slash commands:", err);
+  }
+});
+
 client.on("error", (err) => log("error", "[Discord] Client error:", err));
 
 // ---------------------------------------------------------------------------
@@ -316,20 +440,67 @@ if (channelCount > 0) {
 
 let sillyTavernClient = null;
 
+// ---------------------------------------------------------------------------
+// Pending autocomplete requests
+//
+// When Discord fires an autocomplete interaction for /switchchar, /switchgroup,
+// or /switchchat, the bridge sends a get_autocomplete request to SillyTavern
+// and parks the interaction here until the response arrives. Each entry is
+// keyed by a unique requestId and holds the interaction object and a cleanup
+// timeout.
+//
+// Discord requires autocomplete responses within 3 seconds. The timeout fires
+// at 2.8 seconds and responds with an empty list rather than letting the
+// interaction silently expire, which would leave the user staring at a spinner.
+// Entries are deleted on response or timeout, whichever comes first.
+// ---------------------------------------------------------------------------
+
+const AUTOCOMPLETE_TIMEOUT_MS = 2800;
+const pendingAutocompletes = {};
+
 wss.on("connection", (ws) => {
   console.log("[Bridge] SillyTavern connected");
   sillyTavernClient = ws;
 
   ws.on("message", async (message) => {
     const data = JSON.parse(message);
-    const channelId = data.chatId;
-    const channel = client.channels.cache.get(channelId);
-    if (!channel) return;
 
     if (data.type === "heartbeat") {
       ws.send(JSON.stringify({ type: "heartbeat" })); // Echo back
       return;
     }
+
+    // autocomplete_response carries a requestId rather than a chatId so it
+    // needs no channel object. It is handled here, before the channel lookup,
+    // to avoid being silently swallowed by the `if (!channel) return` guard.
+    if (data.type === "autocomplete_response") {
+      const pending = pendingAutocompletes[data.requestId];
+      if (!pending) return; // Already timed out; the timeout already responded.
+
+      clearTimeout(pending.timeout);
+      delete pendingAutocompletes[data.requestId];
+
+      // Discord requires each choice to be { name, value }. name is the label
+      // shown in the dropdown; value is what gets submitted when the user picks
+      // it. For our purposes they are always the same string. The 25-entry cap
+      // is applied again here as a safety net in case the extension sends more
+      // than expected, since Discord will reject the entire respond() call if
+      // the array exceeds 25 entries.
+      const choices = (data.choices || []).slice(0, 25).map((name) => ({
+        name,
+        value: name,
+      }));
+
+      await pending.interaction.respond(choices).catch((err) => {
+        log("warn", `[Autocomplete] respond() failed: ${err.message}`);
+      });
+      return;
+    }
+
+    // All remaining message types are tied to a specific Discord channel.
+    const channelId = data.chatId;
+    const channel = client.channels.cache.get(channelId);
+    if (!channel) return;
 
     switch (data.type) {
       // Show the Discord typing indicator while SillyTavern is generating.
@@ -532,7 +703,169 @@ wss.on("connection", (ws) => {
     for (const channelId of Object.keys(channelQueues)) {
       delete channelQueues[channelId];
     }
+
+    // Resolve all pending autocomplete interactions immediately. If left
+    // alone, each would wait for its timeout before responding - but once the
+    // 3-second Discord window expires the interaction token becomes invalid
+    // and respond() will throw, leaving the user's dropdown permanently stuck
+    // on a loading spinner. Responding with an empty list now closes them
+    // cleanly. The timeouts are cancelled first to prevent a double respond().
+    for (const [requestId, pending] of Object.entries(pendingAutocompletes)) {
+      clearTimeout(pending.timeout);
+      delete pendingAutocompletes[requestId];
+      pending.interaction.respond([]).catch(() => {});
+    }
   });
+});
+
+// ---------------------------------------------------------------------------
+// Incoming Discord interactions → slash commands and autocomplete
+//
+// Both slash command executions and autocomplete requests arrive as
+// InteractionCreate events; the handler branches on interaction type first.
+//
+// AUTOCOMPLETE path: fired while the user is still typing into a switchchar,
+// switchgroup, or switchchat option field. The bridge sends a get_autocomplete
+// packet to SillyTavern, parks the interaction in pendingAutocompletes with a
+// safety timeout, and returns. When the extension replies with
+// autocomplete_response the ws.on("message") handler above calls
+// interaction.respond() with the live list. If the extension doesn't reply in
+// time the timeout responds with an empty list rather than letting Discord
+// show an indefinite spinner.
+//
+// COMMAND EXECUTION path: the slash-command counterpart to the messageCreate
+// handler below. Both paths converge on the same execute_command packet sent
+// to the extension, keeping the extension unaware of how a command was
+// invoked. Access is gated by the same allowedUserIds and allowedChannelIds
+// rules as regular messages. Blocked interactions receive an ephemeral error
+// reply visible only to the invoking user.
+//
+// Discord requires every interaction to be acknowledged within 3 seconds or
+// it permanently fails with a "This interaction failed" error visible to all
+// channel members. Because SillyTavern's actual response arrives
+// asynchronously as a separate ai_reply packet, command interactions are
+// acknowledged immediately with a brief ephemeral echo. The ephemeral flag
+// also prevents messageCreate from seeing the acknowledgement as a new "/"
+// message and firing a duplicate execute_command.
+// ---------------------------------------------------------------------------
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  // ------------------------------------------------------------------
+  // Autocomplete interactions
+  // ------------------------------------------------------------------
+  if (interaction.isAutocomplete()) {
+    // Silently ignore if the bridge is not connected - Discord will show
+    // an empty list, which is preferable to an unhandled promise rejection.
+    if (!sillyTavernClient) {
+      await interaction.respond([]).catch(() => {});
+      return;
+    }
+
+    const command = interaction.commandName;
+    const focusedValue = interaction.options.getFocused();
+
+    // Map each autocomplete-enabled command to the list type the extension
+    // needs to query. Any command not in this map is ignored.
+    const listMap = {
+      switchchar: "characters",
+      switchgroup: "groups",
+      switchchat: "chats",
+    };
+    const list = listMap[command];
+    if (!list) return;
+
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    // Safety timeout: respond with an empty list if the extension doesn't
+    // reply within AUTOCOMPLETE_TIMEOUT_MS, preventing Discord from showing
+    // an indefinite spinner to the user.
+    const timeout = setTimeout(async () => {
+      if (!pendingAutocompletes[requestId]) return;
+      delete pendingAutocompletes[requestId];
+      log("warn", `[Autocomplete] Request ${requestId} timed out`);
+      await interaction.respond([]).catch(() => {});
+    }, AUTOCOMPLETE_TIMEOUT_MS);
+
+    pendingAutocompletes[requestId] = { interaction, timeout };
+
+    sillyTavernClient.send(
+      JSON.stringify({
+        type: "get_autocomplete",
+        requestId,
+        list,
+        query: focusedValue,
+      }),
+    );
+    return;
+  }
+
+  // ------------------------------------------------------------------
+  // Slash command execution interactions
+  // ------------------------------------------------------------------
+  if (!interaction.isChatInputCommand()) return;
+
+  if (
+    config.allowedUserIds?.length > 0 &&
+    !config.allowedUserIds.includes(interaction.user.id)
+  ) {
+    await interaction
+      .reply({
+        content: "You are not authorised to use this bot.",
+        ephemeral: true,
+      })
+      .catch(() => {});
+    return;
+  }
+
+  if (
+    config.allowedChannelIds?.length > 0 &&
+    !config.allowedChannelIds.includes(interaction.channelId)
+  ) {
+    await interaction
+      .reply({
+        content: "This bot is not enabled in this channel.",
+        ephemeral: true,
+      })
+      .catch(() => {});
+    return;
+  }
+
+  if (!sillyTavernClient) {
+    await interaction
+      .reply({
+        content: "Bridge is not connected to SillyTavern.",
+        ephemeral: true,
+      })
+      .catch(() => {});
+    return;
+  }
+
+  const command = interaction.commandName;
+  // Extract all STRING-type options in declaration order. Currently every
+  // command has at most one ("name"), but filtering by type rather than by
+  // key name means future options added to SLASH_COMMANDS are picked up
+  // automatically without changes here.
+  const args = interaction.options.data
+    .filter((opt) => opt.type === 3)
+    .map((opt) => String(opt.value));
+
+  const chatId = interaction.channelId;
+
+  sillyTavernClient.send(
+    JSON.stringify({ type: "execute_command", command, args, chatId }),
+  );
+
+  // Acknowledge within the 3-second window. The reply is ephemeral (visible
+  // only to the invoking user) for two reasons: it prevents messageCreate from
+  // seeing the echo as a new "/" message and firing a second execute_command,
+  // and it keeps command noise out of the channel. The real response arrives as
+  // a normal channel message once SillyTavern processes the command.
+  await interaction
+    .reply({
+      content: `✓ ${command}${args.length ? " " + args.join(" ") : ""}`,
+      ephemeral: true,
+    })
+    .catch(() => {});
 });
 
 // ---------------------------------------------------------------------------
