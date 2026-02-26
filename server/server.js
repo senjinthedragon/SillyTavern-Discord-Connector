@@ -22,7 +22,7 @@
 
 "use strict";
 
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits, Events } = require("discord.js");
 const WebSocket = require("ws");
 const fs = require("fs");
 const path = require("path");
@@ -136,8 +136,8 @@ const client = new Client({
 });
 
 client.login(token);
-client.on("ready", () =>
-  console.log(`[Discord] Logged in as ${client.user.tag}`),
+client.on(Events.ClientReady, (c) =>
+  console.log(`[Discord] Ready! Logged in as ${c.user.tag}`),
 );
 client.on("error", (err) => log("error", "[Discord] Client error:", err));
 
