@@ -10,8 +10,6 @@ If this tool adds value to your roleplay experience, please consider:
 * **[Buying me a coffee on Ko-fi](https://ko-fi.com/senjinthedragon)** (One-time tips, no platform fees)
 * **Starring this repository** to help others find it.
 
-*Future updates planned: Image generation/post support.*
-
 ## Requirements
 
 - [SillyTavern](https://github.com/SillyTavern/SillyTavern) (latest recommended)
@@ -21,7 +19,7 @@ If this tool adds value to your roleplay experience, please consider:
 
 ## Quick Start
 
-**Note for Mobile/Android Users: You only need to perform these steps on the computer running your SillyTavern server. Once the bridge is running, you can chat from your phone using the standard Discord app.**
+*Note for Mobile/Android Users: You only need to perform these steps on the computer running your SillyTavern server. Once the bridge is running, you can chat from your phone using the standard Discord app.*
 
 ### 1. Install the extension
 
@@ -51,19 +49,17 @@ The **Discord Connector Settings** should now appear in your extensions list.
 These folders and files can be found in your SillyTavern extensions folder which you can commonly find in the following locations:
 - **Windows**: [Your SillyTavern Folder]\data\default-user\extensions\SillyTavern-Discord-Connector\server
 - **Linux/Mac**: ~/.local/share/sillytavern/default-user/extensions/SillyTavern-Discord-Connector/server
-- **Docker**: /home/node/app/data/default-user/extensions/SillyTavern-Discord-Connector
+- **Docker**: /home/node/app/data/default-user/extensions/SillyTavern-Discord-Connector/server
 
-**Windows**:
-
+**Windows**:\
 Copy or rename `config.example.js` to `config.js`
 
 **Linux/Mac**:
-```bash
+```shell
 cp config.example.js config.js
 ```
 
-**Both**:
-
+**Both**:\
 Edit `config.js`:
 ```javascript
 discordToken: 'YOUR_BOT_TOKEN_HERE', // The one you copied to a safe place in part 2
@@ -74,40 +70,35 @@ debug: false, // set this to true to enable verbose debug logging
 timezone: "Europe/Amsterdam", // (optional) set this to your timezone (TZ identifier), you can find a list of all timezones at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 ```
 
-To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.
-
-To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.
-
+To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
+To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
 To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode
 
-**SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.**
-**ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.**
+> [!CAUTION]
+> SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.
+> ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.
 
 ### 4. Start the bridge server
 
-**Windows**:
-
+**Windows**:\
 Right click inside the explorer window at the server directory, the same one from the previous step, and select **Open Command Prompt Here** or **Open Terminal**.
 
-**Linux/Mac**:
-
+**Linux/Mac**:\
 Open your terminal and cd into the server directory listed in the previous step
 
-**Both**:
-
+**Both**:\
 Type and press enter to run the following commands:
-```bash
+```shell
 npm install
 node server.js
 ```
 
-This will run the Bridge Server required to make Discord and SillyTavern talk to each other. You need to run the server every time and **keep this window open** for it to work.
+This will run the Bridge Server required to make Discord and SillyTavern talk to each other. You need to run the server every time and **keep this window open** for it to work.\
 You can simplify this if you have the knowledge by creating a batch or shell script to do this or set it up to run automatically on system start or when you start SillyTavern.
 
-**Example batch script for Windows**
-
+**Example batch script for Windows**\
 Create a `start-bridge.bat` file in the server folder (make sure it doesn't end with .txt) and write the following into this file by opening it in a text editor. You can then create a shortcut to the .bat file and place it on your desktop or next to your SillyTavern starter.
-```bash
+```batchfile
 @echo off
 echo Checking dependencies...
 call npm install
