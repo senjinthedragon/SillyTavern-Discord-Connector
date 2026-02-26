@@ -21,6 +21,8 @@ If this tool adds value to your roleplay experience, please consider:
 
 *Note for Mobile/Android Users: You only need to perform these steps on the computer running your SillyTavern server. Once the bridge is running, you can chat from your phone using the standard Discord app.*
 
+**Don't worry about all the scary instructions. If you follow them step by step, you should be able to get started in a few minutes.**
+
 ### 1. Install the extension
 
 - In SillyTavern → **Extensions** menu (The stack of cubes) → **Install extension**
@@ -74,9 +76,13 @@ timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 
 > [!TIP]
 > To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
+> \
 > To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
+> \
 > To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode\
+> \
 > You can find a list of all supported timezone identifiers [here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)\
+> \
 > You can move and rename the server folder to wherever you like. It doesn't have to sit in the extension's folder. Do mind that if you move it out, it won't be updated automatically.
 
 > [!CAUTION]
