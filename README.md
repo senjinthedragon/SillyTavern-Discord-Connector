@@ -76,7 +76,8 @@ timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 > To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
 > To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
 > To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode\
-> You can find a list of all supported timezone identifiers [here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+> You can find a list of all supported timezone identifiers [here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)\
+> You can move and rename the server folder to wherever you like. It doesn't have to sit in the extension's folder
 
 > [!CAUTION]
 > SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.\
