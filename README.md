@@ -41,7 +41,7 @@ The **Discord Connector Settings** should now appear in your extensions list.
   - Under **Privileged Gateway Intents**, enable **Message Content Intent**
 - Go to the **OAuth2** tab:
   - Under **OAuth2 URL generator**:
-    - **Scopes**: `bot`
+    - **Scopes**: `bot`, `applications.commands`
     - **Bot Permissions**: `Send Messages`, `Read Message History`, `Manage Messages`[^1]
     - Leave **Integration Type** set to **Guild Install**
     - Copy the **Generated URL** and open it with a browser to invite your bot to your Discord server
@@ -133,15 +133,20 @@ Use these slash commands in Discord to control the session:
 |---|---|
 | `/sthelp` | Show available commands |
 | `/newchat` | Start a fresh chat with the current character |
-| `/listchars` | List all available characters |
-| `/switchchar <name>` | Switch to a character by name |
+| `/listchars` | List all characters with their shortcut numbers |
+| `/switchchar <name>` | Switch to a character by name - supports live autocomplete |
 | `/switchchar_#` | Switch to a character by number from `/listchars` |
-| `/listgroups` | List all available groups |
-| `/switchgroup <name>` | Switch to a group by name |
+| `/listgroups` | List all groups with their shortcut numbers |
+| `/switchgroup <name>` | Switch to a group by name - supports live autocomplete |
 | `/switchgroup_#` | Switch to a group by number from `/listgroups` |
-| `/listchats` | List saved chats for the current character |
-| `/switchchat <name>` | Load a saved chat by name |
+| `/listchats` | List saved chats for the current character with shortcut numbers |
+| `/switchchat <name>` | Load a saved chat by name - supports live autocomplete |
 | `/switchchat_#` | Load a saved chat by number from `/listchats` |
+
+> [!NOTE]
+> Commands marked as supporting live autocomplete show a dropdown of matching names as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.
+>
+> Numbered shortcuts (`/switchchar_3`, `/switchgroup_2`, `/switchchat_1` etc.) are not registered as slash commands because the number of entries varies per installation. Type them as plain text messages - they work exactly the same way.
 
 ## How It Works
 
@@ -154,6 +159,8 @@ The extension runs inside SillyTavern's browser environment and connects to a lo
 **Message Content Intent error:** This intent must be explicitly enabled in the Discord Developer Portal under your bot's settings - it is not on by default.
 
 **Port conflict:** If port 2333 is in use, change `wssPort` in `config.js` and update the bridge URL in the extension settings to match.
+
+**Slash commands don't appear in Discord:** The `applications.commands` scope must be included when generating the bot's invite URL (see step 2). If you invited the bot before this version, generate a new invite URL with the scope added and open it in a browser - you do not need to kick and re-invite the bot, visiting the new URL is enough to grant the missing scope. Global slash commands can also take up to an hour to propagate to all Discord clients after the bridge first starts.
 
 ## License
 

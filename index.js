@@ -20,6 +20,15 @@
  * read synchronously from context. Results are capped at 25 entries, which is
  * Discord's hard limit for autocomplete choices.
  *
+ * To avoid redundant work on every keystroke, autocomplete results are cached.
+ * Character and group lists use a 60-second TTL: they change infrequently but
+ * unpredictably (a user may add one in the ST UI at any time), so a short
+ * time-based expiry is the right fit. Chat lists are invalidated on specific
+ * known events instead: newchat, switchchar, switchgroup, and their numbered
+ * variants are the only operations that change which chats exist or which
+ * character's chats should be shown. This means chat autocomplete is always
+ * perfectly current without ever hitting disk more than once per relevant action.
+ *
  * Streaming architecture:
  *   Each character turn is assigned a unique streamId at GENERATION_STARTED.
  *   STREAM_TOKEN_RECEIVED events forward cumulative text to the bridge, which
@@ -64,6 +73,51 @@ const DEFAULT_SETTINGS = {
 let ws = null;
 let reconnectTimeout = null;
 let heartbeatInterval = null;
+
+// ---------------------------------------------------------------------------
+// Autocomplete cache
+//
+// Caches the full (unfiltered) name lists used by autocomplete so that repeated
+// keystrokes don't re-query SillyTavern's context or disk on every request.
+//
+// Character and group lists are cached with a time-to-live of
+// AUTOCOMPLETE_CACHE_TTL_MS. They change infrequently - a user might add a
+// character or group occasionally - so a 60-second window means at most a
+// minute of staleness after a change made in the ST UI, which is acceptable.
+//
+// The chat list is not TTL-based. It is keyed by characterId (so switching
+// characters automatically yields a cache miss) and is invalidated explicitly
+// after any command that changes the chat state: newchat creates a new chat,
+// switchchar and switchgroup change which character's chats are relevant, and
+// their numbered variants do the same. This keeps the cache perfectly in sync
+// with the bot's own actions without any TTL guesswork.
+//
+// Each entry: { names: string[], cachedAt: number }
+// chatCache entry: { names: string[] }  (no TTL - invalidation is event-driven)
+// ---------------------------------------------------------------------------
+
+const AUTOCOMPLETE_CACHE_TTL_MS = 60_000;
+
+const autocompleteCache = {
+  characters: null, // { names: string[], cachedAt: number } | null
+  groups: null, // { names: string[], cachedAt: number } | null
+};
+
+// Keyed by characterId so a character switch is automatically a cache miss.
+const chatCache = {}; // { [characterId]: { names: string[] } }
+
+/** Clears the chat cache for the currently selected character, or entirely
+ *  if no character is selected. Called after any command that creates a new
+ *  chat or changes which character is active. */
+function invalidateChatCache() {
+  const ctx = SillyTavern.getContext();
+  if (ctx.characterId !== undefined) {
+    delete chatCache[ctx.characterId];
+  } else {
+    // No character selected - wipe everything to be safe.
+    for (const key of Object.keys(chatCache)) delete chatCache[key];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Settings helpers
@@ -381,37 +435,62 @@ function connect() {
       // response with more than 25 choices.
       // ------------------------------------------------------------------
       if (data.type === "get_autocomplete") {
-        let choices = [];
+        let allNames = [];
         try {
           const context = SillyTavern.getContext();
-          const query = (data.query || "").toLowerCase();
+          const now = Date.now();
 
           if (data.list === "characters") {
-            choices = context.characters
-              .map((c) => c.name)
-              .filter(
-                (name) => name?.trim() && name.toLowerCase().includes(query),
-              );
+            // Serve from cache if fresh; otherwise rebuild from context and cache.
+            if (
+              autocompleteCache.characters &&
+              now - autocompleteCache.characters.cachedAt <
+                AUTOCOMPLETE_CACHE_TTL_MS
+            ) {
+              allNames = autocompleteCache.characters.names;
+            } else {
+              allNames = context.characters
+                .map((c) => c.name)
+                .filter((name) => name?.trim());
+              autocompleteCache.characters = { names: allNames, cachedAt: now };
+            }
           } else if (data.list === "groups") {
-            choices = (context.groups || [])
-              .map((g) => g.name)
-              .filter(
-                (name) => name?.trim() && name.toLowerCase().includes(query),
-              );
+            // Same TTL-based strategy as characters.
+            if (
+              autocompleteCache.groups &&
+              now - autocompleteCache.groups.cachedAt <
+                AUTOCOMPLETE_CACHE_TTL_MS
+            ) {
+              allNames = autocompleteCache.groups.names;
+            } else {
+              allNames = (context.groups || [])
+                .map((g) => g.name)
+                .filter((name) => name?.trim());
+              autocompleteCache.groups = { names: allNames, cachedAt: now };
+            }
           } else if (data.list === "chats") {
             // Chat history is per-character, so the list is only meaningful
             // when a character is currently selected. If none is selected,
-            // choices stays empty and the dropdown will show nothing, which
+            // allNames stays empty and the dropdown will show nothing, which
             // is the correct behaviour - there is nothing to switch to.
+            //
+            // The chat cache is keyed by characterId so switching characters
+            // is automatically a cache miss. Invalidation (via invalidateChatCache)
+            // is triggered after newchat, switchchar, and switchgroup rather than
+            // using a TTL, because those are the only operations that change
+            // which chats exist or which character is active.
             if (context.characterId !== undefined) {
-              const chatFiles = await getPastCharacterChats(
-                context.characterId,
-              );
-              choices = chatFiles
-                .map((c) => c.file_name.replace(".jsonl", ""))
-                .filter(
-                  (name) => name?.trim() && name.toLowerCase().includes(query),
+              if (chatCache[context.characterId]) {
+                allNames = chatCache[context.characterId].names;
+              } else {
+                const chatFiles = await getPastCharacterChats(
+                  context.characterId,
                 );
+                allNames = chatFiles
+                  .map((c) => c.file_name.replace(".jsonl", ""))
+                  .filter((name) => name?.trim());
+                chatCache[context.characterId] = { names: allNames };
+              }
             }
           }
         } catch (err) {
@@ -421,12 +500,20 @@ function connect() {
           console.error("[Discord Bridge] Autocomplete error:", err);
         }
 
+        // Filter the full cached list against the user's partial input and
+        // truncate to 25. Filtering happens here (not at cache-build time) so
+        // the cache always holds the complete list and any query can use it.
+        const query = (data.query || "").toLowerCase();
+        const choices = allNames
+          .filter((name) => name.toLowerCase().includes(query))
+          .slice(0, 25);
+
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
               type: "autocomplete_response",
               requestId: data.requestId,
-              choices: choices.slice(0, 25),
+              choices,
             }),
           );
         }
@@ -450,6 +537,10 @@ function connect() {
           switch (data.command) {
             case "newchat":
               await doNewChat({ deleteCurrentChat: false });
+              // A new chat has been created for the current character;
+              // invalidate the chat cache so it is rebuilt on the next
+              // autocomplete request.
+              invalidateChatCache();
               replyText = "New chat started.";
               break;
 
@@ -481,6 +572,9 @@ function connect() {
               );
               if (target) {
                 await selectCharacterById(context.characters.indexOf(target));
+                // Active character has changed; invalidate the chat cache so
+                // switchchat autocomplete reflects the new character's history.
+                invalidateChatCache();
                 replyText = `Switched to "${targetName}".`;
               } else {
                 replyText = `Character "${targetName}" not found.`;
@@ -514,6 +608,9 @@ function connect() {
               );
               if (target) {
                 await executeSlashCommandsWithOptions(`/go ${target.name}`);
+                // Active group has changed; invalidate the chat cache so
+                // switchchat autocomplete reflects the new context.
+                invalidateChatCache();
                 replyText = `Switched to group "${targetName}".`;
               } else {
                 replyText = `Group "${targetName}" not found.`;
@@ -582,6 +679,8 @@ function connect() {
                 if (index >= 0 && index < characters.length) {
                   const target = characters[index];
                   await selectCharacterById(context.characters.indexOf(target));
+                  // Active character has changed; invalidate the chat cache.
+                  invalidateChatCache();
                   replyText = `Switched to "${target.name}".`;
                 } else {
                   replyText = `Invalid number: ${index + 1}. Use /listchars to see options.`;
@@ -624,6 +723,8 @@ function connect() {
                   await executeSlashCommandsWithOptions(
                     `/go ${groups[index].name}`,
                   );
+                  // Active group has changed; invalidate the chat cache.
+                  invalidateChatCache();
                   replyText = `Switched to group "${groups[index].name}".`;
                 } else {
                   replyText = `Invalid number: ${index + 1}. Use /listgroups to see options.`;

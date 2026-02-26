@@ -24,6 +24,11 @@
  * Discord fires an autocomplete interaction, the extension responds with the
  * live list from SillyTavern's context, and the bridge forwards it to Discord
  * within the 3-second autocomplete window.
+ *
+ * Autocomplete requests are debounced per user per command: only the final
+ * keystroke in a burst actually reaches SillyTavern. Earlier interactions in
+ * the same burst are acknowledged immediately with an empty list so Discord
+ * does not flag them as failed.
  */
 
 "use strict";
@@ -441,22 +446,33 @@ if (channelCount > 0) {
 let sillyTavernClient = null;
 
 // ---------------------------------------------------------------------------
-// Pending autocomplete requests
+// Autocomplete debouncing and pending request tracking
 //
-// When Discord fires an autocomplete interaction for /switchchar, /switchgroup,
-// or /switchchat, the bridge sends a get_autocomplete request to SillyTavern
-// and parks the interaction here until the response arrives. Each entry is
-// keyed by a unique requestId and holds the interaction object and a cleanup
-// timeout.
+// Discord fires an autocomplete interaction on every keystroke while the user
+// is typing. Forwarding each one to SillyTavern would cause unnecessary disk
+// reads (especially for chat lists) and could back up the extension's message
+// queue faster than it can drain. Debouncing collapses each burst of keystrokes
+// into a single request: only the final keystroke within AUTOCOMPLETE_DEBOUNCE_MS
+// is forwarded. Earlier interactions in the same burst are acknowledged
+// immediately with an empty list so Discord does not mark them as failed.
 //
-// Discord requires autocomplete responses within 3 seconds. The timeout fires
-// at 2.8 seconds and responds with an empty list rather than letting the
-// interaction silently expire, which would leave the user staring at a spinner.
+// Debounce state is tracked per (userId, commandName) pair so concurrent users
+// or concurrent commands do not interfere with each other.
+//
+// Once a debounced request fires, the interaction is parked in
+// pendingAutocompletes until the extension responds. Each entry holds the
+// interaction object and a safety timeout. The timeout fires at
+// AUTOCOMPLETE_TIMEOUT_MS and responds with an empty list rather than letting
+// the interaction expire silently, which would leave the user's dropdown
+// permanently stuck on a loading spinner.
+//
 // Entries are deleted on response or timeout, whichever comes first.
 // ---------------------------------------------------------------------------
 
+const AUTOCOMPLETE_DEBOUNCE_MS = 250;
 const AUTOCOMPLETE_TIMEOUT_MS = 2800;
-const pendingAutocompletes = {};
+const autocompleteDebouncers = {}; // keyed by `${userId}:${commandName}`
+const pendingAutocompletes = {}; // keyed by requestId
 
 wss.on("connection", (ws) => {
   console.log("[Bridge] SillyTavern connected");
@@ -704,12 +720,23 @@ wss.on("connection", (ws) => {
       delete channelQueues[channelId];
     }
 
+    // Flush all debounce timers first. Any interaction still waiting in a
+    // debounce slot will never fire since the WS is gone; respond with an
+    // empty list now so Discord closes the dropdown cleanly rather than
+    // leaving it on a loading spinner until the debounce timer fires.
+    for (const [key, debouncer] of Object.entries(autocompleteDebouncers)) {
+      clearTimeout(debouncer.timer);
+      delete autocompleteDebouncers[key];
+      debouncer.interaction.respond([]).catch(() => {});
+    }
+
     // Resolve all pending autocomplete interactions immediately. If left
     // alone, each would wait for its timeout before responding - but once the
     // 3-second Discord window expires the interaction token becomes invalid
     // and respond() will throw, leaving the user's dropdown permanently stuck
     // on a loading spinner. Responding with an empty list now closes them
-    // cleanly. The timeouts are cancelled first to prevent a double respond().
+    // cleanly. The safety timeouts are cancelled first to prevent a double
+    // respond() once they eventually fire.
     for (const [requestId, pending] of Object.entries(pendingAutocompletes)) {
       clearTimeout(pending.timeout);
       delete pendingAutocompletes[requestId];
@@ -725,13 +752,15 @@ wss.on("connection", (ws) => {
 // InteractionCreate events; the handler branches on interaction type first.
 //
 // AUTOCOMPLETE path: fired while the user is still typing into a switchchar,
-// switchgroup, or switchchat option field. The bridge sends a get_autocomplete
-// packet to SillyTavern, parks the interaction in pendingAutocompletes with a
-// safety timeout, and returns. When the extension replies with
-// autocomplete_response the ws.on("message") handler above calls
-// interaction.respond() with the live list. If the extension doesn't reply in
-// time the timeout responds with an empty list rather than letting Discord
-// show an indefinite spinner.
+// switchgroup, or switchchat option field. Interactions are debounced per
+// user per command: intermediate keystrokes are dismissed with an empty
+// respond() immediately, and only the final keystroke within
+// AUTOCOMPLETE_DEBOUNCE_MS actually reaches SillyTavern as a get_autocomplete
+// packet. The resulting interaction is parked in pendingAutocompletes with a
+// safety timeout. When the extension replies, the ws.on("message") handler
+// above calls interaction.respond() with the live list. If the extension
+// doesn't reply in time the timeout responds with an empty list rather than
+// letting Discord show an indefinite spinner.
 //
 // COMMAND EXECUTION path: the slash-command counterpart to the messageCreate
 // handler below. Both paths converge on the same execute_command packet sent
@@ -774,28 +803,48 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const list = listMap[command];
     if (!list) return;
 
-    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    // Debounce: cancel any previous timer for this user+command pair and
+    // acknowledge the interaction immediately with an empty list. This
+    // satisfies Discord's 3-second requirement without forwarding every
+    // keystroke to SillyTavern. Only the final keystroke in a burst - when
+    // the timer actually fires - results in a real get_autocomplete request.
+    const debounceKey = `${interaction.user.id}:${command}`;
+    if (autocompleteDebouncers[debounceKey]) {
+      clearTimeout(autocompleteDebouncers[debounceKey].timer);
+      autocompleteDebouncers[debounceKey].interaction
+        .respond([])
+        .catch(() => {});
+    }
 
-    // Safety timeout: respond with an empty list if the extension doesn't
-    // reply within AUTOCOMPLETE_TIMEOUT_MS, preventing Discord from showing
-    // an indefinite spinner to the user.
-    const timeout = setTimeout(async () => {
-      if (!pendingAutocompletes[requestId]) return;
-      delete pendingAutocompletes[requestId];
-      log("warn", `[Autocomplete] Request ${requestId} timed out`);
-      await interaction.respond([]).catch(() => {});
-    }, AUTOCOMPLETE_TIMEOUT_MS);
+    autocompleteDebouncers[debounceKey] = {
+      interaction,
+      timer: setTimeout(async () => {
+        delete autocompleteDebouncers[debounceKey];
 
-    pendingAutocompletes[requestId] = { interaction, timeout };
+        const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-    sillyTavernClient.send(
-      JSON.stringify({
-        type: "get_autocomplete",
-        requestId,
-        list,
-        query: focusedValue,
-      }),
-    );
+        // Safety timeout: respond with an empty list if the extension doesn't
+        // reply within AUTOCOMPLETE_TIMEOUT_MS, preventing Discord from
+        // showing an indefinite spinner to the user.
+        const timeout = setTimeout(async () => {
+          if (!pendingAutocompletes[requestId]) return;
+          delete pendingAutocompletes[requestId];
+          log("warn", `[Autocomplete] Request ${requestId} timed out`);
+          await interaction.respond([]).catch(() => {});
+        }, AUTOCOMPLETE_TIMEOUT_MS);
+
+        pendingAutocompletes[requestId] = { interaction, timeout };
+
+        sillyTavernClient.send(
+          JSON.stringify({
+            type: "get_autocomplete",
+            requestId,
+            list,
+            query: focusedValue,
+          }),
+        );
+      }, AUTOCOMPLETE_DEBOUNCE_MS),
+    };
     return;
   }
 
