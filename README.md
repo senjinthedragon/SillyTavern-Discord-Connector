@@ -65,7 +65,7 @@ cp config.example.js config.js
 Edit `config.js`:
 ```javascript
 discordToken: 'YOUR_BOT_TOKEN_HERE', // The one you copied to a safe place in part 2
-wssPort: 2333, // must match the bridge URL in the extension settings
+wssPort: 2333, // must match the bridge's port in the extension settings. E.g. 2333, NOT ws://127.0.0.1:2333
 allowedUserIds: [], // (optional) add your Discord user IDs here to make the bot private
 allowedChannelIds: [], // (optional) add your Discord channel IDs here to make the bot only respond to users in specific channels
 debug: false, // set this to true to enable verbose debug logging
