@@ -39,6 +39,7 @@ const {
   Events,
   REST,
   Routes,
+  MessageFlags,
 } = require("discord.js");
 const WebSocket = require("ws");
 const fs = require("fs");
@@ -860,7 +861,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction
       .reply({
         content: "You are not authorised to use this bot.",
-        ephemeral: true,
+        flags: [MessageFlags.Ephemeral],
       })
       .catch(() => {});
     return;
@@ -873,7 +874,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction
       .reply({
         content: "This bot is not enabled in this channel.",
-        ephemeral: true,
+        flags: [MessageFlags.Ephemeral],
       })
       .catch(() => {});
     return;
@@ -883,7 +884,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction
       .reply({
         content: "Bridge is not connected to SillyTavern.",
-        ephemeral: true,
+        flags: [MessageFlags.Ephemeral],
       })
       .catch(() => {});
     return;
@@ -912,7 +913,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   await interaction
     .reply({
       content: `✓ ${command}${args.length ? " " + args.join(" ") : ""}`,
-      ephemeral: true,
+        flags: [MessageFlags.Ephemeral],
     })
     .catch(() => {});
 });
