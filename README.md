@@ -66,16 +66,17 @@ Edit `config.js`:
 ```javascript
 discordToken: 'YOUR_BOT_TOKEN_HERE', // The one you copied to a safe place in part 2
 wssPort: 2333, // must match the bridge URL in the extension settings
-allowedUserIds: [], // (optional) add your Discord user ID here to make the bot private
-allowedChannelIds: [], // (optional) add your Discord channel ID here to make the bot only respond to users in specific channels
+allowedUserIds: [], // (optional) add your Discord user IDs here to make the bot private
+allowedChannelIds: [], // (optional) add your Discord channel IDs here to make the bot only respond to users in specific channels
 debug: false, // set this to true to enable verbose debug logging
-timezone: "Europe/Amsterdam", // (optional) set this to your timezone (TZ identifier), you can find a list of all timezones at https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 ```
 
 > [!TIP]
 > To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
 > To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
 > To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode
+> You can find a list of all supported timezones [here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
 
 > [!CAUTION]
 > SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.\
