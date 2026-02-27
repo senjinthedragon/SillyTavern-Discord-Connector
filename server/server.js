@@ -385,9 +385,18 @@ function scheduleEdit(session, channel, streamId) {
 
     // In group chat, the character name header is prepended on every edit so
     // it remains visible throughout the entire streaming build-up.
-    const displayText = session.characterName
+    let displayText = session.characterName
       ? `**${session.characterName}**\n${text}`
       : text;
+
+    // Discord hard-limits message edits to 2000 characters. The live stream
+    // preview is just a "typing" indicator - if the AI is mid-sentence and
+    // already over the limit, truncate here. stream_end will post the full
+    // final text correctly via sendLong() regardless of length.
+    const DISCORD_LIMIT = 2000;
+    if (displayText.length > DISCORD_LIMIT) {
+      displayText = displayText.slice(0, DISCORD_LIMIT - 1) + "…";
+    }
 
     try {
       if (session.streamMessage) {
@@ -913,7 +922,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   await interaction
     .reply({
       content: `✓ ${command}${args.length ? " " + args.join(" ") : ""}`,
-        flags: [MessageFlags.Ephemeral],
+      flags: [MessageFlags.Ephemeral],
     })
     .catch(() => {});
 });
