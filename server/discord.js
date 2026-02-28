@@ -1,0 +1,355 @@
+/**
+ * discord.js - SillyTavern Discord Connector: Discord Client
+ * Copyright (c) 2026 Senjin the Dragon. MIT License.
+ *
+ * Manages the Discord.js client: slash command registration, incoming message
+ * routing, and interaction handling (slash commands + autocomplete).
+ *
+ * All user messages and slash commands are normalised into the same
+ * execute_command / user_message packets and forwarded to SillyTavern via the
+ * WebSocket client exported from websocket.js.
+ *
+ * Autocomplete interactions are debounced per (userId, commandName): intermediate
+ * keystrokes are dismissed immediately with an empty list; only the final
+ * keystroke within AUTOCOMPLETE_DEBOUNCE_MS reaches SillyTavern. The resolved
+ * interaction is parked in pendingAutocompletes with a safety timeout so
+ * Discord's dropdown is never left on an indefinite spinner.
+ *
+ * Numbered shortcut commands (/switchchar_1 etc.) are not registered as slash
+ * commands — their upper bound depends on the user's ST library and Discord
+ * requires static registration. They remain fully usable as plain text messages
+ * starting with "/", which messageCreate forwards as execute_command.
+ */
+
+"use strict";
+
+const {
+  Client,
+  GatewayIntentBits,
+  Events,
+  REST,
+  Routes,
+  MessageFlags,
+} = require("discord.js");
+
+const { log } = require("./logger");
+const { config, token } = require("./config-loader");
+const { getSillyTavernClient } = require("./websocket");
+const { enqueue } = require("./queue");
+const { sendLong, sendImagesToChannel } = require("./messaging");
+const {
+  streamSessions,
+  streamHandled,
+  pendingImageMessages,
+  scheduleEdit,
+  STREAM_THROTTLE_MS,
+} = require("./streaming");
+
+// ---------------------------------------------------------------------------
+// Discord client
+// ---------------------------------------------------------------------------
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+  ],
+});
+
+// ---------------------------------------------------------------------------
+// Slash command definitions
+//
+// Registered via a full PUT overwrite on every ClientReady, so adding or
+// removing an entry here takes effect on the next restart with no manual
+// cleanup. Global commands can take up to an hour to propagate; for instant
+// dev registration in a single server, swap Routes.applicationCommands for
+// Routes.applicationGuildCommands(clientId, "YOUR_GUILD_ID_HERE").
+// ---------------------------------------------------------------------------
+
+const SLASH_COMMANDS = [
+  {
+    name: "image",
+    description: "Generate an AI image via SillyTavern.",
+    options: [
+      {
+        name: "prompt",
+        type: 3,
+        description:
+          "Keyword (you, face, me, scene, last, raw_last, background) or a custom prompt",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  { name: "sthelp", description: "Show all available bridge commands" },
+  {
+    name: "newchat",
+    description: "Start a fresh chat with the current character",
+  },
+  {
+    name: "listchars",
+    description: "List all characters (includes numbered shortcuts)",
+  },
+  {
+    name: "switchchar",
+    description: "Switch to a character by exact name",
+    options: [
+      {
+        name: "name",
+        type: 3,
+        description: "Character name",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
+    name: "listgroups",
+    description: "List all groups (includes numbered shortcuts)",
+  },
+  {
+    name: "switchgroup",
+    description: "Switch to a group by exact name",
+    options: [
+      {
+        name: "name",
+        type: 3,
+        description: "Group name",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
+    name: "listchats",
+    description: "List chat history for the current character",
+  },
+  {
+    name: "switchchat",
+    description: "Load a past chat by name (omit .jsonl)",
+    options: [
+      {
+        name: "name",
+        type: 3,
+        description: "Chat filename (omit .jsonl)",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
+    name: "charimage",
+    description: "Show a character's avatar",
+    options: [
+      {
+        name: "name",
+        type: 3,
+        description:
+          "Character name (optional in solo chat; autocompletes group members in group chat)",
+        required: false,
+        autocomplete: true,
+      },
+    ],
+  },
+];
+
+client.login(token);
+
+client.on(Events.ClientReady, async (c) => {
+  console.log(`[Discord] Ready! Logged in as ${c.user.tag}`);
+  const rest = new REST({ version: "10" }).setToken(token);
+  try {
+    console.log("[Discord] Registering slash commands...");
+    await rest.put(Routes.applicationCommands(c.user.id), {
+      body: SLASH_COMMANDS,
+    });
+    console.log("[Discord] Slash commands registered.");
+  } catch (err) {
+    log("error", "[Discord] Failed to register slash commands:", err);
+  }
+});
+
+client.on("error", (err) => log("error", "[Discord] Client error:", err));
+
+// ---------------------------------------------------------------------------
+// Autocomplete debouncing
+// ---------------------------------------------------------------------------
+
+const AUTOCOMPLETE_DEBOUNCE_MS = 250;
+const AUTOCOMPLETE_TIMEOUT_MS = 2800;
+const autocompleteDebouncers = {};
+const pendingAutocompletes = {};
+
+// Map each autocomplete-enabled command to the list type the extension queries.
+// charimage uses "group_members" (only members in the active group context, not
+// the full library). image uses "image_prompts" (a static keyword list).
+const AUTOCOMPLETE_LIST_MAP = {
+  switchchar: "characters",
+  switchgroup: "groups",
+  switchchat: "chats",
+  charimage: "group_members",
+  image: "image_prompts",
+};
+
+function getPendingAutocompletes() {
+  return pendingAutocompletes;
+}
+
+function getAutocompleteDebouncers() {
+  return autocompleteDebouncers;
+}
+
+// ---------------------------------------------------------------------------
+// Interaction handler (autocomplete + slash commands)
+// ---------------------------------------------------------------------------
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isAutocomplete()) {
+    const stClient = getSillyTavernClient();
+    if (!stClient) {
+      await interaction.respond([]).catch(() => {});
+      return;
+    }
+
+    const command = interaction.commandName;
+    const focusedValue = interaction.options.getFocused();
+    const list = AUTOCOMPLETE_LIST_MAP[command];
+    if (!list) return;
+
+    const debounceKey = `${interaction.user.id}:${command}`;
+    if (autocompleteDebouncers[debounceKey]) {
+      clearTimeout(autocompleteDebouncers[debounceKey].timer);
+      autocompleteDebouncers[debounceKey].interaction
+        .respond([])
+        .catch(() => {});
+    }
+
+    autocompleteDebouncers[debounceKey] = {
+      interaction,
+      timer: setTimeout(async () => {
+        delete autocompleteDebouncers[debounceKey];
+
+        const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+        const timeout = setTimeout(async () => {
+          if (!pendingAutocompletes[requestId]) return;
+          delete pendingAutocompletes[requestId];
+          log("warn", `[Autocomplete] Request ${requestId} timed out`);
+          await interaction.respond([]).catch(() => {});
+        }, AUTOCOMPLETE_TIMEOUT_MS);
+
+        pendingAutocompletes[requestId] = { interaction, timeout };
+
+        stClient.send(
+          JSON.stringify({
+            type: "get_autocomplete",
+            requestId,
+            list,
+            query: focusedValue,
+          }),
+        );
+      }, AUTOCOMPLETE_DEBOUNCE_MS),
+    };
+    return;
+  }
+
+  if (!interaction.isChatInputCommand()) return;
+
+  if (
+    config.allowedUserIds?.length > 0 &&
+    !config.allowedUserIds.includes(interaction.user.id)
+  ) {
+    await interaction
+      .reply({
+        content: "You are not authorised to use this bot.",
+        flags: [MessageFlags.Ephemeral],
+      })
+      .catch(() => {});
+    return;
+  }
+
+  if (
+    config.allowedChannelIds?.length > 0 &&
+    !config.allowedChannelIds.includes(interaction.channelId)
+  ) {
+    await interaction
+      .reply({
+        content: "This bot is not enabled in this channel.",
+        flags: [MessageFlags.Ephemeral],
+      })
+      .catch(() => {});
+    return;
+  }
+
+  const stClient = getSillyTavernClient();
+  if (!stClient) {
+    await interaction
+      .reply({
+        content: "Bridge is not connected to SillyTavern.",
+        flags: [MessageFlags.Ephemeral],
+      })
+      .catch(() => {});
+    return;
+  }
+
+  const command = interaction.commandName;
+  const args = interaction.options.data
+    .filter((opt) => opt.type === 3)
+    .map((opt) => String(opt.value));
+  const chatId = interaction.channelId;
+
+  stClient.send(
+    JSON.stringify({ type: "execute_command", command, args, chatId }),
+  );
+
+  // Acknowledge immediately (ephemeral) to satisfy Discord's 3-second window.
+  // Ephemeral also prevents messageCreate from seeing this echo as a new "/" message.
+  await interaction
+    .reply({
+      content: `✓ ${command}${args.length ? " " + args.join(" ") : ""}`,
+      flags: [MessageFlags.Ephemeral],
+    })
+    .catch(() => {});
+});
+
+// ---------------------------------------------------------------------------
+// Incoming Discord messages → SillyTavern
+// ---------------------------------------------------------------------------
+
+client.on("messageCreate", (message) => {
+  if (message.author.bot) return;
+  if (
+    config.allowedUserIds?.length > 0 &&
+    !config.allowedUserIds.includes(message.author.id)
+  )
+    return;
+  if (
+    config.allowedChannelIds?.length > 0 &&
+    !config.allowedChannelIds.includes(message.channel.id)
+  )
+    return;
+
+  const stClient = getSillyTavernClient();
+  if (!stClient) {
+    message.reply("Bridge is not connected to SillyTavern.").catch(() => {});
+    return;
+  }
+
+  const chatId = message.channel.id;
+  const content = message.content;
+
+  if (content.startsWith("/")) {
+    const [command, ...args] = content.slice(1).split(" ");
+    stClient.send(
+      JSON.stringify({ type: "execute_command", command, args, chatId }),
+    );
+  } else {
+    stClient.send(
+      JSON.stringify({ type: "user_message", text: content, chatId }),
+    );
+  }
+});
+
+module.exports = { client, getPendingAutocompletes, getAutocompleteDebouncers };
