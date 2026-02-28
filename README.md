@@ -1,6 +1,6 @@
 # SillyTavern Discord Connector
 
-Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming support.
+Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming and images support.
 
 ## ☕ Support the Developer
 
@@ -132,7 +132,7 @@ Use these slash commands in Discord to control the session:
 | Command | Description |
 |---|---|
 | `/sthelp` | Show available commands |
-| `/newchat` | Start a fresh chat with the current character |
+| `/newchat` | Start a fresh chat and receive the character's greeting |
 | `/listchars` | List all characters with their shortcut numbers |
 | `/switchchar <name>` | Switch to a character by name - supports live autocomplete |
 | `/switchchar_#` | Switch to a character by number from `/listchars` |
@@ -142,15 +142,38 @@ Use these slash commands in Discord to control the session:
 | `/listchats` | List saved chats for the current character with shortcut numbers |
 | `/switchchat <name>` | Load a saved chat by name - supports live autocomplete |
 | `/switchchat_#` | Load a saved chat by number from `/listchats` |
+| `/charimage [name]` | Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat |
+| `/image <prompt>` | Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords |
+
+**`/image` keywords**
+
+Instead of a custom prompt you can use one of these shorthand keywords:
+
+| Keyword | Generates |
+|---|---|
+| `you` | Full body portrait of the current character |
+| `face` | Close-up portrait of the current character |
+| `me` | Full body portrait of your player character |
+| `scene` | An image based on the events of the entire chat |
+| `last` | An image based on the last message sent by the character |
+| `raw_last` | Uses the character's last message verbatim as the prompt |
+| `background` | A backdrop image based on the current setting/location |
 
 > [!NOTE]
-> Commands marked as supporting live autocomplete show a dropdown of matching names as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.
+> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready. You do not need to wait or re-run the command.
+
+> [!NOTE]
+> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.
 >
 > Numbered shortcuts (`/switchchar_3`, `/switchgroup_2`, `/switchchat_1` etc.) are not registered as slash commands because the number of entries varies per installation. Type them as plain text messages - they work exactly the same way.
 
 ## How It Works
 
 The extension runs inside SillyTavern's browser environment and connects to a local Node.js WebSocket server. When a Discord message arrives, the server forwards it to SillyTavern, which generates a response using your active character and AI settings. The reply is sent back through the bridge and posted to Discord. Streaming is supported - the Discord message updates in real time as the AI generates.
+
+When `/newchat` is used, the character's greeting message is automatically forwarded to Discord, including any images embedded in it. In group chats, each member's individual greeting is sent in order.
+
+Images embedded in character messages - whether generated automatically by SillyTavern after a reply or requested via `/image` - are fetched and posted to Discord as attachments. The `/image` command generates an AI image from a prompt or keyword and posts it once ready, with a placeholder message shown in the meantime. The `/charimage` command posts a character's avatar portrait.
 
 ## Troubleshooting
 
