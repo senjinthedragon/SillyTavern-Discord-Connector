@@ -305,7 +305,7 @@ async function sendImagesFromMesText(chatId, mesTextEl, caption) {
  */
 async function sendCharacterAvatar(chatId, character) {
   if (!character?.avatar || ws?.readyState !== WebSocket.OPEN) return;
-  const src = `/thumbnail?type=avatar&file=${encodeURIComponent(character.avatar)}`;
+  const src = `/characters/${encodeURIComponent(character.avatar)}`;
   const fetched = await fetchLocalImageAsBase64(src);
   if (!fetched) {
     console.warn("[Discord Bridge] Could not fetch character avatar.");
