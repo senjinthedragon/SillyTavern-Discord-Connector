@@ -6,18 +6,18 @@
  * Routes incoming packets from the extension to the appropriate Discord actions.
  *
  * Message types handled here:
- *   heartbeat             — echo back to keep the connection alive
- *   autocomplete_response — resolve a pending Discord autocomplete interaction
- *   generate_image_result — delete placeholder, post generated image
- *   generate_image_error  — edit placeholder to show error
- *   typing_action         — show Discord typing indicator
- *   image_placeholder     — post "🎨 Generating image…" placeholder
- *   stream_chunk          — forward cumulative token text as a throttled edit
- *   stream_end            — finalise streaming: delete edit, repost cleanly
- *   ai_reply              — post complete response (non-streaming or fallback)
- *   error_message         — forward extension error to Discord channel
- *   intro_message         — post /newchat character greeting
- *   send_images           — post one or more images to a channel
+ *   heartbeat             - echo back to keep the connection alive
+ *   autocomplete_response - resolve a pending Discord autocomplete interaction
+ *   generate_image_result - delete placeholder, post generated image
+ *   generate_image_error  - edit placeholder to show error
+ *   typing_action         - show Discord typing indicator
+ *   image_placeholder     - post "🎨 Generating image…" placeholder
+ *   stream_chunk          - forward cumulative token text as a throttled edit
+ *   stream_end            - finalise streaming: delete edit, repost cleanly
+ *   ai_reply              - post complete response (non-streaming or fallback)
+ *   error_message         - forward extension error to Discord channel
+ *   intro_message         - post /newchat character greeting
+ *   send_images           - post one or more images to a channel
  *
  * On disconnect, all in-flight state (stream sessions, image placeholders,
  * autocomplete debouncers, pending interactions, channel queues) is cleaned up
@@ -328,7 +328,7 @@ wss.on("connection", (ws) => {
     // Edit any outstanding image placeholders so they don't sit forever.
     for (const [channelId, msg] of Object.entries(pendingImageMessages)) {
       msg
-        .edit("🎨 Image generation was interrupted — bridge disconnected.")
+        .edit("🎨 Image generation was interrupted - bridge disconnected.")
         .catch(() => {});
       delete pendingImageMessages[channelId];
     }

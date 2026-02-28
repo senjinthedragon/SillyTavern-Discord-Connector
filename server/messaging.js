@@ -9,10 +9,10 @@
  *     by the browser extension and uploads them as Discord attachments.
  *
  * Image descriptors come in two forms:
- *   { type: "inline", data, mimeType, filename }  — base64 data already fetched
+ *   { type: "inline", data, mimeType, filename }  - base64 data already fetched
  *     by the extension inside the browser (local ST resources, avatars, etc.).
  *     Decoded here and uploaded without any outbound HTTP request.
- *   { type: "url", url }  — a publicly reachable external URL fetched directly
+ *   { type: "url", url }  - a publicly reachable external URL fetched directly
  *     by this server.
  *
  * Images are sent in batches of up to 10 (Discord's per-message limit).

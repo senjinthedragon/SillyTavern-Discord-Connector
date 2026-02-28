@@ -6,7 +6,7 @@
  * preserved. Each enqueue() call chains onto the previous promise for that
  * channel; the slot is freed automatically once the tail resolves.
  *
- * Stream edits bypass this queue intentionally — they fire directly to stay
+ * Stream edits bypass this queue intentionally - they fire directly to stay
  * real-time. Only stream_end (final post), ai_reply, and image operations use
  * the queue.
  */

@@ -12,7 +12,7 @@
  * while still ensuring the most recent text is always shown.
  *
  * When stream_end arrives, the streaming message is deleted and the final text
- * is reposted cleanly — removing Discord's [edited] marker. The streamHandled
+ * is reposted cleanly - removing Discord's [edited] marker. The streamHandled
  * flag tells the subsequent ai_reply packet to skip re-posting for that channel.
  */
 

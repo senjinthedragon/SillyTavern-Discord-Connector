@@ -14,7 +14,7 @@ const path = require("path");
 const configPath = path.join(__dirname, "./config.js");
 if (!fs.existsSync(configPath)) {
   console.error(
-    "[ERROR] Missing config.js — copy config.example.js and fill in your settings.",
+    "[ERROR] Missing config.js - copy config.example.js and fill in your settings.",
   );
   process.exit(1);
 }

@@ -16,7 +16,7 @@
  * Discord's dropdown is never left on an indefinite spinner.
  *
  * Numbered shortcut commands (/switchchar_1 etc.) are not registered as slash
- * commands — their upper bound depends on the user's ST library and Discord
+ * commands - their upper bound depends on the user's ST library and Discord
  * requires static registration. They remain fully usable as plain text messages
  * starting with "/", which messageCreate forwards as execute_command.
  */

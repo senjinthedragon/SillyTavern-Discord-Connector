@@ -16,7 +16,7 @@
  *
  * Image relay:
  *   Local ST images (thumbnails, generated art, avatars) are fetched here in
- *   the browser — where same-origin access is always available — and sent as
+ *   the browser - where same-origin access is always available - and sent as
  *   base64 inline data. External URLs are passed through for the bridge to
  *   fetch directly. This split works regardless of whether the bridge runs on
  *   the same machine as SillyTavern.
@@ -745,7 +745,7 @@ async function handleUserMessage(data) {
   };
   eventSource.on(GROUP_WRAPPER_FINISHED, onGroupFinished);
 
-  // User aborted — clean up without sending a reply.
+  // User aborted - clean up without sending a reply.
   const onGenerationStopped = () => {
     removeAllListeners();
     sendStreamEnd();
@@ -892,7 +892,7 @@ async function handleExecuteCommand(data) {
       }
 
       case "charimage": {
-        // In solo chat, no argument needed — active character's avatar is sent.
+        // In solo chat, no argument needed - active character's avatar is sent.
         // In group chat, an argument selects which member to show; if omitted,
         // lists the group members instead.
         const ctx = SillyTavern.getContext();
@@ -954,7 +954,7 @@ async function handleExecuteCommand(data) {
             }),
           );
         }
-        // Queue and return early — generate_image_result/error sends its own packets.
+        // Queue and return early - generate_image_result/error sends its own packets.
         enqueueImageGeneration(() => generateAndSendImage(data.chatId, prompt));
         return;
       }
@@ -1096,7 +1096,7 @@ async function handleGetAutocomplete(data) {
         }
       }
     } else if (data.list === "image_prompts") {
-      // Static keyword list — no caching needed.
+      // Static keyword list - no caching needed.
       allNames = [
         "you",
         "face",
@@ -1108,7 +1108,7 @@ async function handleGetAutocomplete(data) {
       ];
     } else if (data.list === "group_members") {
       // Only active group members, not the full character library.
-      // Empty in solo chat — correct, since the dropdown doesn't appear there.
+      // Empty in solo chat - correct, since the dropdown doesn't appear there.
       const activeGroup = (context.groups || []).find(
         (g) => g.id === context.groupId,
       );
