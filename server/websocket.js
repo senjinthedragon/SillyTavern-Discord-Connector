@@ -6,7 +6,7 @@
  * Routes incoming packets from the extension to the appropriate Discord actions.
  *
  * Message types handled here:
- *   heartbeat            — echo back to keep the connection alive
+ *   heartbeat             — echo back to keep the connection alive
  *   autocomplete_response — resolve a pending Discord autocomplete interaction
  *   generate_image_result — delete placeholder, post generated image
  *   generate_image_error  — edit placeholder to show error
