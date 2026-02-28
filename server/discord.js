@@ -5,9 +5,10 @@
  * Manages the Discord.js client: slash command registration, incoming message
  * routing, and interaction handling (slash commands + autocomplete).
  *
- * All user messages and slash commands are normalised into the same
- * execute_command / user_message packets and forwarded to SillyTavern via the
- * WebSocket client exported from websocket.js.
+ * All user messages and slash commands are normalised into execute_command /
+ * user_message packets and forwarded to SillyTavern via the WebSocket client
+ * from websocket.js. That module is required lazily (inside handlers) to avoid
+ * a circular dependency at load time.
  *
  * Autocomplete interactions are debounced per (userId, commandName): intermediate
  * keystrokes are dismissed immediately with an empty list; only the final
@@ -16,47 +17,25 @@
  * Discord's dropdown is never left on an indefinite spinner.
  *
  * Numbered shortcut commands (/switchchar_1 etc.) are not registered as slash
- * commands - their upper bound depends on the user's ST library and Discord
+ * commands — their upper bound depends on the user's ST library and Discord
  * requires static registration. They remain fully usable as plain text messages
  * starting with "/", which messageCreate forwards as execute_command.
  */
 
 "use strict";
 
-const {
-  Client,
-  GatewayIntentBits,
-  Events,
-  REST,
-  Routes,
-  MessageFlags,
-} = require("discord.js");
+const { Events, REST, Routes, MessageFlags } = require("discord.js");
 
 const { log } = require("./logger");
 const { config, token } = require("./config-loader");
-const { getSillyTavernClient } = require("./websocket");
-const { enqueue } = require("./queue");
-const { sendLong, sendImagesToChannel } = require("./messaging");
-const {
-  streamSessions,
-  streamHandled,
-  pendingImageMessages,
-  scheduleEdit,
-  STREAM_THROTTLE_MS,
-} = require("./streaming");
+const { client } = require("./client");
 
-// ---------------------------------------------------------------------------
-// Discord client
-// ---------------------------------------------------------------------------
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.DirectMessages,
-  ],
-});
+// Required lazily inside handlers to break the discord.js ↔ websocket.js
+// circular dependency. By the time any handler fires, both modules are
+// fully initialised and getSillyTavernClient is available.
+function getSillyTavernClient() {
+  return require("./websocket").getSillyTavernClient();
+}
 
 // ---------------------------------------------------------------------------
 // Slash command definitions
@@ -182,9 +161,9 @@ const AUTOCOMPLETE_TIMEOUT_MS = 2800;
 const autocompleteDebouncers = {};
 const pendingAutocompletes = {};
 
-// Map each autocomplete-enabled command to the list type the extension queries.
-// charimage uses "group_members" (only members in the active group context, not
-// the full library). image uses "image_prompts" (a static keyword list).
+// Maps each autocomplete-enabled command to the list type the extension queries.
+// charimage uses "group_members" (active group only, not the full library).
+// image uses "image_prompts" (a static keyword list built inline by the extension).
 const AUTOCOMPLETE_LIST_MAP = {
   switchchar: "characters",
   switchgroup: "groups",
@@ -352,4 +331,4 @@ client.on("messageCreate", (message) => {
   }
 });
 
-module.exports = { client, getPendingAutocompletes, getAutocompleteDebouncers };
+module.exports = { getPendingAutocompletes, getAutocompleteDebouncers };

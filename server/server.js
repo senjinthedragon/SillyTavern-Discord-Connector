@@ -5,13 +5,13 @@
  * Bootstraps the bridge: validates config, runs crash-loop protection, and
  * loads the Discord client and WebSocket server. Actual logic lives in:
  *
- *   config-loader.js  - config validation and exports
- *   logger.js         - timestamped, level-filtered logging
- *   queue.js          - per-channel async message queue
- *   messaging.js      - sendLong, image fetching and posting
- *   streaming.js      - stream session state and throttled Discord edits
- *   discord.js        - Discord client, slash commands, interaction handler
- *   websocket.js      - WebSocket server and ST→Discord message routing
+ *   config-loader.js  — config validation and exports
+ *   logger.js         — timestamped, level-filtered logging
+ *   queue.js          — per-channel async message queue
+ *   messaging.js      — sendLong, image fetching and posting
+ *   streaming.js      — stream session state and throttled Discord edits
+ *   discord.js        — Discord client, slash commands, interaction handler
+ *   websocket.js      — WebSocket server and ST→Discord message routing
  */
 
 "use strict";
@@ -69,5 +69,6 @@ require("./logger");
 require("./queue");
 require("./messaging");
 require("./streaming");
+require("./client");
 require("./discord");
 require("./websocket");
