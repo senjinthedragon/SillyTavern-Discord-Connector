@@ -29,6 +29,14 @@
  * keystroke in a burst actually reaches SillyTavern. Earlier interactions in
  * the same burst are acknowledged immediately with an empty list so Discord
  * does not flag them as failed.
+ *
+ * Image relay receives two kinds of image descriptor from the extension:
+ *   { type: "inline", data, mimeType, filename } - a local ST image that the
+ *     browser already fetched and base64-encoded; decoded here and uploaded
+ *     to Discord as an attachment without any outbound HTTP request.
+ *   { type: "url", url } - a publicly reachable external URL fetched directly
+ *     by this server. The split keeps local ST resources off the network while
+ *     avoiding unnecessary base64 overhead for large external images.
  */
 
 "use strict";
@@ -40,11 +48,15 @@ const {
   REST,
   Routes,
   MessageFlags,
+  AttachmentBuilder,
 } = require("discord.js");
 const WebSocket = require("ws");
 const fs = require("fs");
 const path = require("path");
+const https = require("https");
+const http = require("http");
 const { setGlobalDispatcher, Agent } = require("undici");
+const { Jimp } = require("jimp");
 
 // Force IPv4 and extend the connection timeout for slow networks / large responses.
 setGlobalDispatcher(
@@ -240,6 +252,21 @@ const SLASH_COMMANDS = [
       },
     ],
   },
+  {
+    name: "charimage",
+    description:
+      "Show a character's avatar (omit name in solo chat; autocompletes group members in group chat)",
+    options: [
+      {
+        name: "name",
+        type: 3, // STRING
+        description:
+          "Character name (optional in solo chat, autocompletes group members in group chat)",
+        required: false,
+        autocomplete: true,
+      },
+    ],
+  },
 ];
 
 client.login(token);
@@ -348,6 +375,200 @@ async function sendLong(channel, text) {
 }
 
 /**
+ * Modern Jimp v1.6.0 Image Optimization
+ * Scales down large images while maintaining aspect ratio.
+ */
+async function processImageForDiscord(buffer) {
+  const DISCORD_LIMIT = 7.8 * 1024 * 1024; // 7.8MB safety margin
+  if (buffer.length <= DISCORD_LIMIT) return buffer;
+
+  console.log(
+    `[Bridge] Image too large (${(buffer.length / 1024 / 1024).toFixed(2)}MB). Optimizing...`,
+  );
+
+  try {
+    const image = await Jimp.read(buffer);
+
+    // Resize logic for v1.6.0:
+    // By only providing 'w', Jimp maintains the aspect ratio automatically.
+    if (image.bitmap.width > 2048) {
+      image.resize({ w: 2048 });
+    }
+
+    // Get the buffer as a JPEG with 80% quality (standard for AI art compression)
+    const optimizedBuffer = await image.getBuffer("image/jpeg", {
+      quality: 80,
+    });
+
+    console.log(
+      `[Bridge] Optimized to ${(optimizedBuffer.length / 1024).toFixed(0)}KB`,
+    );
+    return optimizedBuffer;
+  } catch (err) {
+    console.error("[Bridge] Failed to process image:", err);
+    return buffer; // Fallback to original if something goes wrong
+  }
+}
+
+/**
+ * Fetches an image from a URL and returns it as a Buffer.
+ *
+ * Uses the raw http/https modules rather than fetch() for two reasons:
+ * streaming the response into a Buffer is straightforward with the callback
+ * API, and manual redirect handling lets us cap the chain at 5 hops to
+ * prevent redirect loops on untrusted external URLs.
+ *
+ * Rejects on non-2xx status codes. Times out after 15 seconds.
+ *
+ * @param {string} url
+ * @param {number} [redirectsLeft=5]
+ * @returns {Promise<{buffer: Buffer, contentType: string}>}
+ */
+function fetchImageBuffer(url, redirectsLeft = 5) {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith("https://") ? https : http;
+    lib
+      .get(url, { timeout: 15000 }, (res) => {
+        // Follow redirects (3xx responses).
+        if (
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          if (redirectsLeft <= 0) {
+            reject(new Error("Too many redirects"));
+            return;
+          }
+          resolve(fetchImageBuffer(res.headers.location, redirectsLeft - 1));
+          return;
+        }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+          return;
+        }
+        const contentType = res.headers["content-type"] || "image/png";
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () =>
+          resolve({ buffer: Buffer.concat(chunks), contentType }),
+        );
+        res.on("error", reject);
+      })
+      .on("error", reject)
+      .on("timeout", () => reject(new Error(`Timeout fetching ${url}`)));
+  });
+}
+
+/**
+ * Derives a safe filename from a URL for use as the Discord attachment name.
+ * Falls back to "image.png" if nothing useful can be extracted.
+ *
+ * @param {string} url
+ * @param {string} [contentType]
+ * @returns {string}
+ */
+function imageFilename(url, contentType) {
+  try {
+    const parsed = new URL(url);
+    const base = path.basename(parsed.pathname);
+    if (base && /\.[a-z]{2,5}$/i.test(base)) return base;
+  } catch {
+    // Ignore malformed URLs.
+  }
+  const ext = (contentType || "").includes("jpeg")
+    ? "jpg"
+    : (contentType || "").includes("gif")
+      ? "gif"
+      : (contentType || "").includes("webp")
+        ? "webp"
+        : "png";
+  return `image.${ext}`;
+}
+
+/**
+ * Posts one or more images to a Discord channel.
+ *
+ * Accepts a mixed array of image descriptors as produced by the extension:
+ *
+ *   { type: "inline", data, mimeType, filename }
+ *     Base64-encoded image data already fetched by the browser extension.
+ *     Decoded to a Buffer and uploaded directly - no outbound HTTP needed.
+ *
+ *   { type: "url", url }
+ *     An external (publicly reachable) URL. Fetched by the bridge server.
+ *
+ * Images are sent in batches of up to 10 (Discord's per-message limit).
+ * An optional caption is prepended to the first batch.
+ * Individual failures are logged and skipped rather than aborting the batch.
+ *
+ * @param {import("discord.js").TextChannel} channel
+ * @param {Array} images  Mixed array of image descriptors.
+ * @param {string|null} [caption]
+ */
+async function sendImagesToChannel(channel, images, caption) {
+  if (!images?.length) return;
+
+  const attachments = (
+    await Promise.all(
+      images.map(async (img) => {
+        try {
+          let buffer;
+          let filename;
+
+          if (img.type === "inline") {
+            buffer = Buffer.from(img.data, "base64");
+            filename = img.filename || "image.png";
+          } else if (img.type === "url") {
+            const { buffer: fetchedBuffer, contentType } =
+              await fetchImageBuffer(img.url);
+            buffer = fetchedBuffer;
+            filename = imageFilename(img.url, contentType);
+          } else {
+            log("warn", `[Images] Unknown image descriptor type: ${img.type}`);
+            return null;
+          }
+
+          const safeBuffer = await processImageForDiscord(buffer);
+
+          // If optimized, change extension to .jpg to match the MIME conversion
+          const finalFilename =
+            safeBuffer.length !== buffer.length
+              ? filename.replace(/\.[^/.]+$/, "") + ".jpg"
+              : filename;
+
+          return new AttachmentBuilder(safeBuffer, { name: finalFilename });
+        } catch (err) {
+          const label = img.type === "url" ? img.url : img.filename || "inline";
+          log(
+            "warn",
+            `[Images] Failed to process image "${label}": ${err.message}`,
+          );
+          return null;
+        }
+      }), // End map
+    )
+  ) // End Promise.all
+    .filter(Boolean);
+
+  if (attachments.length === 0) {
+    log(
+      "warn",
+      "[Images] All images failed to process; nothing sent to Discord.",
+    );
+    return;
+  }
+
+  // Discord allows up to 10 attachments per message.
+  const BATCH = 10;
+  for (let i = 0; i < attachments.length; i += BATCH) {
+    const batch = attachments.slice(i, i + BATCH);
+    const payload = { files: batch };
+    if (i === 0 && caption) payload.content = caption;
+    await channel.send(payload);
+  }
+}
+
+/**
  * Schedules a throttled Discord edit for an active stream session.
  *
  * Self-chaining throttle pattern:
@@ -429,7 +650,13 @@ function scheduleEdit(session, channel, streamId) {
 // WebSocket server
 // ---------------------------------------------------------------------------
 
-const wss = new WebSocket.Server({ port: wssPort });
+// Set an explicit payload limit that comfortably covers base64-encoded
+// images (Discord caps uploads at 8 MB; base64 adds ~33% overhead)
+// while preventing runaway memory use from unexpectedly large frames.
+const wss = new WebSocket.Server({
+  port: wssPort,
+  maxPayload: 50 * 1024 * 1024,
+});
 console.log(`[Bridge] WebSocket server listening on port ${wssPort}`);
 
 const userCount = config.allowedUserIds?.length || 0;
@@ -702,6 +929,63 @@ wss.on("connection", (ws) => {
         break;
       }
 
+      // -----------------------------------------------------------------------
+      // intro_message - the character greeting that SillyTavern places in the
+      // chat DOM when /newchat is called, captured by the extension's
+      // MutationObserver before any generation has taken place.
+      //
+      // Kept as a distinct message type rather than reusing ai_reply because
+      // the intro arrives outside the normal generation lifecycle: there is no
+      // streamId, no stream_end handshake, and no streamHandled flag to check.
+      // Using the same type would risk the streamHandled guard silently dropping
+      // the intro if it happened to arrive in the same channel window as a
+      // just-completed stream. The text is split across multiple Discord
+      // messages by sendLong just like any other long reply. Any images in the
+      // intro follow as a separate send_images packet.
+      // -----------------------------------------------------------------------
+      case "intro_message": {
+        const introText = (data?.text || "").trim();
+        if (!introText) break;
+        enqueue(channelId, () => sendLong(channel, introText));
+        break;
+      }
+
+      // -----------------------------------------------------------------------
+      // send_images - one or more images to post in the Discord channel.
+      //
+      // Used for:
+      //   • Images embedded in /newchat intro messages.
+      //   • AI-generated images that SillyTavern adds to a reply automatically
+      //     or on user request.
+      //   • The /charimage command (character profile picture).
+      //
+      // The extension pre-classifies every image as either:
+      //
+      //   { type: "inline", data, mimeType, filename }
+      //     A local ST image already fetched and base64-encoded by the
+      //     extension inside the browser. The bridge decodes it and uploads
+      //     it as a Discord attachment without making any outbound HTTP
+      //     request. This covers avatars, /thumbnail paths, AI-generated
+      //     images, and anything else served by the ST web process itself –
+      //     none of which is guaranteed to be reachable from wherever the
+      //     bridge server is running.
+      //
+      //   { type: "url", url }
+      //     An external image (different origin, e.g. imgur, CDNs). The
+      //     bridge fetches it directly because external URLs are publicly
+      //     reachable and may be too large to relay comfortably over the
+      //     WebSocket.
+      //
+      // An optional caption is shown above the first batch.
+      // -----------------------------------------------------------------------
+      case "send_images": {
+        const images = (data?.images || []).filter(Boolean);
+        if (!images.length) break;
+        const caption = data?.caption || null;
+        enqueue(channelId, () => sendImagesToChannel(channel, images, caption));
+        break;
+      }
+
       default:
         log("warn", "[Bridge] Unknown message type:", data.type);
     }
@@ -762,7 +1046,7 @@ wss.on("connection", (ws) => {
 // InteractionCreate events; the handler branches on interaction type first.
 //
 // AUTOCOMPLETE path: fired while the user is still typing into a switchchar,
-// switchgroup, or switchchat option field. Interactions are debounced per
+// switchgroup, switchchat, or charimage option field. Interactions are debounced per
 // user per command: intermediate keystrokes are dismissed with an empty
 // respond() immediately, and only the final keystroke within
 // AUTOCOMPLETE_DEBOUNCE_MS actually reaches SillyTavern as a get_autocomplete
@@ -805,10 +1089,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // Map each autocomplete-enabled command to the list type the extension
     // needs to query. Any command not in this map is ignored.
+    //
+    // charimage uses "group_members" rather than "characters" because it
+    // should only offer the characters actually participating in the current
+    // context - in solo chat the field is optional with no dropdown needed,
+    // and in group chat showing the full library would be noisy and unhelpful.
+    // The extension's group_members handler returns an empty list when no
+    // group is active, so the dropdown simply stays empty in solo chat.
     const listMap = {
       switchchar: "characters",
       switchgroup: "groups",
       switchchat: "chats",
+      charimage: "group_members",
     };
     const list = listMap[command];
     if (!list) return;

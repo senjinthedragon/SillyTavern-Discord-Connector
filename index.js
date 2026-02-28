@@ -36,6 +36,21 @@
  *   a stream_end message tells the bridge to replace the streaming message with
  *   a clean final copy. Group chats include the character's name; solo chats do not.
  *
+ * Image relay:
+ *   SillyTavern messages can contain embedded images (AI-generated art, intro
+ *   scene images, external links). Because the bridge server may run on a
+ *   different machine than SillyTavern, local ST images are fetched here in
+ *   the browser (same-origin access is always available) and base64-encoded
+ *   before being sent to the bridge as inline data. External URLs are passed
+ *   through as-is for the bridge to fetch directly. This split means image
+ *   delivery works regardless of network topology.
+ *
+ * Intro messages:
+ *   When /newchat starts a fresh chat, SillyTavern inserts a character greeting
+ *   into the chat DOM before any generation occurs. This is not surfaced by the
+ *   normal generation events, so a MutationObserver watches #chat for the first
+ *   AI message and forwards it (text + images) as an intro_message packet.
+ *
  * Listener hygiene:
  *   All per-message event listeners are registered inside the user_message
  *   handler and removed in every exit path (normal completion, stop, error)
@@ -71,6 +86,7 @@ const DEFAULT_SETTINGS = {
 };
 
 let ws = null;
+let shouldReconnect = true;
 let reconnectTimeout = null;
 let heartbeatInterval = null;
 
@@ -120,6 +136,469 @@ function invalidateChatCache() {
 }
 
 // ---------------------------------------------------------------------------
+// Image relay and intro-message helpers
+//
+// SillyTavern messages may embed images in two ways: local resources served
+// by the ST web process itself (thumbnails, AI-generated art saved to disk,
+// character avatars via /thumbnail?...) and external URLs pointing to CDNs
+// or image hosts like imgur.
+//
+// The bridge server may run on a different machine than SillyTavern, so it
+// cannot be relied upon to reach ST-local URLs. The extension, however,
+// always runs inside the ST browser page and has unrestricted same-origin
+// access. The strategy is therefore:
+//
+//   Local images  → fetched here in the browser, base64-encoded, sent to
+//                   the bridge as { type: "inline", data, mimeType, filename }.
+//                   The bridge decodes and uploads to Discord without making
+//                   any outbound HTTP request of its own.
+//
+//   External URLs → passed through as { type: "url", url }. The bridge
+//                   fetches them directly; they are publicly reachable and
+//                   may be large enough that routing them through the
+//                   WebSocket would be wasteful.
+//
+// Classification happens on the raw src value before any resolution, so the
+// original string is preserved for accurate same-origin comparison.
+// ---------------------------------------------------------------------------
+
+/**
+ * Classifies an image src as local (served by ST itself) or external.
+ *
+ * Local means: relative paths, protocol-relative, or absolute URLs that share
+ * the same origin as the ST web UI. These are only reachable from the browser
+ * running the extension - the bridge server may be on a different machine and
+ * cannot fetch them.
+ *
+ * External means: absolute http(s):// URLs pointing to a different origin
+ * (e.g. imgur, CDNs). The bridge can fetch these directly.
+ *
+ * @param {string} src - Raw src attribute value.
+ * @returns {"local"|"external"|null}
+ */
+function classifyImageSrc(src) {
+  if (!src) return null;
+  if (/^data:/i.test(src)) return "local"; // inline data URI - treat as local blob
+  if (src.startsWith("//")) return "external"; // protocol-relative → always external CDN
+  if (/^https?:\/\//i.test(src)) {
+    // Same origin means local; anything else is external.
+    try {
+      return new URL(src).origin === window.location.origin
+        ? "local"
+        : "external";
+    } catch {
+      return "external";
+    }
+  }
+  // Relative or root-relative path → local ST resource.
+  return "local";
+}
+
+/**
+ * Resolves a local ST image src to a full absolute URL on the same origin.
+ *
+ * Called only after classifyImageSrc has confirmed the src is local, so
+ * protocol-relative and relative paths can be safely assumed to belong to
+ * the ST origin. Keeping resolution separate from classification means
+ * classification always operates on the original src value.
+ *
+ * @param {string} src
+ * @returns {string}
+ */
+function resolveLocalUrl(src) {
+  if (/^https?:\/\//i.test(src)) return src; // already absolute same-origin
+  if (src.startsWith("//")) return window.location.protocol + src;
+  return window.location.origin + (src.startsWith("/") ? "" : "/") + src;
+}
+
+/**
+ * Fetches a local ST image and returns it as a base64-encoded object ready to
+ * embed in a send_images WebSocket packet.
+ *
+ * The extension runs inside the ST browser page, so it has unrestricted
+ * same-origin access regardless of whether ST is exposed to the network.
+ * This lets us relay images to the bridge server even when the user is
+ * remote (e.g. on a laptop away from home with only Discord access).
+ *
+ * @param {string} src - Raw image src (local).
+ * @returns {Promise<{data: string, mimeType: string, filename: string}|null>}
+ */
+async function fetchLocalImageAsBase64(src) {
+  try {
+    // data: URIs don't need fetching - decode them directly.
+    if (/^data:([^;]+);base64,/i.test(src)) {
+      const [header, data] = src.split(",", 2);
+      const mimeType = header.replace(/^data:/i, "").replace(/;base64$/i, "");
+      const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") || "png";
+      return { data, mimeType, filename: `image.${ext}` };
+    }
+
+    const url = resolveLocalUrl(src);
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn(
+        `[Discord Bridge] Image fetch failed (${response.status}): ${url}`,
+      );
+      return null;
+    }
+    const blob = await response.blob();
+    const mimeType = blob.type || "image/png";
+
+    // Discord's file upload limit is 8 MB on standard servers (25 MB with
+    // Nitro boost). Reject anything larger before wasting time encoding it
+    // and potentially overflowing the WebSocket frame.
+    const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+    if (blob.size > MAX_IMAGE_BYTES) {
+      console.warn(
+        `[Discord Bridge] Image too large to relay ` +
+          `(${(blob.size / 1024 / 1024).toFixed(1)} MB, limit 8 MB): ${url}`,
+      );
+      return null;
+    }
+
+    // Derive a filename from the URL path. /thumbnail?type=avatar&file=X.png
+    // needs special handling because the path component is just "thumbnail"
+    // with no extension; the meaningful name is in the file query parameter.
+    let filename;
+    try {
+      const parsed = new URL(url);
+      if (parsed.pathname === "/thumbnail") {
+        const fileParam = parsed.searchParams.get("file");
+        filename = fileParam ? fileParam.split("/").pop() : "avatar.png";
+      } else {
+        const base = parsed.pathname.split("/").pop();
+        filename =
+          base && /\.[a-z]{2,5}$/i.test(base)
+            ? base
+            : `image.${mimeType.split("/")[1]?.replace("jpeg", "jpg") || "png"}`;
+      }
+    } catch {
+      filename = "image.png";
+    }
+
+    // Convert blob → base64 via FileReader.
+    const data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",", 2)[1]);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+
+    return { data, mimeType, filename };
+  } catch (err) {
+    console.warn(
+      `[Discord Bridge] Failed to fetch local image: ${err.message}`,
+    );
+    return null;
+  }
+}
+
+/**
+ * Extracts all image srcs from a .mes_text element.
+ *
+ * Returns the raw src attribute values without resolving them so that
+ * classifyImageSrc can operate on the original strings. Resolution to
+ * absolute URLs is deferred to fetchLocalImageAsBase64 for local images
+ * and is not needed at all for external URLs.
+ *
+ * @param {Element} mesTextEl
+ * @returns {string[]} Raw src attribute values (unresolved).
+ */
+function extractImageSrcsFromMesText(mesTextEl) {
+  if (!mesTextEl) return [];
+  return Array.from(mesTextEl.querySelectorAll("img"))
+    .map((img) => img.getAttribute("src"))
+    .filter(Boolean);
+}
+
+/**
+ * Extracts the plain text content from a .mes_text element, stripping HTML
+ * tags but preserving paragraph breaks.
+ *
+ * @param {Element} mesTextEl - The .mes_text DOM element.
+ * @returns {string} Plain text.
+ */
+function extractTextFromMesText(mesTextEl) {
+  if (!mesTextEl) return "";
+  // Clone so we don't mutate the live DOM.
+  const clone = mesTextEl.cloneNode(true);
+  // Replace <p> and <br> with newlines before getting innerText so paragraph
+  // structure is preserved.
+  for (const p of clone.querySelectorAll("p")) {
+    p.insertAdjacentText("afterend", "\n\n");
+  }
+  for (const br of clone.querySelectorAll("br")) {
+    br.replaceWith("\n");
+  }
+  return clone.innerText?.replace(/\n{3,}/g, "\n\n").trim() || "";
+}
+
+/**
+ * Collects images from a list of raw src values, fetching local ones via the
+ * browser and passing external URLs through for the bridge to fetch itself.
+ *
+ * Returns a mixed array of:
+ *   { type: "inline", data, mimeType, filename }  ← local, already fetched
+ *   { type: "url",    url }                        ← external, bridge fetches
+ *
+ * @param {string[]} srcs - Raw src attribute values.
+ * @returns {Promise<Array>}
+ */
+async function collectImages(srcs) {
+  const results = await Promise.all(
+    srcs.map(async (src) => {
+      const kind = classifyImageSrc(src);
+      if (!kind) return null;
+      if (kind === "local") {
+        const fetched = await fetchLocalImageAsBase64(src);
+        if (!fetched) return null;
+        return { type: "inline", ...fetched };
+      }
+      // External: hand the URL to the bridge.
+      return { type: "url", url: src };
+    }),
+  );
+  return results.filter(Boolean);
+}
+
+/**
+ * Sends a collected image list to the bridge for posting on Discord.
+ *
+ * Kept as a standalone function so that sendCharacterAvatar can bypass
+ * the collectImages pipeline and send a single pre-fetched inline image
+ * without the overhead of src extraction and classification.
+ *
+ * @param {string} chatId
+ * @param {Array} images - Output of collectImages(), or a manually constructed
+ *   array of { type: "inline", ... } / { type: "url", ... } descriptors.
+ * @param {string|null} [caption]
+ */
+function sendCollectedImages(chatId, images, caption) {
+  if (!images?.length || ws?.readyState !== WebSocket.OPEN) return;
+  ws.send(
+    JSON.stringify({
+      type: "send_images",
+      chatId,
+      images,
+      caption: caption || null,
+    }),
+  );
+}
+
+/**
+ * Extracts, classifies, and relays all images found in a .mes_text element.
+ *
+ * Composes extractImageSrcsFromMesText → collectImages → sendCollectedImages.
+ * Local images are fetched by the browser before the packet is sent; external
+ * URLs are passed through for the bridge to retrieve. Exits early if the
+ * element contains no images so callers do not need to check first.
+ *
+ * @param {string} chatId
+ * @param {Element} mesTextEl
+ * @param {string|null} [caption]
+ */
+async function sendImagesFromMesText(chatId, mesTextEl, caption) {
+  const srcs = extractImageSrcsFromMesText(mesTextEl);
+  if (!srcs.length) return;
+  const images = await collectImages(srcs);
+  if (images.length > 0) sendCollectedImages(chatId, images, caption);
+}
+
+/**
+ * Sends the avatar image of a character to Discord.
+ *
+ * The avatar is served by ST via /thumbnail?type=avatar&file=<filename> and
+ * is therefore always a local resource fetched by the extension.
+ *
+ * @param {string} chatId
+ * @param {object} character - A SillyTavern character object.
+ */
+async function sendCharacterAvatar(chatId, character) {
+  if (!character?.avatar || ws?.readyState !== WebSocket.OPEN) return;
+  const src = `/thumbnail?type=avatar&file=${encodeURIComponent(character.avatar)}`;
+  const fetched = await fetchLocalImageAsBase64(src);
+  if (!fetched) {
+    console.warn("[Discord Bridge] Could not fetch character avatar.");
+    return;
+  }
+  sendCollectedImages(
+    chatId,
+    [{ type: "inline", ...fetched }],
+    character.name ? `**${character.name}**` : null,
+  );
+}
+
+/**
+ * Scans the last AI message in the chat DOM for images and sends them to Discord.
+ *
+ * Called at the tail of collectAndSendReplies to catch images that SillyTavern
+ * adds to a message after generation: either automatically (if ST is configured
+ * to generate art after each reply) or on demand when the user requests one.
+ * In both cases ST inserts an <img> into the message HTML after the text has
+ * already been sent to the chat array, so this DOM-based scan is the only
+ * reliable way to detect them.
+ *
+ * The function is async because local images must be fetched via the browser,
+ * but callers deliberately do not await it: text replies reach Discord first
+ * and images trail behind independently without blocking the reply pipeline.
+ *
+ * @param {string} chatId
+ */
+async function sendLastMessageImages(chatId) {
+  const messages = document.querySelectorAll("#chat .mes");
+  if (!messages.length) return;
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage.getAttribute("is_user") === "true") return;
+  const mesText = lastMessage.querySelector(".mes_text");
+  await sendImagesFromMesText(chatId, mesText);
+}
+
+/**
+ * Captures all introductory greetings that SillyTavern places in the chat
+ * after /newchat and forwards them (text + any embedded images) to Discord.
+ *
+ * In solo chat, one AI .mes element appears for the single character's
+ * greeting. In group chat, SillyTavern inserts one .mes per group member in
+ * sequence - each character's greeting is a separate DOM element and must
+ * all be captured and forwarded individually.
+ *
+ * Intro messages are written directly into the chat DOM as pre-existing AI
+ * turns; they are never produced by the generation pipeline and so fire none
+ * of the GENERATION_STARTED/ENDED events the normal reply path depends on.
+ * A MutationObserver on #chat is used to detect arrivals instead.
+ *
+ * Settling strategy:
+ *   The observer stays connected after the first message arrives, accumulating
+ *   all messages as they are added. A short settling timer (INTRO_SETTLE_MS)
+ *   is (re)started on each new arrival and only fires when the DOM has been
+ *   quiet for that window - at which point all intros are considered complete.
+ *
+ *   As an optimisation in group chat, the expected member count is read from
+ *   context up front. If the collected message count reaches that number the
+ *   observer disconnects immediately without waiting for the settling timer,
+ *   giving a faster response when all members have greetings. The timer still
+ *   provides the correct fallback when some members have no greeting defined.
+ *
+ * A hard 10-second timeout disconnects the observer regardless, preventing a
+ * permanent listener leak if ST never adds any intro messages at all.
+ *
+ * @param {string} chatId
+ */
+function captureAndSendIntroMessage(chatId) {
+  const chatEl = document.getElementById("chat");
+  if (!chatEl || !chatId || ws?.readyState !== WebSocket.OPEN) return;
+
+  // How many intro messages to expect. In group chat this is the number of
+  // members in the active group; in solo chat it is 1. Used to short-circuit
+  // the settling timer as soon as all greetings have arrived.
+  const ctx = SillyTavern.getContext();
+  const activeGroup = ctx.groupId
+    ? (ctx.groups || []).find((g) => g.id === ctx.groupId)
+    : null;
+  const expectedCount = activeGroup?.members?.length ?? 1;
+
+  // Track which .mes elements we have already seen so new arrivals can be
+  // distinguished from messages that were present before /newchat ran.
+  const seen = new Set();
+
+  const isIntroMessage = (el) =>
+    el.classList.contains("mes") && el.getAttribute("is_user") !== "true";
+
+  // Collect all qualifying .mes elements currently in the DOM that have not
+  // been seen yet. Returns the newly found elements.
+  const collectNew = () => {
+    const fresh = [];
+    for (const el of chatEl.querySelectorAll(".mes")) {
+      if (isIntroMessage(el) && !seen.has(el)) {
+        seen.add(el);
+        fresh.push(el);
+      }
+    }
+    return fresh;
+  };
+
+  // Send one intro message element to Discord: text first, then images.
+  const sendOne = async (mesEl) => {
+    const mesText = mesEl.querySelector(".mes_text");
+    if (!mesText) return;
+    const text = extractTextFromMesText(mesText);
+    if (text && ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "intro_message", chatId, text }));
+    }
+    await sendImagesFromMesText(chatId, mesText);
+  };
+
+  // Flush all accumulated unsent messages and then shut down.
+  // Called either when expectedCount is reached or when the settling timer
+  // fires after a quiet period.
+  //
+  // Async so that each character's text and images are fully sent before the
+  // next character's content is queued, keeping text and images interleaved
+  // in the correct per-character order on Discord.
+  const flush = async (observer, hardTimeoutId, settleTimeoutId) => {
+    observer.disconnect();
+    clearTimeout(hardTimeoutId);
+    clearTimeout(settleTimeoutId);
+    // collectNew() at flush time picks up anything added between the last
+    // observer callback and this call, though in practice seen is already
+    // current by the time either trigger fires.
+    for (const el of collectNew()) await sendOne(el);
+  };
+
+  let settleTimeoutId = null;
+  let hardTimeoutId = null;
+  let observer = null;
+
+  // How long to wait after the last new .mes before declaring all intros done.
+  // 600 ms is enough to absorb ST's sequential group-intro rendering without
+  // feeling sluggish to the Discord user.
+  const INTRO_SETTLE_MS = 600;
+
+  // Async so that each character's text is followed by its own images before
+  // moving on to the next character. MutationObserver does not await its
+  // callback, but that is fine - we only need sequential ordering within a
+  // single invocation, not across separate mutation batches.
+  const onMutation = async () => {
+    const fresh = collectNew();
+    if (!fresh.length) return;
+
+    // Send each new message (text then images) in order so Discord output
+    // stays correctly interleaved per character.
+    for (const el of fresh) await sendOne(el);
+
+    // Short-circuit: all expected greetings have arrived.
+    if (seen.size >= expectedCount) {
+      flush(observer, hardTimeoutId, settleTimeoutId);
+      return;
+    }
+
+    // Reset the settling timer - more messages may still be coming.
+    clearTimeout(settleTimeoutId);
+    settleTimeoutId = setTimeout(
+      () => flush(observer, hardTimeoutId, null),
+      INTRO_SETTLE_MS,
+    );
+  };
+
+  observer = new MutationObserver(onMutation);
+  // subtree: true catches .mes elements whether ST adds them as direct
+  // children of #chat or inside a wrapper element it inserts first.
+  observer.observe(chatEl, { childList: true, subtree: true });
+
+  // Hard timeout: disconnect even if no messages ever arrive (e.g. a character
+  // with no greeting defined, or ST takes unexpectedly long to render).
+  hardTimeoutId = setTimeout(() => {
+    observer.disconnect();
+    clearTimeout(settleTimeoutId);
+    console.warn("[Discord Bridge] Intro message capture timed out");
+  }, 10_000);
+
+  // Run an immediate scan in case doNewChat populated messages synchronously
+  // before the observer was installed.
+  onMutation();
+}
+
+// ---------------------------------------------------------------------------
 // Settings helpers
 // ---------------------------------------------------------------------------
 
@@ -149,6 +628,8 @@ function connect() {
   ) {
     return;
   }
+
+  shouldReconnect = true;
 
   const settings = getSettings();
   if (!settings.bridgeUrl) {
@@ -254,6 +735,8 @@ function connect() {
         // Walk the chat array backwards to collect all consecutive AI messages
         // since the last user turn. Sends them as an ai_reply payload so the
         // bridge can post them on Discord (non-streaming path only).
+        // Also checks the last AI message in the DOM for any embedded images
+        // (AI-generated or character images) and forwards them to Discord.
         const collectAndSendReplies = () => {
           if (!messageState.chatId || ws?.readyState !== WebSocket.OPEN) return;
           const { chat } = SillyTavern.getContext();
@@ -287,6 +770,18 @@ function connect() {
               }),
             );
           }
+
+          // Forward any images embedded in the last AI message to Discord.
+          // This covers both automatically generated images (when SillyTavern
+          // is configured to auto-generate after each reply) and images the
+          // user requested manually – in both cases ST inserts an <img> into
+          // the message HTML which we detect and relay here.
+          //
+          // sendLastMessageImages is async (it fetches local images via the
+          // browser) but we deliberately do not await it here: text replies
+          // should reach Discord immediately, and image delivery can trail
+          // behind without blocking anything.
+          sendLastMessageImages(messageState.chatId);
         };
 
         // Assign a new streamId at the start of each character's turn so the
@@ -423,7 +918,7 @@ function connect() {
       // get_autocomplete - the bridge is asking for a live list to populate
       // a Discord autocomplete dropdown while the user is typing.
       //
-      // data.list    "characters" | "groups" | "chats"
+      // data.list    "characters" | "groups" | "chats" | "group_members"
       // data.query   The partial string the user has typed so far. Used to
       //              filter results so the most relevant names appear first.
       //              An empty string returns all entries (up to 25).
@@ -492,6 +987,31 @@ function connect() {
                 chatCache[context.characterId] = { names: allNames };
               }
             }
+          } else if (data.list === "group_members") {
+            // Returns the names of characters participating in the currently
+            // active group so the /charimage autocomplete dropdown shows only
+            // the relevant members rather than the full character library.
+            //
+            // In solo chat groupId is undefined and the list stays empty,
+            // which is correct: the dropdown will not appear for that case
+            // because the bridge only requests group_members when a group is
+            // active (see the charimage command handler).
+            //
+            // Group membership is read synchronously from context on every
+            // request. No caching is applied: the list is cheap to build and
+            // changes whenever the user switches group, so a stale cache would
+            // cause more problems than the negligible cost of rebuilding it.
+            const activeGroup = (context.groups || []).find(
+              (g) => g.id === context.groupId,
+            );
+            if (activeGroup?.members?.length) {
+              allNames = activeGroup.members
+                .map((id) => {
+                  const char = context.characters.find((c) => c.id === id);
+                  return char?.name?.trim() || null;
+                })
+                .filter(Boolean);
+            }
           }
         } catch (err) {
           // On any unexpected error, fall through with an empty choices array.
@@ -541,6 +1061,10 @@ function connect() {
               // invalidate the chat cache so it is rebuilt on the next
               // autocomplete request.
               invalidateChatCache();
+              // Capture the introductory/greeting message that SillyTavern
+              // places in the chat after a new chat is started, and forward
+              // it (text + any embedded images) to Discord.
+              captureAndSendIntroMessage(data.chatId);
               replyText = "New chat started.";
               break;
 
@@ -655,6 +1179,72 @@ function connect() {
               break;
             }
 
+            case "charimage": {
+              // Sends a character's avatar to Discord.
+              //
+              // In solo chat, no argument is needed - the active character's
+              // avatar is sent automatically. An explicit name may still be
+              // provided and will be matched against the full character list.
+              //
+              // In group chat, the optional name argument selects which group
+              // member to show. If omitted in group context, the command lists
+              // the participating members so the user knows what to pick.
+              //
+              // sendCharacterAvatar is async (it fetches the image via the
+              // browser) but is not awaited here so the text reply reaches
+              // Discord immediately while image delivery follows behind it.
+              const ctx = SillyTavern.getContext();
+              const isGroup = !!ctx.groupId;
+              const targetName = data.args?.join(" ").trim() || null;
+
+              if (targetName) {
+                // Explicit name provided: search the full character list.
+                // In group context this is still valid - a user may type the
+                // name manually rather than using the autocomplete dropdown.
+                const target = ctx.characters.find(
+                  (c) => c.name?.toLowerCase() === targetName.toLowerCase(),
+                );
+                if (!target) {
+                  replyText = `Character "${targetName}" not found.`;
+                  break;
+                }
+                sendCharacterAvatar(data.chatId, target); // async, not awaited
+                replyText = `Sending avatar for **${target.name}**…`;
+              } else if (isGroup) {
+                // Group chat, no name given: list the group members so the
+                // user knows which names to use with the autocomplete option.
+                const activeGroup = (ctx.groups || []).find(
+                  (g) => g.id === ctx.groupId,
+                );
+                const memberNames = (activeGroup?.members || [])
+                  .map((id) => {
+                    const c = ctx.characters.find((ch) => ch.id === id);
+                    return c?.name?.trim() || null;
+                  })
+                  .filter(Boolean);
+                replyText = memberNames.length
+                  ? "Group members:\n\n" +
+                    memberNames.map((n) => `\u2022 ${n}`).join("\n") +
+                    "\n\nUse /charimage <n> to see a member's avatar."
+                  : "No members found in the current group.";
+              } else {
+                // Solo chat, no name given: send the active character.
+                if (
+                  ctx.characterId === undefined ||
+                  !ctx.characters?.[ctx.characterId]
+                ) {
+                  replyText = "No character is currently selected.";
+                  break;
+                }
+                sendCharacterAvatar(
+                  data.chatId,
+                  ctx.characters[ctx.characterId],
+                ); // async, not awaited
+                replyText = `Sending avatar for **${ctx.characters[ctx.characterId].name}**…`;
+              }
+              break;
+            }
+
             case "sthelp":
               replyText =
                 "Available commands:\n" +
@@ -665,7 +1255,8 @@ function connect() {
                 "/listgroups - List all groups\n" +
                 "/switchgroup <name> or /switchgroup_# - Switch group\n" +
                 "/listchats - List chat history for current character\n" +
-                "/switchchat <name> or /switchchat_# - Load a past chat";
+                "/switchchat <name> or /switchchat_# - Load a past chat\n" +
+                "/charimage [name] - Show a character's avatar (name optional in solo chat, autocompletes in group chat)";
               break;
 
             default: {
@@ -777,7 +1368,8 @@ function connect() {
 
     // Auto-reconnect logic
     const settings = getSettings();
-    if (settings.autoConnect) {
+    // Only reconnect if autoConnect is enabled AND we didn't manually disconnect
+    if (settings.autoConnect && shouldReconnect) {
       console.log("[Discord Bridge] Connection lost. Retrying in 5 seconds...");
       updateStatus("Reconnecting...", "orange");
 
@@ -788,6 +1380,10 @@ function connect() {
           connect();
         }, 5000);
       }
+    } else if (!shouldReconnect) {
+      console.log(
+        "[Discord Bridge] Manual disconnect. Auto-reconnect suppressed.",
+      );
     }
   };
 
@@ -798,7 +1394,15 @@ function connect() {
 }
 
 function disconnect() {
-  ws?.close();
+  shouldReconnect = false;
+  if (ws) {
+    ws.close();
+  }
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  updateStatus("Disconnected", "red");
 }
 
 // ---------------------------------------------------------------------------
