@@ -12,6 +12,7 @@
  *   streaming.js      - stream session state and throttled Discord edits
  *   discord.js        - Discord client, slash commands, interaction handler
  *   websocket.js      - WebSocket server and ST→Discord message routing
+ *   client.js         - Discord.js Client instance (separate to avoid circular refs)
  */
 
 "use strict";
