@@ -51,6 +51,24 @@
  *   normal generation events, so a MutationObserver watches #chat for the first
  *   AI message and forwards it (text + images) as an intro_message packet.
  *
+ * AI image generation (/image command):
+ *   The /image slash command forwards a prompt or keyword to SillyTavern's /sd
+ *   command (stable diffusion; /image and /img are aliases). Because generation
+ *   can take seconds to minutes depending on hardware, the flow is:
+ *     1. An image_placeholder packet is sent immediately so the bridge can post
+ *        a "🎨 Generating image…" message in Discord while the user waits.
+ *     2. A MutationObserver on #chat watches for any new img.mes_img element
+ *        whose src was not present before the command fired. This works for both
+ *        DOM layouts ST may use (image in a new .mes, or injected into an
+ *        existing one).
+ *     3. When the image appears it is fetched via fetchLocalImageAsBase64 (same
+ *        path as all other local ST images) and sent as generate_image_result.
+ *        The bridge then deletes the placeholder and posts the image.
+ *     4. On failure or timeout (20 minutes) a generate_image_error packet is
+ *        sent instead, and the bridge edits the placeholder to show the error.
+ *   Requests are serialised through imageQueue so concurrent /image calls and
+ *   overlapping chat generations never fire /sd into ST simultaneously.
+ *
  * Listener hygiene:
  *   All per-message event listeners are registered inside the user_message
  *   handler and removed in every exit path (normal completion, stop, error)
@@ -599,6 +617,185 @@ function captureAndSendIntroMessage(chatId) {
 }
 
 // ---------------------------------------------------------------------------
+// Image generation queue
+//
+// Serialises /image requests so that two concurrent Discord users (or a rapid
+// double-tap of the command) never fire overlapping /sd calls into SillyTavern.
+// Each request is a link in a Promise chain; the next one only starts once the
+// previous one has fully resolved or rejected (i.e. the image was sent or an
+// error was reported).
+//
+// There is intentionally no separate check for "is chat generation in progress".
+// Queuing here means the image request simply waits its turn in the Promise
+// chain; if ST is already busy the /sd slash command will queue on ST's side
+// as well, which is the correct behaviour.
+// ---------------------------------------------------------------------------
+
+let imageQueue = Promise.resolve();
+
+/**
+ * Wraps fn() in the image generation queue so requests never overlap.
+ * @param {() => Promise<void>} fn
+ */
+function enqueueImageGeneration(fn) {
+  imageQueue = imageQueue
+    .then(() => fn())
+    .catch((err) => {
+      console.error("[Discord Bridge] Image generation queue error:", err);
+    });
+}
+
+/**
+ * Executes an /sd (image generation) command in SillyTavern and waits for the
+ * resulting image to appear in the chat DOM, then relays it to the bridge.
+ *
+ * Detection strategy:
+ *   A MutationObserver watches the entire #chat subtree for any new img.mes_img
+ *   element. This works regardless of whether ST injects the image into a new
+ *   .mes element or appends it to an existing one - both cases produce a new
+ *   <img class="mes_img"> node in the subtree.
+ *
+ *   The observer records a snapshot of all existing img.mes_img srcs BEFORE the
+ *   slash command fires so that only genuinely new images are forwarded, not ones
+ *   that were already present from an earlier generation.
+ *
+ * Hard timeout:
+ *   Image generation can take up to ~20 minutes on slow hardware. The observer
+ *   is kept alive for IMAGE_GENERATION_TIMEOUT_MS and then abandoned, sending an
+ *   error packet back to the bridge so the placeholder message can be updated.
+ *
+ * @param {string} chatId   - Discord channel ID, echoed in every response packet.
+ * @param {string} prompt   - The prompt string or keyword passed to /sd.
+ * @returns {Promise<void>}  Resolves when the image is sent or an error is reported.
+ */
+function generateAndSendImage(chatId, prompt) {
+  return new Promise(async (resolve) => {
+    // 20-minute hard timeout - generous enough for potato hardware.
+    const IMAGE_GENERATION_TIMEOUT_MS = 20 * 60 * 1000;
+
+    const chatEl = document.getElementById("chat");
+    if (!chatEl || ws?.readyState !== WebSocket.OPEN) {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "generate_image_error",
+            chatId,
+            text: "Could not find the SillyTavern chat element.",
+          }),
+        );
+      }
+      return resolve();
+    }
+
+    // Snapshot of img srcs already in the DOM before we fire the command.
+    // Any img.mes_img whose src appears in this set is pre-existing and must
+    // be ignored by the observer.
+    const existingSrcs = new Set(
+      Array.from(chatEl.querySelectorAll("img.mes_img"))
+        .map((img) => img.getAttribute("src"))
+        .filter(Boolean),
+    );
+
+    let hardTimeoutId = null;
+    let observer = null;
+    let settled = false;
+
+    const finish = (cleanupFn) => {
+      if (settled) return;
+      settled = true;
+      if (observer) observer.disconnect();
+      clearTimeout(hardTimeoutId);
+      cleanupFn();
+      resolve();
+    };
+
+    // Called when a new img.mes_img appears in the DOM.
+    const onNewImage = async (src) => {
+      finish(() => {}); // Stop observing immediately - we have our image.
+
+      const fetched = await fetchLocalImageAsBase64(src);
+      if (!fetched) {
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "generate_image_error",
+              chatId,
+              text: "Image was generated but could not be fetched from SillyTavern.",
+            }),
+          );
+        }
+        return;
+      }
+
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "generate_image_result",
+            chatId,
+            image: { type: "inline", ...fetched },
+          }),
+        );
+      }
+    };
+
+    // Watch the entire #chat subtree for new img.mes_img nodes.
+    observer = new MutationObserver(() => {
+      for (const img of chatEl.querySelectorAll("img.mes_img")) {
+        const src = img.getAttribute("src");
+        if (src && !existingSrcs.has(src)) {
+          // Found a genuinely new generated image.
+          onNewImage(src);
+          return;
+        }
+      }
+    });
+
+    observer.observe(chatEl, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["src"],
+    });
+
+    // Hard timeout.
+    hardTimeoutId = setTimeout(() => {
+      finish(() => {
+        console.warn(
+          "[Discord Bridge] Image generation timed out after 20 minutes.",
+        );
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "generate_image_error",
+              chatId,
+              text: "Image generation timed out (20 minutes). SillyTavern may still be processing.",
+            }),
+          );
+        }
+      });
+    }, IMAGE_GENERATION_TIMEOUT_MS);
+
+    // Fire the slash command. /sd, /image and /img are all aliases in ST.
+    try {
+      await executeSlashCommandsWithOptions(`/sd ${prompt}`);
+    } catch (err) {
+      finish(() => {
+        console.error("[Discord Bridge] /sd command failed:", err);
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "generate_image_error",
+              chatId,
+              text: `Image generation failed: ${err.message || "Unknown error"}`,
+            }),
+          );
+        }
+      });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Settings helpers
 // ---------------------------------------------------------------------------
 
@@ -918,7 +1115,8 @@ function connect() {
       // get_autocomplete - the bridge is asking for a live list to populate
       // a Discord autocomplete dropdown while the user is typing.
       //
-      // data.list    "characters" | "groups" | "chats" | "group_members"
+      // data.list    "characters" | "groups" | "chats" | "group_members" |
+      //              "image_prompts"
       // data.query   The partial string the user has typed so far. Used to
       //              filter results so the most relevant names appear first.
       //              An empty string returns all entries (up to 25).
@@ -987,6 +1185,31 @@ function connect() {
                 chatCache[context.characterId] = { names: allNames };
               }
             }
+          } else if (data.list === "image_prompts") {
+            // Returns the fixed set of ST image generation keywords for the
+            // /image autocomplete dropdown. These are the special-purpose
+            // arguments that /sd (and its /image, /img aliases) recognises:
+            //   you        - full body portrait of the current character
+            //   face       - close-up portrait of the current character
+            //   me         - full body portrait of the player character
+            //   scene      - image based on the entire chat history
+            //   last       - image based on the last AI message
+            //   raw_last   - last AI message used verbatim as the prompt
+            //   background - backdrop image for the ST interface
+            //
+            // The list is static and never changes, so no caching or TTL is
+            // applied - it is always built inline on every request. The user
+            // can also type a free-form custom prompt; the keyword list
+            // appears as a convenient starting point in the dropdown.
+            allNames = [
+              "you",
+              "face",
+              "me",
+              "scene",
+              "last",
+              "raw_last",
+              "background",
+            ];
           } else if (data.list === "group_members") {
             // Returns the names of characters participating in the currently
             // active group so the /charimage autocomplete dropdown shows only
@@ -1245,6 +1468,43 @@ function connect() {
               break;
             }
 
+            case "image": {
+              if (!data.args?.length) {
+                replyText =
+                  "Usage: /image <prompt> or /image <keyword>\n" +
+                  "Keywords: you, face, me, scene, last, raw_last, background";
+                break;
+              }
+              const prompt = data.args.join(" ").trim();
+
+              // Acknowledge the command immediately - generation may take minutes.
+              // The bridge stores this message reference and will delete it when
+              // the image arrives (generate_image_result) or edit it on failure.
+              if (ws?.readyState === WebSocket.OPEN) {
+                ws.send(
+                  JSON.stringify({
+                    type: "image_placeholder",
+                    chatId: data.chatId,
+                    text: "🎨 Generating image…",
+                  }),
+                );
+              }
+
+              // Queue the generation so concurrent /image requests and ongoing
+              // chat generations do not overlap. The Promise resolves once the
+              // image packet (generate_image_result or generate_image_error)
+              // has been sent to the bridge.
+              enqueueImageGeneration(() =>
+                generateAndSendImage(data.chatId, prompt),
+              );
+
+              // Return early - the queued work sends its own WebSocket packets.
+              // We must NOT fall through to the ai_reply send at the bottom of
+              // the execute_command block because the placeholder was already sent
+              // above and replyText is still the default failure string.
+              return;
+            }
+
             case "sthelp":
               replyText =
                 "Available commands:\n" +
@@ -1256,7 +1516,8 @@ function connect() {
                 "/switchgroup <name> or /switchgroup_# - Switch group\n" +
                 "/listchats - List chat history for current character\n" +
                 "/switchchat <name> or /switchchat_# - Load a past chat\n" +
-                "/charimage [name] - Show a character's avatar (name optional in solo chat, autocompletes in group chat)";
+                "/charimage [name] - Show a character's avatar (name optional in solo chat, autocompletes in group chat)\n" +
+                "/image <prompt or keyword> - Generate an AI image. Keywords: you, face, me, scene, last, raw_last, background";
               break;
 
             default: {

@@ -192,6 +192,21 @@ const client = new Client({
 
 const SLASH_COMMANDS = [
   {
+    name: "image",
+    description:
+      "Generate an AI image via SillyTavern. Use a keyword or type your own prompt.",
+    options: [
+      {
+        name: "prompt",
+        type: 3, // STRING
+        description:
+          "Keyword (you, face, me, scene, last, raw_last, background) or a custom prompt",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
     name: "sthelp",
     description: "Show all available bridge commands",
   },
@@ -350,6 +365,11 @@ const STREAM_THROTTLE_MS = 1200;
 // Channels where stream_end has already posted the final message. The
 // subsequent ai_reply sent by SillyTavern is skipped for these channels.
 const streamHandled = new Set();
+
+// Placeholder messages sent while an AI image is being generated, keyed by
+// channelId. Stored here so generate_image_result/error can delete or edit
+// them once the extension reports back.
+const pendingImageMessages = {};
 
 /**
  * Splits text that exceeds Discord's 2000-character limit into multiple
@@ -750,6 +770,66 @@ wss.on("connection", (ws) => {
       return;
     }
 
+    // -----------------------------------------------------------------------
+    // generate_image_result - a successfully generated AI image.
+    //
+    // The extension watched the ST chat DOM for a new img.mes_img element,
+    // fetched it as a base64-encoded inline image, and sent it here.
+    //
+    // Flow:
+    //   1. Look up the pending placeholder message stored under this chatId.
+    //   2. Delete the "🎨 Generating image…" placeholder.
+    //   3. Post the image as a Discord attachment via the existing
+    //      sendImagesToChannel pipeline (handles resizing, batching, etc.).
+    //
+    // The placeholder lookup/delete and image post are routed through the
+    // channel queue so they interleave correctly with any chat replies that
+    // may have arrived while generation was in progress.
+    // -----------------------------------------------------------------------
+    if (data.type === "generate_image_result") {
+      const channelId = data.chatId;
+      const channel = client.channels.cache.get(channelId);
+      if (!channel) return;
+
+      const pending = pendingImageMessages[channelId];
+      delete pendingImageMessages[channelId];
+
+      enqueue(channelId, async () => {
+        // Delete the placeholder first so the image appears without it above.
+        if (pending) {
+          await pending.delete().catch((err) => {
+            log("warn", `[Image] Could not delete placeholder: ${err.message}`);
+          });
+        }
+        if (data.image) {
+          await sendImagesToChannel(channel, [data.image], null);
+        }
+      });
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // generate_image_error - image generation failed or timed out.
+    //
+    // Edits the placeholder message in-place to show the error text so the
+    // user knows what happened without cluttering the channel with a second
+    // message followed by an orphaned placeholder.
+    // -----------------------------------------------------------------------
+    if (data.type === "generate_image_error") {
+      const channelId = data.chatId;
+      const pending = pendingImageMessages[channelId];
+      delete pendingImageMessages[channelId];
+
+      if (pending) {
+        await pending
+          .edit(data.text || "Image generation failed.")
+          .catch((err) => {
+            log("warn", `[Image] Could not edit placeholder: ${err.message}`);
+          });
+      }
+      return;
+    }
+
     // All remaining message types are tied to a specific Discord channel.
     const channelId = data.chatId;
     const channel = client.channels.cache.get(channelId);
@@ -760,6 +840,28 @@ wss.on("connection", (ws) => {
       case "typing_action":
         channel.sendTyping().catch(() => {});
         break;
+
+      // -----------------------------------------------------------------------
+      // image_placeholder - sent immediately when /image is invoked, before
+      // generation starts. Posts the "🎨 Generating image…" message and stores
+      // the Message object in pendingImageMessages so generate_image_result /
+      // generate_image_error can delete or edit it later.
+      //
+      // Goes through the channel queue so it arrives in the correct position
+      // relative to any chat messages that preceded the /image command.
+      // -----------------------------------------------------------------------
+      case "image_placeholder": {
+        const placeholderText = data?.text || "🎨 Generating image…";
+        enqueue(channelId, async () => {
+          try {
+            const msg = await channel.send(placeholderText);
+            pendingImageMessages[channelId] = msg;
+          } catch (err) {
+            log("warn", `[Image] Could not send placeholder: ${err.message}`);
+          }
+        });
+        break;
+      }
 
       // -----------------------------------------------------------------------
       // stream_chunk - a cumulative token update from an active generation.
@@ -1007,6 +1109,15 @@ wss.on("connection", (ws) => {
     }
     streamHandled.clear();
 
+    // Edit any outstanding image placeholder messages to show that the bridge
+    // disconnected, so they don't sit forever as "🎨 Generating image…".
+    for (const [channelId, msg] of Object.entries(pendingImageMessages)) {
+      msg
+        .edit("🎨 Image generation was interrupted — bridge disconnected.")
+        .catch(() => {});
+      delete pendingImageMessages[channelId];
+    }
+
     // Drain the channel queues by replacing each with a resolved promise.
     // Any tasks still pending in them will never complete since the WS is
     // gone, so holding onto them would just waste memory.
@@ -1096,11 +1207,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // and in group chat showing the full library would be noisy and unhelpful.
     // The extension's group_members handler returns an empty list when no
     // group is active, so the dropdown simply stays empty in solo chat.
+    //
+    // image uses "image_prompts", which is a fixed list of ST's built-in
+    // generation keywords (you, face, me, scene, last, raw_last, background).
+    // No live ST data is needed - the extension returns this static list
+    // inline. The user may also type a free-form prompt; the keywords appear
+    // as convenient starting suggestions at the top of the dropdown.
     const listMap = {
       switchchar: "characters",
       switchgroup: "groups",
       switchchat: "chats",
       charimage: "group_members",
+      image: "image_prompts",
     };
     const list = listMap[command];
     if (!list) return;
