@@ -212,7 +212,10 @@ wss.on("connection", (ws) => {
             });
           }
 
-          const rawText = s.pendingText || "";
+          // Use the ST-trimmed text from the extension when available; fall back
+          // to pendingText (last raw streaming token) if finalText wasn't sent.
+          const rawText =
+            data.finalText != null ? data.finalText : s.pendingText || "";
           const activeName = data.characterName || null;
           let processedText = rawText;
           if (activeName) {

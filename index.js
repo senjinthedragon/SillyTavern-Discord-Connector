@@ -649,12 +649,45 @@ async function handleUserMessage(data) {
       ws?.readyState === WebSocket.OPEN
     ) {
       const isGroup = !!SillyTavern.getContext().groupId;
+
+      // Read chat[i].mes rather than relying on the server's pendingText (last
+      // raw streaming token). ST applies sentence-completion trimming to mes
+      // after generation ends, so pendingText may contain a trailing fragment
+      // that ST discarded. Null if the chat array hasn't flushed yet; the server
+      // falls back to pendingText in that case.
+      let finalText = null;
+      try {
+        const { chat } = SillyTavern.getContext();
+        if (chat?.length) {
+          for (let i = chat.length - 1; i >= 0; i--) {
+            const msg = chat[i];
+            if (msg.is_user) break;
+            if (
+              !isGroup ||
+              !currentCharacterName ||
+              msg.name === currentCharacterName
+            ) {
+              if (msg.mes?.trim()) {
+                finalText = msg.mes.trim();
+                break;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(
+          "[Discord Bridge] Could not read final text from chat array:",
+          err,
+        );
+      }
+
       ws.send(
         JSON.stringify({
           type: "stream_end",
           chatId: messageState.chatId,
           streamId: currentStreamId,
           characterName: isGroup ? currentCharacterName : null,
+          finalText,
         }),
       );
     }
