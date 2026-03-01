@@ -1,0 +1,23 @@
+{
+  "name": "@senjinthedragon/sillytavern-discord-connector",
+  "version": "1.2.0",
+  "description": "Full-featured Discord bridge for SillyTavern with image support and slash commands.",
+  "main": "server/server.js",
+  "scripts": {
+    "install-server": "cd server && npm install",
+    "start": "cd server && node server.js"
+  },
+  "author": "Senjin the Dragon",
+  "license": "MIT",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/senjinthedragon/SillyTavern-Discord-Connector.git"
+  },
+  "bugs": {
+    "url": "https://github.com/senjinthedragon/SillyTavern-Discord-Connector/issues"
+  },
+  "homepage": "https://github.com/senjinthedragon/SillyTavern-Discord-Connector#readme"
+}
