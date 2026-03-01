@@ -1,6 +1,11 @@
 # SillyTavern Discord Connector
 
-Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming and images support.
+Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming and image support.
+
+<p align="center">
+  <img src="assets/SillyTavern-Discord-Bridge_1.webp" width="57%" alt="Desktop Discord chat session with images">
+  <img src="assets/SillyTavern-Discord-Bridge_2.webp" width="37%" alt="Mobile Discord showing group chat and /charimage autocomplete">
+</p>
 
 ## ☕ Support the Developer
 
@@ -169,11 +174,11 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 
 ## How It Works
 
-The extension runs inside SillyTavern's browser environment and connects to a local Node.js WebSocket server. When a Discord message arrives, the server forwards it to SillyTavern, which generates a response using your active character and AI settings. The reply is sent back through the bridge and posted to Discord. Streaming is supported - the Discord message updates in real time as the AI generates.
+The extension runs inside SillyTavern's browser environment and connects to a local Node.js bridge server. When a Discord message arrives, the server forwards it to SillyTavern, which generates a response using your active character and AI settings. The reply streams back through the bridge and updates in real time in Discord as the AI generates.
 
-When `/newchat` is used, the character's greeting message is automatically forwarded to Discord, including any images embedded in it. In group chats, each member's individual greeting is sent in order.
+When `/newchat` is used, the character's greeting is automatically forwarded to Discord. In group chats, each member's individual greeting is sent in turn. Any images embedded in a greeting come through as well.
 
-Images embedded in character messages - whether generated automatically by SillyTavern after a reply or requested via `/image` - are fetched and posted to Discord as attachments. The `/image` command generates an AI image from a prompt or keyword and posts it once ready, with a placeholder message shown in the meantime. The `/charimage` command posts a character's avatar portrait.
+Images that SillyTavern adds to a reply - whether generated automatically after a message or requested via `/image` - are detected and posted to Discord as attachments. Images that exceed Discord's upload limit are scaled down automatically before sending.
 
 ## Troubleshooting
 
