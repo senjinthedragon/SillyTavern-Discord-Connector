@@ -3,8 +3,8 @@
 Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming and image support.
 
 <p align="center">
-  <img src="assets/SillyTavern-Discord-Bridge_1.webp" width="57%" alt="Desktop Discord chat session with images">
-  <img src="assets/SillyTavern-Discord-Bridge_2.webp" width="37%" alt="Mobile Discord showing group chat and /charimage autocomplete">
+  <img src="https://raw.githubusercontent.com/senjinthedragon/SillyTavern-Discord-Connector/main/assets/SillyTavern-Discord-Bridge_1.webp" width="57%" alt="Desktop Discord chat session with images">
+  <img src="https://raw.githubusercontent.com/senjinthedragon/SillyTavern-Discord-Connector/main/assets/SillyTavern-Discord-Bridge_2.webp" width="37%" alt="Mobile Discord showing group chat and /charimage autocomplete">
 </p>
 
 ## ☕ Support the Developer

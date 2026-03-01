@@ -1,0 +1,21 @@
+# Documentation Assets
+/assets/
+README.md
+
+# Development & GitHub files
+.github/
+.gitignore
+.npmignore
+
+# Private / Dynamic files
+server/config.js
+server/config.local.js
+server/*.local.js
+server/.env
+server/.restart_protection
+
+# System / Editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

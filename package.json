@@ -1,7 +1,18 @@
 {
   "name": "@senjinthedragon/sillytavern-discord-connector",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Full-featured Discord bridge for SillyTavern with image support and slash commands.",
+  "files": [
+    "index.js",
+    "manifest.json",
+    "settings.html",
+    "style.css",
+    "server/*.js",
+    "server/package.json",
+    "server/config.example.js",
+    "server/start-bridge.bat",
+    "!server/config.js"
+  ],
   "main": "server/server.js",
   "scripts": {
     "install-server": "cd server && npm install",
