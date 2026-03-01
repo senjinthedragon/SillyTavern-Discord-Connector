@@ -1,5 +1,7 @@
 # SillyTavern Discord Connector
 
+[![Build Status](https://github.com/senjinthedragon/SillyTavern-Discord-Connector/actions/workflows/publish.yml/badge.svg)](https://github.com/senjinthedragon/SillyTavern-Discord-Connector/actions/workflows/publish.yml)
+
 Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming and image support.
 
 <p align="center">
