@@ -18,13 +18,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org/'
 
       - name: Install Dependencies
         run: cd server && npm install
 
       - name: Publish to npm
-        run: npm publish --access public --provenance --registry https://registry.npmjs.org/
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ""
 
       - name: Publish to GitHub Packages
         run: npm publish --registry https://npm.pkg.github.com/
