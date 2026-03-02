@@ -59,7 +59,7 @@ The **Discord Connector Settings** should now appear in your extensions list.
 
 ### 3. Configure the SillyTavern Bridge Server
 
-These folders and files can be found in your SillyTavern extensions folder which you can commonly find in the following locations:
+These folders and files can be found in the server folder of your SillyTavern extension which you can commonly find in the following locations:
 - **Windows**: [Your SillyTavern Folder]\data\default-user\extensions\SillyTavern-Discord-Connector\server
 - **Linux/Mac**: ~/.local/share/sillytavern/default-user/extensions/SillyTavern-Discord-Connector/server
 - **Docker**: /home/node/app/data/default-user/extensions/SillyTavern-Discord-Connector/server
@@ -104,7 +104,7 @@ timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 I have included a `start-bridge.bat` file in the server folder. You can run this file to start the bridge server.
 
 **Linux/Mac**:\
-Open your terminal and `cd` into the server directory listed in the previous step.
+Open your terminal and `cd` into the server folder listed in the previous step.
 
 ```shell
 npm install // Updates dependencies and installs the bridge server.
