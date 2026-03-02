@@ -25,7 +25,6 @@
     "server/start-bridge.bat",
     "!server/config.js"
   ],
-  "main": "server/server.js",
   "scripts": {
     "version": "version-everything manifest.json server/package.json && git add manifest.json server/package.json",
     "bump": "npm version patch && git push origin main --tags",
