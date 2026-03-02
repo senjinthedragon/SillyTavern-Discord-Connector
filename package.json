@@ -15,13 +15,19 @@
   ],
   "main": "server/server.js",
   "scripts": {
+    "version": "version-everything manifest.json server/package.json && git add manifest.json server/package.json",
+    "bump": "npm version patch",
+    "bump-minor": "npm version minor",
+    "bump-major": "npm version major",
+    "test-package": "npm pack --dry-run",
     "install-server": "cd server && npm install",
     "start": "cd server && node server.js"
   },
   "author": "Senjin the Dragon <https://github.com/senjinthedragon>",
   "license": "MIT",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "repository": {
     "type": "git",
@@ -30,5 +36,8 @@
   "bugs": {
     "url": "https://github.com/senjinthedragon/SillyTavern-Discord-Connector/issues"
   },
-  "homepage": "https://github.com/senjinthedragon/SillyTavern-Discord-Connector#readme"
+  "homepage": "https://github.com/senjinthedragon/SillyTavern-Discord-Connector#readme",
+  "devDependencies": {
+    "version-everything": "^0.11.4"
+  }
 }
