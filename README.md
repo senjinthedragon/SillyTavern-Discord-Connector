@@ -184,7 +184,7 @@ If port 2333 is in use, change `wssPort` in `config.js` and update the bridge UR
 
 **Slash commands don't appear in Discord:**\
 The `applications.commands` scope must be included when generating the bot's invite URL (see step 2).\
-If you invited the bot before this version, generate a new invite URL with the scope added and open it in a browser - you do not need to kick and re-invite the bot, visiting the new URL is enough to grant the missing scope. Slash commands can also take up to an hour to appear in Discord after the bridge first starts.
+If you invited the bot already, generate a new invite URL with the scope added and open it in a browser - you do not need to kick and re-invite the bot, visiting the new URL is enough to grant the missing scope. Slash commands can also take up to an hour to appear in Discord after the bridge first starts.
 
 ## License
 
