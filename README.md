@@ -112,7 +112,7 @@ node server.js // Starts the bridge server.
 ```
 
 **Both**:\
-This will run the Bridge Server required to make Discord and SillyTavern talk to each other. You need to run the server every time and **keep this window open** for it to work.\
+This will run the Bridge Server required to make Discord and SillyTavern talk to each other. You need to run the server every time and **keep this window open** for it to work.
 
 ### 5. Connect the extension
 
