@@ -101,38 +101,25 @@ timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 ### 4. Start the bridge server
 
 **Windows**:\
-Right click inside the explorer window at the server directory, the same one from the previous step, and select **Open Command Prompt Here** or **Open Terminal**.
+I have included a `start-bridge.bat` file in the server folder. You can run this file to start the bridge server.
 
 **Linux/Mac**:\
-Open your terminal and cd into the server directory listed in the previous step
+Open your terminal and cd into the server directory listed in the previous step.\
+
+```shell
+npm install // Updates dependencies and installs the bridge server.
+node server.js // Starts the bridge server.
+```
 
 **Both**:\
-Type and press enter to run the following commands:
-```shell
-npm install
-node server.js
-```
-
 This will run the Bridge Server required to make Discord and SillyTavern talk to each other. You need to run the server every time and **keep this window open** for it to work.\
-You can simplify this if you have the knowledge by creating a batch or shell script to do this or set it up to run automatically on system start or when you start SillyTavern.
-
-**Example batch script for Windows**\
-Create a `start-bridge.bat` file in the server folder (make sure it doesn't end with .txt) and write the following into this file by opening it in a text editor. You can then create a shortcut to the .bat file and place it on your desktop or next to your SillyTavern starter.
-```batchfile
-@echo off
-echo Checking dependencies...
-call npm install
-echo Starting bridge server...
-node server.js
-pause
-```
 
 ### 5. Connect the extension
 
 - In SillyTavern, open the **Discord Connector** panel in the Extensions tab
 - The last number of the bridge URL should match your `wssPort`, 127.0.0.1 means 'this computer' (default: `ws://127.0.0.1:2333`)
 - Click **Connect** - or enable **Auto-connect** to connect on every page load
-- Select a character in SillyTavern and start chatting in Discord
+- Start chatting in Discord to chat with the default character or use `switchchar` to select a different character from the list.
 
 ## Commands
 
@@ -186,7 +173,7 @@ Images that SillyTavern adds to a reply - whether generated automatically after 
 
 ## Troubleshooting
 
-**Bot doesn't respond:** Check that the bridge server is running, the extension shows "Connected" in green, and a character is selected in SillyTavern.
+**Bot doesn't respond:** Check that the bridge server is running and the extension shows "Connected" in green.
 
 **Message Content Intent error:** This intent must be explicitly enabled in the Discord Developer Portal under your bot's settings - it is not on by default.
 
