@@ -24,9 +24,7 @@ jobs:
         run: cd server && npm install
 
       - name: Publish to npm
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance
 
       - name: Setup Node.js for GitHub Packages
         uses: actions/setup-node@v4
