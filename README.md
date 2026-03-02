@@ -15,7 +15,7 @@ Bridge your SillyTavern character to Discord for real-time roleplay. Messages se
 
 I am a solo developer building this bridge to make mobile RP better for the community. I maintain this project in my free time, and as I'm currently navigating some financial challenges, any support is deeply appreciated.
 
-If this tool adds value to your roleplay experience, please consider:
+If this extension adds value to your roleplay experience, please consider:
 * **[Buying me a coffee on Ko-fi](https://ko-fi.com/senjinthedragon)** (One-time tips, no platform fees)
 * **Starring this repository** to help others find it.
 
