@@ -28,9 +28,9 @@
   "main": "server/server.js",
   "scripts": {
     "version": "version-everything manifest.json server/package.json && git add manifest.json server/package.json",
-    "bump": "npm version patch",
-    "bump-minor": "npm version minor",
-    "bump-major": "npm version major",
+    "bump": "npm version patch && git push origin main --tags",
+    "bump-minor": "npm version minor && git push origin main --tags",
+    "bump-major": "npm version major && git push origin main --tags",
     "test-package": "npm pack --dry-run",
     "install-server": "cd server && npm install",
     "start": "cd server && node server.js"
