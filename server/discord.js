@@ -1,6 +1,9 @@
 /**
  * discord.js - SillyTavern Discord Connector: Discord Client
- * Copyright (c) 2026 Senjin the Dragon. MIT License.
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
  *
  * Manages the Discord.js client: slash command registration, incoming message
  * routing, and interaction handling (slash commands + autocomplete).

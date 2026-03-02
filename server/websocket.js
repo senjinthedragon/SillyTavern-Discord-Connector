@@ -1,6 +1,9 @@
 /**
  * websocket.js - SillyTavern Discord Connector: WebSocket Server
- * Copyright (c) 2026 Senjin the Dragon. MIT License.
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
  *
  * Runs the WebSocket server that the SillyTavern browser extension connects to.
  * Routes incoming packets from the extension to the appropriate Discord actions.

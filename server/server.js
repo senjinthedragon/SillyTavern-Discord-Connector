@@ -1,6 +1,9 @@
 /**
  * server.js - SillyTavern Discord Connector: Entry Point
- * Copyright (c) 2026 Senjin the Dragon. MIT License.
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
  *
  * Bootstraps the bridge: validates config, runs crash-loop protection, and
  * loads the Discord client and WebSocket server. Actual logic lives in:

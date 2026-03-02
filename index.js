@@ -1,6 +1,9 @@
 /**
  * index.js - SillyTavern Discord Connector: Browser Extension
- * Copyright (c) 2026 Senjin the Dragon. MIT License.
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
  *
  * Runs inside SillyTavern as a third-party extension. Connects to the bridge
  * server (server.js) over WebSocket and acts as the intermediary between

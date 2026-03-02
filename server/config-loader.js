@@ -1,6 +1,9 @@
 /**
  * config-loader.js - SillyTavern Discord Connector: Configuration
- * Copyright (c) 2026 Senjin the Dragon. MIT License.
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
  *
  * Loads and validates config.js, then exits early with a clear error message
  * if required fields are missing or still set to their placeholder values.

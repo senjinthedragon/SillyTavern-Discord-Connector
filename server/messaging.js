@@ -1,6 +1,9 @@
 /**
  * messaging.js - SillyTavern Discord Connector: Message and Image Delivery
- * Copyright (c) 2026 Senjin the Dragon. MIT License.
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
  *
  * Handles posting content to Discord channels:
  *   - sendLong splits text that exceeds Discord's 2000-character limit,
