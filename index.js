@@ -1004,7 +1004,8 @@ async function handleExecuteCommand(data) {
           "/listchats - List chat history for current character\n" +
           "/switchchat <n> or /switchchat_# - Load a past chat\n" +
           "/charimage [name] - Show a character's avatar (optional in solo chat, autocompletes in group chat)\n" +
-          "/image <prompt or keyword> - Generate an AI image. Keywords: you, face, me, scene, last, raw_last, background";
+          "/image <prompt or keyword> - Generate an AI image. Keywords: you, face, me, scene, last, raw_last, background\n\n" +
+          "*Architected by Senjin the Dragon (Est. 1999)*";
         break;
 
       default: {

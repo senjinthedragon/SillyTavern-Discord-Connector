@@ -2,6 +2,13 @@
   "name": "sillytavern-discord-bridge",
   "version": "1.2.1",
   "description": "Discord bridge server for SillyTavern",
+  "author": "Senjin the Dragon <https://github.com/senjinthedragon>",
+  "license": "MIT",
+  "homepage": "https://github.com/senjinthedragon/SillyTavern-Discord-Connector",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/senjinthedragon/SillyTavern-Discord-Connector.git"
+  },
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

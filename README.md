@@ -1,6 +1,8 @@
 # SillyTavern Discord Connector
 
 [![Build Status](https://github.com/senjinthedragon/SillyTavern-Discord-Connector/actions/workflows/publish.yml/badge.svg)](https://github.com/senjinthedragon/SillyTavern-Discord-Connector/actions/workflows/publish.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
+[![Author: Senjin the Dragon](https://img.shields.io/badge/Author-Senjin_the_Dragon-gold.svg)](https://github.com/senjinthedragon)
 
 Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming and image support.
 
@@ -138,19 +140,19 @@ Use these slash commands in Discord to control the session:
 
 | Command | Description |
 |---|---|
-| `/sthelp` | Show available commands |
-| `/newchat` | Start a fresh chat and receive the character's greeting |
-| `/listchars` | List all characters with their shortcut numbers |
-| `/switchchar <name>` | Switch to a character by name - supports live autocomplete |
-| `/switchchar_#` | Switch to a character by number from `/listchars` |
-| `/listgroups` | List all groups with their shortcut numbers |
-| `/switchgroup <name>` | Switch to a group by name - supports live autocomplete |
-| `/switchgroup_#` | Switch to a group by number from `/listgroups` |
-| `/listchats` | List saved chats for the current character with shortcut numbers |
-| `/switchchat <name>` | Load a saved chat by name - supports live autocomplete |
-| `/switchchat_#` | Load a saved chat by number from `/listchats` |
-| `/charimage [name]` | Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat |
-| `/image <prompt>` | Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords |
+| **`/sthelp`** | *Show available commands* |
+| **`/newchat`** | *Start a fresh chat and receive the character's greeting* |
+| **`/listchars`** | *List all characters with their shortcut numbers* |
+| **`/switchchar <name>`** | *Switch to a character by name - supports live autocomplete* |
+| **`/switchchar_#`** | *Switch to a character by number from `/listchars`* |
+| **`/listgroups`** | *List all groups with their shortcut numbers* |
+| **`/switchgroup <name>`** | *Switch to a group by name - supports live autocomplete* |
+| **`/switchgroup_#`** | *Switch to a group by number from `/listgroups`* |
+| **`/listchats`** | *List saved chats for the current character with shortcut numbers* |
+| **`/switchchat <name>`** | *Load a saved chat by name - supports live autocomplete* |
+| **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
+| **`/charimage [name]`** | *Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat* |
+| **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
 
 **`/image` keywords**
 
@@ -158,13 +160,13 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 
 | Keyword | Generates |
 |---|---|
-| `you` | Full body portrait of the current character |
-| `face` | Close-up portrait of the current character |
-| `me` | Full body portrait of your player character |
-| `scene` | An image based on the events of the entire chat |
-| `last` | An image based on the last message sent by the character |
-| `raw_last` | Uses the character's last message verbatim as the prompt |
-| `background` | A backdrop image based on the current setting/location |
+| **`you`** | *Full body portrait of the current character* |
+| **`face`** | *Close-up portrait of the current character* |
+| **`me`** | *Full body portrait of your player character* |
+| **`scene`** | *An image based on the events of the entire chat* |
+| **`last`** | *An image based on the last message sent by the character* |
+| **`raw_last`** | *Uses the character's last message verbatim as the prompt* |
+| **`background`** | *A backdrop image based on the current setting/location* |
 
 > [!NOTE]
 > Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready. You do not need to wait or re-run the command.

@@ -43,6 +43,26 @@ const {
   getAutocompleteDebouncers,
 } = require("./discord");
 
+const version = require("./package.json").version;
+const architect = "Senjin the Dragon";
+const width = 50;
+
+const canColor = process.stdout.isTTY && process.env.TERM !== "dumb";
+
+const purple = canColor ? "\x1b[38;5;93m" : "";
+const gold = canColor ? "\x1b[38;5;220m" : "";
+const reset = canColor ? "\x1b[0m" : "";
+
+const title = ` SILLYTAVERN DISCORD CONNECTOR - v${version}`;
+const credit = ` Architect: ${architect} (Est. 2000)`;
+
+console.log(`
+${purple}╔${"═".repeat(width)}╗
+║${gold}${title.padEnd(width)}${purple}║
+║${gold}${credit.padEnd(width)}${purple}║
+╚${"═".repeat(width)}╝${reset}
+`);
+
 // ---------------------------------------------------------------------------
 // WebSocket server
 //

@@ -18,7 +18,7 @@
     "install-server": "cd server && npm install",
     "start": "cd server && node server.js"
   },
-  "author": "Senjin the Dragon",
+  "author": "Senjin the Dragon <https://github.com/senjinthedragon>",
   "license": "MIT",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"

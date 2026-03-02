@@ -24,7 +24,13 @@
 
 "use strict";
 
-const { Events, REST, Routes, MessageFlags } = require("discord.js");
+const {
+  Events,
+  REST,
+  Routes,
+  MessageFlags,
+  ActivityType,
+} = require("discord.js");
 
 const { log } = require("./logger");
 const { config, token } = require("./config-loader");
@@ -137,6 +143,12 @@ const SLASH_COMMANDS = [
 client.login(token);
 
 client.on(Events.ClientReady, async (c) => {
+  const version = require("./package.json").version;
+
+  client.user.setActivity(`SillyTavern Bridge v${version}`, {
+    type: ActivityType.Playing,
+  });
+
   console.log(`[Discord] Ready! Logged in as ${c.user.tag}`);
   const rest = new REST({ version: "10" }).setToken(token);
   try {
