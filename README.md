@@ -104,7 +104,7 @@ timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 I have included a `start-bridge.bat` file in the server folder. You can run this file to start the bridge server.
 
 **Linux/Mac**:\
-Open your terminal and cd into the server directory listed in the previous step.\
+Open your terminal and `cd` into the server directory listed in the previous step.
 
 ```shell
 npm install // Updates dependencies and installs the bridge server.
