@@ -25,7 +25,7 @@ If this tool adds value to your roleplay experience, please consider:
 - [Node.js](https://nodejs.org/) v18 or higher
 - A Discord bot token with the **Message Content** privileged intent enabled (see step 2)
 - A Discord server with a channel where you want to send messages. You can set this up yourself, for free, with Discord. It's at the bottom of your server list, **Add a Server** (the little icon with a + sign)
-- IF you want to use the `/image` command to generate images, the `Image Generation` extension that comes with SillyTavern needs to be set up correctly and be working.
+- If you want to use the `/image` command to generate images, the `Image Generation` extension that comes with SillyTavern needs to be set up correctly and be working.
 
 ## Quick Start
 
