@@ -997,19 +997,23 @@ async function handleExecuteCommand(data) {
 
       case "sthelp":
         replyText =
-          "Available commands:\n" +
-          "/sthelp - Show this help message\n" +
-          "/newchat - Start a new chat\n" +
-          "/listchars - List all characters\n" +
-          "/switchchar <n> or /switchchar_# - Switch character\n" +
-          "/listgroups - List all groups\n" +
-          "/switchgroup <n> or /switchgroup_# - Switch group\n" +
-          "/listchats - List chat history for current character\n" +
-          "/switchchat <n> or /switchchat_# - Load a past chat\n" +
-          "/charimage [name] - Show a character's avatar (optional in solo chat, autocompletes in group chat)\n" +
-          "/image <prompt or keyword> - Generate an AI image. Keywords: you, face, me, scene, last, raw_last, background\n\n" +
-          "*Developed by Senjin the Dragon https://github.com/senjinthedragon*\n" +
-          "*Please support me with a cup of coffee at: https://ko-fi.com/senjinthedragon*";
+          "### SillyTavern-Discord-Connector Commands:\n" +
+          "**Navigation & Chat**\n" +
+          "`/sthelp` - Show this menu\n" +
+          "`/newchat` - Start a new chat\n" +
+          "`/listchats` - Show chat history for current character\n" +
+          "`/switchchat <chat name>` or `/switchchat_#` - Load a past chat\n\n" +
+          "**Characters & Groups**\n" +
+          "`/listchars` - List available characters\n" +
+          "`/switchchar <character name>` or `/switchchar_#` - Switch character\n" +
+          "`/listgroups` - List available groups\n" +
+          "`/switchgroup <group name>` or `/switchgroup_#` - Switch to a group\n\n" +
+          "**Media & Images**\n" +
+          "`/charimage [name]` - Show character's avatar\n" +
+          "`/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n\n" +
+          "~~                                                                                                                                          ~~\n" +
+          "*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n" +
+          "*Please support my work:* <https://ko-fi.com/senjinthedragon>";
         break;
 
       default: {
