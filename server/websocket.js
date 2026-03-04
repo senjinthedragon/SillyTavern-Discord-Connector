@@ -47,8 +47,7 @@ const {
 } = require("./discord");
 
 const version = require("./package.json").version;
-const architect = "Senjin the Dragon";
-const width = 50;
+const width = 70;
 
 const canColor = process.stdout.isTTY && process.env.TERM !== "dumb";
 
@@ -57,12 +56,14 @@ const gold = canColor ? "\x1b[38;5;220m" : "";
 const reset = canColor ? "\x1b[0m" : "";
 
 const title = ` SILLYTAVERN DISCORD CONNECTOR - v${version}`;
-const credit = ` Architect: ${architect} (Est. 2000)`;
+const credit = ` Developed by: Senjin the Dragon https://github.com/senjinthedragon`;
+const support = ` Please support my work: https://ko-fi.com/senjinthedragon`;
 
 console.log(`
 ${purple}╔${"═".repeat(width)}╗
 ║${gold}${title.padEnd(width)}${purple}║
 ║${gold}${credit.padEnd(width)}${purple}║
+║${gold}${support.padEnd(width)}${purple}║
 ╚${"═".repeat(width)}╝${reset}
 `);
 

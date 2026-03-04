@@ -1008,7 +1008,8 @@ async function handleExecuteCommand(data) {
           "/switchchat <n> or /switchchat_# - Load a past chat\n" +
           "/charimage [name] - Show a character's avatar (optional in solo chat, autocompletes in group chat)\n" +
           "/image <prompt or keyword> - Generate an AI image. Keywords: you, face, me, scene, last, raw_last, background\n\n" +
-          "*Architected by Senjin the Dragon (Est. 1999)*";
+          "*Developed by Senjin the Dragon https://github.com/senjinthedragon*\n" +
+          "*Please support me with a cup of coffee at: https://ko-fi.com/senjinthedragon*";
         break;
 
       default: {
