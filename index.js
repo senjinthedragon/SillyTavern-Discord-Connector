@@ -997,7 +997,7 @@ async function handleExecuteCommand(data) {
 
       case "sthelp":
         replyText =
-          "### SillyTavern-Discord-Connector Commands:\n" +
+          "## __SillyTavern-Discord-Connector Commands:__\n" +
           "**Navigation & Chat**\n" +
           "`/sthelp` - Show this menu\n" +
           "`/newchat` - Start a new chat with the active character or group\n" +
