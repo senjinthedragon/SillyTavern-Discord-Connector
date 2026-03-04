@@ -1000,7 +1000,7 @@ async function handleExecuteCommand(data) {
           "### SillyTavern-Discord-Connector Commands:\n" +
           "**Navigation & Chat**\n" +
           "`/sthelp` - Show this menu\n" +
-          "`/newchat` - Start a new chat\n" +
+          "`/newchat` - Start a new chat with the active character or group\n" +
           "`/listchats` - Show chat history for current character\n" +
           "`/switchchat <chat name>` or `/switchchat_#` - Load a past chat\n\n" +
           "**Characters & Groups**\n" +
