@@ -9,7 +9,7 @@
     </div>
     <div class="inline-drawer-content">
       <div class="discord-connector_block flex-container">
-        <label for="discord_bridge_url">Bridge Server WebSocket URL</label>
+        <label for="discord_bridge_url">Bridge Server URL</label>
         <input
           type="text"
           id="discord_bridge_url"
@@ -44,14 +44,14 @@
         </label>
       </div>
       <div class="discord-connector_block flex-container">
-        <label for="discord_expression_mode">Expression sync</label>
+        <label for="discord_expression_mode">Expression/Reaction mode</label>
         <select id="discord_expression_mode" class="text_pole">
           <option value="off">Off</option>
-          <option value="activity" selected>Discord activity only</option>
-          <option value="activity_and_image">Activity + send expression image updates</option>
+          <option value="status" selected>Discord status only</option>
+          <option value="full">Discord status AND Show expression images</option>
         </select>
         <small style="opacity: 0.8">
-          Expression updates use SillyTavern's expression image (#expression-image). Image updates are posted to the last active Discord channel.
+          Reactions use SillyTavern's expression images. Image updates are posted to the last active Discord channel.
         </small>
       </div>
       <hr class="sysHR" />

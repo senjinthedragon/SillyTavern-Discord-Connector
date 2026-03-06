@@ -105,7 +105,7 @@ function getSettings() {
   };
 
   if (
-    !["off", "activity", "activity_and_image"].includes(
+    !["off", "status", "full"].includes(
       extensionSettings[MODULE_NAME].expressionMode,
     )
   ) {
@@ -371,8 +371,8 @@ async function sendLastMessageImages(chatId) {
 const EXPRESSION_DEBOUNCE_MS = 250;
 const EXPRESSION_MODE_VALUES = new Set([
   "off",
-  "activity",
-  "activity_and_image",
+  "status",
+  "full",
 ]);
 
 function normalizeExpressionOwnerName(name) {
@@ -462,7 +462,7 @@ async function sendExpressionUpdate(chatIdHint = null) {
   if (settings.expressionMode === "off") return;
 
   const snapshot = await getCurrentExpressionSnapshot(
-    settings.expressionMode === "activity_and_image",
+    settings.expressionMode === "full",
   );
   if (!snapshot) return;
   const { expression, image } = snapshot;
@@ -474,7 +474,7 @@ async function sendExpressionUpdate(chatIdHint = null) {
   lastExpressionSignature = signature;
 
   let chatId = null;
-  if (settings.expressionMode === "activity_and_image") {
+  if (settings.expressionMode === "full") {
     chatId = chatIdHint || lastActiveChatId || null;
   }
 
@@ -1350,7 +1350,7 @@ async function handleExecuteCommand(data) {
       case "reaction": {
         if (!data.args?.length) {
           replyText =
-            "Usage: /reaction <mode>\nModes: off, activity, activity_and_image";
+            "Usage: /reaction <mode>\nModes: off, status, full";
           break;
         }
 
@@ -1359,7 +1359,7 @@ async function handleExecuteCommand(data) {
           .toLowerCase();
         if (!EXPRESSION_MODE_VALUES.has(mode)) {
           replyText =
-            "Invalid mode. Use one of: off, activity, activity_and_image.";
+            "Invalid mode. Use one of: off, status, full.";
           break;
         }
 
@@ -1522,7 +1522,7 @@ async function handleExecuteCommand(data) {
           "**System & Status**\n" +
           "> `/sthelp` - Show this menu\n" +
           "> `/status` - Check bridge and image pipeline health\n" +
-          "> `/reaction <mode>` - Set sync (`off`, `activity`, `activity_and_image`)\n\n" +
+          "> `/reaction <mode>` - Set mode (`off`, `status`, `full`)\n\n" +
           "**Management**\n" +
           "> `/listchars` | `/listgroups` - List available characters/groups\n" +
           "> `/switchchar` | `/switchgroup` - Switch character/group\n" +

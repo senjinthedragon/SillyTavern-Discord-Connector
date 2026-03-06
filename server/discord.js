@@ -140,19 +140,19 @@ const SLASH_COMMANDS = [
   },
   {
     name: "reaction",
-    description: "Set how expressions are mirrored to Discord",
+    description: "Set how expressions are shown on Discord",
     options: [
       {
         name: "mode",
         type: 3,
-        description: "off, activity, or activity_and_image",
+        description: "off, status, or full",
         required: true,
         choices: [
           { name: "Off", value: "off" },
-          { name: "Activity only", value: "activity" },
+          { name: "Status only", value: "status" },
           {
-            name: "Activity + expression image updates",
-            value: "activity_and_image",
+            name: "Status and image updates",
+            value: "full",
           },
         ],
       },
