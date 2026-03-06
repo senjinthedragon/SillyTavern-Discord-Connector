@@ -72,26 +72,21 @@ const EXPRESSION_EMOJI_MAP = {
   neutral: "😐",
 };
 
-let lastActivitySuffix = "";
+let lastActivityText = "";
 
 function setBridgeActivity(expression) {
   if (!client?.user) return;
-
   const normalized = String(expression || "")
     .trim()
     .toLowerCase();
-  let suffix = "";
-  if (normalized) {
-    const emoji = EXPRESSION_EMOJI_MAP[normalized] || "🎭";
-    suffix = ` ${emoji} ${normalized}`;
-  }
 
-  if (suffix === lastActivitySuffix) return;
-  lastActivitySuffix = suffix;
+  const activityText = normalized
+    ? `${EXPRESSION_EMOJI_MAP[normalized] || "🎭"} ${normalized}`
+    : ACTIVITY_BASE;
 
-  client.user.setActivity(`${ACTIVITY_BASE}${suffix}`, {
-    type: ActivityType.Playing,
-  });
+  if (activityText === lastActivityText) return;
+  lastActivityText = activityText;
+  client.user.setActivity(activityText, { type: ActivityType.Playing });
 }
 
 // Required lazily inside handlers to break the discord.js ↔ websocket.js
