@@ -41,7 +41,7 @@
  *   keyed by characterId and invalidated on newchat/switchchar/switchgroup
  *   rather than by TTL, keeping them perfectly current.
  *
- * Expression sync:
+ * Reactions:
  *   Watches #expression-image in the ST DOM and forwards expression updates.
  *   Depending on extension settings, updates Discord activity only (default)
  *   or activity plus expression image posts to the last active Discord channel.
@@ -77,7 +77,7 @@ const MODULE_NAME = "SillyTavern-Discord-Connector";
 const DEFAULT_SETTINGS = {
   bridgeUrl: "ws://127.0.0.1:2333",
   autoConnect: true,
-  expressionMode: "activity",
+  expressionMode: "status",
 };
 
 // String fallback covers older ST versions that don't export this event type.
@@ -1371,10 +1371,10 @@ async function handleExecuteCommand(data) {
         const modeLabel =
           mode === "off"
             ? "Off"
-            : mode === "activity"
-              ? "Discord activity only"
-              : "Activity + expression image updates";
-        replyText = `Expression sync mode set to: **${modeLabel}**.`;
+            : mode === "status"
+              ? "Discord status only"
+              : "Discord status + expression images";
+        replyText = `Reaction mode set to: **${modeLabel}**.`;
         break;
       }
 
