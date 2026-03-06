@@ -160,7 +160,7 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 | **`last`** | *An image based on the last message sent by the character* |
 | **`raw_last`** | *Uses the character's last message verbatim as the prompt* |
 | **`background`** | *A backdrop image based on the current setting/location* |
-| **`cancel`** | *Cancel the active image request for the channel* |
+| **`cancel`** | *Cancel the active image generation task for the channel* |
 
 > [!NOTE]
 > Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready.
