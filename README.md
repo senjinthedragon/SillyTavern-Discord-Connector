@@ -165,9 +165,9 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 > To keep things stable, the connector may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a little and run `/image` again.
 
 > [!TIP]
-> Expression updates can arrive a little after the chat text. That's normal.
+> Reactions can arrive a little after the chat text. That's normal.
 >
-> If you use `off` or `activity` mode for expressions, run `/mood` any time you want to post the current expression image in chat.
+> If you use `off` or `status` mode for reactions, run `/mood` any time you want to post the current expression image in chat.
 
 > [!NOTE]
 > Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.
