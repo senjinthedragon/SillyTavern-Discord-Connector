@@ -45,7 +45,7 @@ const streamSessions = {};
  *  The subsequent ai_reply is skipped for these channels. */
 const streamHandled = new Set();
 
-/** Placeholder messages sent while an AI image is generating, keyed by channelId. */
+/** Placeholder messages sent while an AI image is generating, keyed by requestId. */
 const pendingImageMessages = {};
 
 /**

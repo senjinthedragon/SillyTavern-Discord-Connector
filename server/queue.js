@@ -19,6 +19,24 @@
 const { log } = require("./logger");
 
 const channelQueues = {};
+const QUEUE_TASK_TIMEOUT_MS = 30_000;
+
+function withTimeout(promise, channelId) {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(
+        new Error(
+          `Queue task timed out after ${QUEUE_TASK_TIMEOUT_MS}ms for channel ${channelId}`,
+        ),
+      );
+    }, QUEUE_TASK_TIMEOUT_MS);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
 
 /**
  * @param {string} channelId
@@ -27,7 +45,7 @@ const channelQueues = {};
 function enqueue(channelId, fn) {
   const prev = channelQueues[channelId] || Promise.resolve();
   const next = prev
-    .then(() => fn())
+    .then(() => withTimeout(Promise.resolve().then(() => fn()), channelId))
     .catch((err) => {
       log("error", `[Queue] Error in channel ${channelId}:`, err.message);
     });

@@ -33,7 +33,8 @@
  *   /image sends an image_placeholder immediately, then fires /sd and watches
  *   the DOM for a new img.mes_img element. On success the image is sent as
  *   generate_image_result; on timeout or failure as generate_image_error.
- *   Requests are serialised through imageQueue to prevent overlapping /sd calls.
+ *   Requests are serialised per Discord channel with a hard watchdog so a
+ *   stalled task can never permanently block retries.
  *
  * Autocomplete:
  *   Character and group lists are cached with a 60-second TTL. Chat lists are
@@ -467,18 +468,141 @@ function captureAndSendIntroMessage(chatId) {
 // Sends an image_placeholder immediately, fires /sd, then watches #chat for
 // a new img.mes_img element. The observer snapshots existing srcs before the
 // command fires so only genuinely new images are forwarded.
-// Requests are serialised through imageQueue to prevent overlapping /sd calls.
+// Requests are serialised per Discord channel to prevent overlapping /sd calls
+// within the same conversation while still allowing other channels to proceed.
 // ---------------------------------------------------------------------------
 
-let imageQueue = Promise.resolve();
+const IMAGE_GENERATION_TIMEOUT_MS = 3 * 60 * 1000;
+const IMAGE_QUEUE_WATCHDOG_MS = IMAGE_GENERATION_TIMEOUT_MS + 10_000;
+const IMAGE_RATE_LIMIT_WINDOW_MS = 60_000;
+const IMAGE_RATE_LIMIT_MAX_REQUESTS = 3;
+const IMAGE_BREAKER_THRESHOLD = 3;
+const IMAGE_BREAKER_COOLDOWN_MS = 2 * 60 * 1000;
 
-/** Wraps fn() in the image queue so /sd calls never overlap. */
-function enqueueImageGeneration(fn) {
-  imageQueue = imageQueue
-    .then(() => fn())
+const imageQueues = new Map();
+const activeImageJobs = new Map();
+const imageRateHistory = new Map();
+const imageCircuitState = new Map();
+const imageMetrics = {
+  totalRequests: 0,
+  succeeded: 0,
+  timedOut: 0,
+  failed: 0,
+  canceled: 0,
+  rateLimited: 0,
+  breakerRejected: 0,
+  breakerTrips: 0,
+  inFlight: 0,
+  maxConcurrentInFlight: 0,
+  lastError: null,
+  lastErrorAt: null,
+};
+
+function makeImageRequestId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function sendImageError(chatId, requestId, text) {
+  if (ws?.readyState !== WebSocket.OPEN) return;
+  ws.send(
+    JSON.stringify({
+      type: "generate_image_error",
+      chatId,
+      requestId,
+      text,
+    }),
+  );
+}
+
+function pruneImageRateHistory(chatId) {
+  const now = Date.now();
+  const history = imageRateHistory.get(chatId) || [];
+  const pruned = history.filter((ts) => now - ts < IMAGE_RATE_LIMIT_WINDOW_MS);
+  imageRateHistory.set(chatId, pruned);
+  return pruned;
+}
+
+function getBreakerState(chatId) {
+  const state = imageCircuitState.get(chatId);
+  if (!state) return null;
+  if (Date.now() >= state.openUntil) {
+    imageCircuitState.delete(chatId);
+    return null;
+  }
+  return state;
+}
+
+function markImageFailure(chatId, reason) {
+  const state = imageCircuitState.get(chatId) || {
+    consecutiveFailures: 0,
+    openUntil: 0,
+  };
+  state.consecutiveFailures += 1;
+
+  if (state.consecutiveFailures >= IMAGE_BREAKER_THRESHOLD) {
+    state.openUntil = Date.now() + IMAGE_BREAKER_COOLDOWN_MS;
+    imageMetrics.breakerTrips += 1;
+  }
+
+  imageCircuitState.set(chatId, state);
+  imageMetrics.lastError = reason;
+  imageMetrics.lastErrorAt = Date.now();
+}
+
+function markImageSuccess(chatId) {
+  if (!imageCircuitState.has(chatId)) return;
+  imageCircuitState.set(chatId, { consecutiveFailures: 0, openUntil: 0 });
+}
+
+function getImageQueue(chatId) {
+  if (!imageQueues.has(chatId)) imageQueues.set(chatId, Promise.resolve());
+  return imageQueues.get(chatId);
+}
+
+/**
+ * Wraps fn() in a per-channel queue with a watchdog release.
+ * Even if /sd or observers wedge, the queue recovers automatically.
+ *
+ * @param {string} chatId
+ * @param {() => Promise<{status: string, reason?: string|null}>} fn
+ */
+function enqueueImageGeneration(chatId, fn) {
+  const prev = getImageQueue(chatId);
+  const next = prev
+    .then(
+      () =>
+        new Promise((resolve) => {
+          let released = false;
+          const release = () => {
+            if (released) return;
+            released = true;
+            clearTimeout(watchdogId);
+            resolve();
+          };
+
+          const watchdogId = setTimeout(() => {
+            console.error(
+              `[Discord Bridge] Image queue watchdog released a stuck task for ${chatId}.`,
+            );
+            release();
+          }, IMAGE_QUEUE_WATCHDOG_MS);
+
+          Promise.resolve()
+            .then(fn)
+            .catch((err) => {
+              console.error("[Discord Bridge] Image generation queue error:", err);
+            })
+            .finally(release);
+        }),
+    )
     .catch((err) => {
-      console.error("[Discord Bridge] Image generation queue error:", err);
+      console.error("[Discord Bridge] Unexpected queue chain error:", err);
     });
+
+  imageQueues.set(chatId, next);
+  next.finally(() => {
+    if (imageQueues.get(chatId) === next) imageQueues.delete(chatId);
+  });
 }
 
 /**
@@ -486,13 +610,12 @@ function enqueueImageGeneration(fn) {
  * Resolves after sending generate_image_result or generate_image_error.
  *
  * @param {string} chatId
+ * @param {string} requestId
  * @param {string} prompt
- * @returns {Promise<void>}
+ * @returns {Promise<{status: string, reason?: string|null}>}
  */
-function generateAndSendImage(chatId, prompt) {
+function generateAndSendImage(chatId, requestId, prompt) {
   return new Promise(async (resolve) => {
-    const IMAGE_GENERATION_TIMEOUT_MS = 20 * 60 * 1000;
-
     const chatEl = document.getElementById("chat");
     if (!chatEl || ws?.readyState !== WebSocket.OPEN) {
       if (ws?.readyState === WebSocket.OPEN) {
@@ -500,11 +623,12 @@ function generateAndSendImage(chatId, prompt) {
           JSON.stringify({
             type: "generate_image_error",
             chatId,
+            requestId,
             text: "Could not find the SillyTavern chat element.",
           }),
         );
       }
-      return resolve();
+      return resolve({ status: "failed", reason: "chat_element_missing" });
     }
 
     const existingSrcs = new Set(
@@ -517,39 +641,49 @@ function generateAndSendImage(chatId, prompt) {
     let observer = null;
     let settled = false;
 
-    const finish = (cleanupFn) => {
+    const finish = (status, reason, cleanupFn) => {
       if (settled) return;
       settled = true;
       if (observer) observer.disconnect();
       clearTimeout(hardTimeoutId);
       cleanupFn();
-      resolve();
+      if (activeImageJobs.get(chatId) === cancelJob) activeImageJobs.delete(chatId);
+      resolve({ status, reason });
     };
 
+    const cancelJob = {
+      cancel: () => {
+        finish("cancelled", "cancelled_by_user", () => {
+          sendImageError(chatId, requestId, "Image generation cancelled.");
+        });
+      },
+    };
+    activeImageJobs.set(chatId, cancelJob);
+
     const onNewImage = async (src) => {
-      finish(() => {});
       const fetched = await fetchLocalImageAsBase64(src);
       if (!fetched) {
+        finish("failed", "image_fetch_failed", () => {
+          sendImageError(
+            chatId,
+            requestId,
+            "Image was generated but could not be fetched from SillyTavern.",
+          );
+        });
+        return;
+      }
+      finish("success", null, () => {
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
-              type: "generate_image_error",
+              type: "generate_image_result",
               chatId,
-              text: "Image was generated but could not be fetched from SillyTavern.",
+              requestId,
+              image: { type: "inline", ...fetched },
             }),
           );
         }
-        return;
-      }
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({
-            type: "generate_image_result",
-            chatId,
-            image: { type: "inline", ...fetched },
-          }),
-        );
-      }
+      });
     };
 
     observer = new MutationObserver(() => {
@@ -570,36 +704,24 @@ function generateAndSendImage(chatId, prompt) {
     });
 
     hardTimeoutId = setTimeout(() => {
-      finish(() => {
+      finish("timed_out", "timeout", () => {
         console.warn(
-          "[Discord Bridge] Image generation timed out after 20 minutes.",
+          `[Discord Bridge] Image generation timed out after ${IMAGE_GENERATION_TIMEOUT_MS / 1000}s.`,
         );
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "generate_image_error",
-              chatId,
-              text: "Image generation timed out (20 minutes). SillyTavern may still be processing.",
-            }),
-          );
-        }
+        sendImageError(chatId, requestId, "Image generation timed out. Please try again.");
       });
     }, IMAGE_GENERATION_TIMEOUT_MS);
 
     try {
       await executeSlashCommandsWithOptions(`/sd ${prompt}`);
     } catch (err) {
-      finish(() => {
+      finish("failed", "sd_command_failed", () => {
         console.error("[Discord Bridge] /sd command failed:", err);
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "generate_image_error",
-              chatId,
-              text: `Image generation failed: ${err.message || "Unknown error"}`,
-            }),
-          );
-        }
+        sendImageError(
+          chatId,
+          requestId,
+          `Image generation failed: ${err.message || "Unknown error"}`,
+        );
       });
     }
   });
@@ -977,22 +1099,118 @@ async function handleExecuteCommand(data) {
       case "image": {
         if (!data.args?.length) {
           replyText =
-            "Usage: /image <prompt> or /image <keyword>\nKeywords: you, face, me, scene, last, raw_last, background";
+            "Usage: /image <prompt> or /image <keyword>\nKeywords: you, face, me, scene, last, raw_last, background\nUse /image cancel to stop an active generation.";
           break;
         }
+
         const prompt = data.args.join(" ").trim();
+        const lowerPrompt = prompt.toLowerCase();
+
+        if (lowerPrompt === "cancel") {
+          const activeJob = activeImageJobs.get(data.chatId);
+          if (!activeJob) {
+            replyText = "No active image generation to cancel.";
+            break;
+          }
+
+          activeJob.cancel();
+          imageMetrics.canceled += 1;
+          replyText = "Cancelled active image generation.";
+          break;
+        }
+
+        const breakerState = getBreakerState(data.chatId);
+        if (breakerState) {
+          imageMetrics.breakerRejected += 1;
+          const seconds = Math.ceil((breakerState.openUntil - Date.now()) / 1000);
+          replyText = `Image generation is temporarily paused after repeated failures. Try again in ~${seconds}s.`;
+          break;
+        }
+
+        const requestHistory = pruneImageRateHistory(data.chatId);
+        if (requestHistory.length >= IMAGE_RATE_LIMIT_MAX_REQUESTS) {
+          imageMetrics.rateLimited += 1;
+          replyText =
+            "Too many image requests in a short time. Please wait a minute and try again.";
+          break;
+        }
+
+        requestHistory.push(Date.now());
+        imageRateHistory.set(data.chatId, requestHistory);
+
+        const requestId = makeImageRequestId();
+        imageMetrics.totalRequests += 1;
+
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
               type: "image_placeholder",
               chatId: data.chatId,
-              text: "🎨 Generating image…",
+              requestId,
+              text: "🎨 Generating image… (timeout: 3 minutes; use /image cancel to abort)",
             }),
           );
         }
+
         // Queue and return early - generate_image_result/error sends its own packets.
-        enqueueImageGeneration(() => generateAndSendImage(data.chatId, prompt));
+        enqueueImageGeneration(data.chatId, async () => {
+          imageMetrics.inFlight += 1;
+          imageMetrics.maxConcurrentInFlight = Math.max(
+            imageMetrics.maxConcurrentInFlight,
+            imageMetrics.inFlight,
+          );
+
+          const result = await generateAndSendImage(data.chatId, requestId, prompt);
+          imageMetrics.inFlight = Math.max(0, imageMetrics.inFlight - 1);
+
+          if (result?.status === "success") {
+            imageMetrics.succeeded += 1;
+            markImageSuccess(data.chatId);
+          } else if (result?.status === "timed_out") {
+            imageMetrics.timedOut += 1;
+            markImageFailure(data.chatId, "Image generation timed out");
+          } else if (result?.status === "cancelled") {
+            // /image cancel increments canceled immediately for user feedback.
+          } else {
+            imageMetrics.failed += 1;
+            markImageFailure(
+              data.chatId,
+              result?.reason || "Image generation failed unexpectedly",
+            );
+          }
+        });
         return;
+      }
+
+      case "status": {
+        const breakerState = getBreakerState(data.chatId);
+        const breakerText = breakerState
+          ? `OPEN (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s remaining)`
+          : "CLOSED";
+
+        const activeCharacter =
+          context.characterId !== undefined
+            ? context.characters?.[context.characterId]?.name || "(unknown)"
+            : "(none)";
+
+        const activeGroup = context.groupId
+          ? (context.groups || []).find((g) => g.id === context.groupId)?.name ||
+            "(unknown)"
+          : "(none)";
+
+        replyText =
+          "## __Bridge Status__\n" +
+          `- WebSocket: ${ws?.readyState === WebSocket.OPEN ? "Connected" : "Disconnected"}\n` +
+          `- Active character: ${activeCharacter}\n` +
+          `- Active group: ${activeGroup}\n` +
+          `- Image queue active (this chat): ${imageQueues.has(data.chatId) ? "yes" : "no"}\n` +
+          `- Image generation in-flight (this chat): ${activeImageJobs.has(data.chatId) ? "yes" : "no"}\n` +
+          `- Image breaker: ${breakerText}\n` +
+          `- Image metrics: total=${imageMetrics.totalRequests}, success=${imageMetrics.succeeded}, timeout=${imageMetrics.timedOut}, failed=${imageMetrics.failed}, canceled=${imageMetrics.canceled}, rate_limited=${imageMetrics.rateLimited}, breaker_rejected=${imageMetrics.breakerRejected}, breaker_trips=${imageMetrics.breakerTrips}, in_flight=${imageMetrics.inFlight}, max_concurrent=${imageMetrics.maxConcurrentInFlight}` +
+          (imageMetrics.lastError
+            ? `\n- Last image error: ${imageMetrics.lastError} (${new Date(imageMetrics.lastErrorAt).toLocaleString()})`
+            : "");
+        break;
       }
 
       case "sthelp":
@@ -1000,6 +1218,7 @@ async function handleExecuteCommand(data) {
           "## __SillyTavern-Discord-Connector Commands:__\n" +
           "**Navigation & Chat**\n" +
           "`/sthelp` - Show this menu\n" +
+          "`/status` - Show bridge and image pipeline health\n" +
           "`/newchat` - Start a new chat with the active character or group\n" +
           "`/listchats` - Show chat history for current character\n" +
           "`/switchchat <chat name>` or `/switchchat_#` - Load a past chat\n\n" +
@@ -1010,7 +1229,8 @@ async function handleExecuteCommand(data) {
           "`/switchgroup <group name>` or `/switchgroup_#` - Switch to a group\n\n" +
           "**Media & Images**\n" +
           "`/charimage [name]` - Show character's avatar\n" +
-          "`/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n\n" +
+          "`/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
+          "`/image cancel` - Cancel active image generation\n\n" +
           "~~                                                                                                                                          ~~\n" +
           "*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n" +
           "*Please support my work:* <https://ko-fi.com/senjinthedragon>";
@@ -1147,6 +1367,7 @@ async function handleGetAutocomplete(data) {
         "last",
         "raw_last",
         "background",
+        "cancel",
       ];
     } else if (data.list === "group_members") {
       // Only active group members, not the full character library.
