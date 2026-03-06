@@ -137,7 +137,7 @@ Use these slash commands in Discord to control the session:
 | **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
 | **`/charimage [name]`** | *Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat* |
 | **`/mood <name>`** | *Show the current character's visible mood (you can also pass a character name)* |
-| **`/expressionsync <mode>`** | *Set expression sync mode (`off`, `activity`, or `activity_and_image`)* |
+| **`/reaction <mode>`** | *Set expression sync mode (`off`, `activity`, or `activity_and_image`)* |
 | **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
 | **`/image cancel`** | *Cancel the active image generation request* |
 | **`/status`** | *Show if everything is connected and how image requests are doing* |

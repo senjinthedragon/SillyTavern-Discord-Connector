@@ -20,7 +20,7 @@ This release hardens the Discord ↔ SillyTavern bridge around image generation 
 - Optional expression-image posting sends updates to the most recently active Discord channel.
 - Added `/mood [name]` command to fetch and post the current visible expression image on demand; in group chats, `name` can be provided for the currently visible member.
 - Added lightweight per-character mood memory so `/mood <name>` can return the last seen mood for a group member when that member is not currently visible.
-- Added `/expressionsync <mode>` command so expression mode can be changed remotely from Discord.
+- Added `/reaction <mode>` command so expression mode can be changed remotely from Discord.
 - Expression handling supports asynchronous mood updates (text first, mood afterwards) and missing expression blocks when expressions are disabled.
 
 ### Stability protections

@@ -1335,10 +1335,10 @@ async function handleExecuteCommand(data) {
         break;
       }
 
-      case "expressionsync": {
+      case "reaction": {
         if (!data.args?.length) {
           replyText =
-            "Usage: /expressionsync <mode>\nModes: off, activity, activity_and_image";
+            "Usage: /reaction <mode>\nModes: off, activity, activity_and_image";
           break;
         }
 
@@ -1488,7 +1488,7 @@ async function handleExecuteCommand(data) {
           "**System & Status**\n" +
           "> `/sthelp` - Show this menu\n" +
           "> `/status` - Check bridge and image pipeline health\n" +
-          "> `/expressionsync <mode>` - Set sync (`off`, `activity`, `activity_and_image`)\n\n" +
+          "> `/reaction <mode>` - Set sync (`off`, `activity`, `activity_and_image`)\n\n" +
           "**Management**\n" +
           "> `/listchars` | `/listgroups` - List available characters/groups\n" +
           "> `/switchchar` | `/switchgroup` - Switch character/group\n" +

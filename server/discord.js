@@ -138,7 +138,7 @@ const SLASH_COMMANDS = [
     ],
   },
   {
-    name: "expressionsync",
+    name: "reaction",
     description: "Set how expressions are mirrored to Discord",
     options: [
       {
