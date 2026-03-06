@@ -43,6 +43,17 @@
           <span>Automatically connect on page load</span>
         </label>
       </div>
+      <div class="discord-connector_block flex-container">
+        <label for="discord_expression_mode">Expression sync</label>
+        <select id="discord_expression_mode" class="text_pole">
+          <option value="off">Off</option>
+          <option value="activity" selected>Discord activity only</option>
+          <option value="activity_and_image">Activity + send expression image updates</option>
+        </select>
+        <small style="opacity: 0.8">
+          Expression updates use SillyTavern's expression image (#expression-image). Image updates are posted to the last active Discord channel.
+        </small>
+      </div>
       <hr class="sysHR" />
     </div>
   </div>

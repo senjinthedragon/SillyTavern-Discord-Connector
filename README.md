@@ -119,6 +119,7 @@ This will run the Bridge Server required to make Discord and SillyTavern talk to
 
 - In SillyTavern, open the **Discord Connector** panel in the Extensions tab
 - The last number of the bridge URL should match your `wssPort`, 127.0.0.1 means 'this computer' (default: `ws://127.0.0.1:2333`)
+- Optional: choose an **Expression sync** mode (`Off`, `Discord activity only`, or `Activity + send expression image updates`)
 - Click **Connect** - or enable **Auto-connect** to connect on every page load
 - Start chatting in Discord to chat with the default character or use `switchchar` to select a different character from the list.
 
@@ -129,6 +130,9 @@ Use these slash commands in Discord to control the session:
 | Command | Description |
 |---|---|
 | **`/sthelp`** | *Show available commands* |
+| **`/status`** | *Show if everything is connected and how image requests are doing* |
+| **`/mood [name]`** | *Show the current visible mood and send its expression image if available (group chats can pass a character name)* |
+| **`/expressionsync <mode>`** | *Set expression sync mode (`off`, `activity`, or `activity_and_image`)* |
 | **`/newchat`** | *Start a fresh chat and receive the character's greeting* |
 | **`/listchars`** | *List all characters with their shortcut numbers* |
 | **`/switchchar <name>`** | *Switch to a character by name - supports live autocomplete* |
@@ -141,6 +145,7 @@ Use these slash commands in Discord to control the session:
 | **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
 | **`/charimage [name]`** | *Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat* |
 | **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
+| **`/image cancel`** | *Cancel the active image request in the current channel* |
 
 **`/image` keywords**
 
@@ -155,9 +160,23 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 | **`last`** | *An image based on the last message sent by the character* |
 | **`raw_last`** | *Uses the character's last message verbatim as the prompt* |
 | **`background`** | *A backdrop image based on the current setting/location* |
+| **`cancel`** | *Cancel the active image request for the channel* |
 
 > [!NOTE]
-> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready. You do not need to wait or re-run the command.
+> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready.
+>
+> If generation gets stuck, this message will change after a few minutes and tell you to try again.
+>
+> To keep things stable, the connector may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a little and run `/image` again.
+
+> [!NOTE]
+> Expression updates can arrive a little after the chat text. That's normal.
+>
+> If you use `activity` mode, run `/mood` any time you want to post the current expression image in chat.
+>
+> In group chats, `/mood <name>` works only when that character is the one currently shown in SillyTavern's expression panel.
+>
+> If that member is not currently visible, the bridge will use the last mood it saw for that member (if available).
 
 > [!NOTE]
 > Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.
