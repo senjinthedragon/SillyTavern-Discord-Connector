@@ -77,7 +77,9 @@ let lastActivitySuffix = "";
 function setBridgeActivity(expression) {
   if (!client?.user) return;
 
-  const normalized = String(expression || "").trim().toLowerCase();
+  const normalized = String(expression || "")
+    .trim()
+    .toLowerCase();
   let suffix = "";
   if (normalized) {
     const emoji = EXPRESSION_EMOJI_MAP[normalized] || "🎭";
@@ -117,8 +119,7 @@ const SLASH_COMMANDS = [
       {
         name: "prompt",
         type: 3,
-        description:
-          "Prompt, keyword, or 'cancel'",
+        description: "Prompt, keyword, or 'cancel'",
         required: true,
         autocomplete: true,
       },
@@ -157,7 +158,10 @@ const SLASH_COMMANDS = [
       },
     ],
   },
-  { name: "status", description: "Show bridge health and image pipeline stats" },
+  {
+    name: "status",
+    description: "Show bridge health and image pipeline stats",
+  },
   { name: "sthelp", description: "Show all available bridge commands" },
   {
     name: "newchat",

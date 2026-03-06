@@ -35,9 +35,13 @@ if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
   process.exit(1);
 }
 
-
-if (!Number.isFinite(config.queueTaskTimeoutMs) || config.queueTaskTimeoutMs < 1000) {
-  console.error("[ERROR] config.queueTaskTimeoutMs must be a number >= 1000 (ms).");
+if (
+  !Number.isFinite(config.queueTaskTimeoutMs) ||
+  config.queueTaskTimeoutMs < 1000
+) {
+  console.error(
+    "[ERROR] config.queueTaskTimeoutMs must be a number >= 1000 (ms).",
+  );
   process.exit(1);
 }
 

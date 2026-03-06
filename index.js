@@ -109,7 +109,8 @@ function getSettings() {
       extensionSettings[MODULE_NAME].expressionMode,
     )
   ) {
-    extensionSettings[MODULE_NAME].expressionMode = DEFAULT_SETTINGS.expressionMode;
+    extensionSettings[MODULE_NAME].expressionMode =
+      DEFAULT_SETTINGS.expressionMode;
   }
 
   return extensionSettings[MODULE_NAME];
@@ -407,7 +408,10 @@ function parseExpressionFromElement(imgEl) {
 
   const src = imgEl.getAttribute("src") || "";
   const base = src.split("?")[0].split("/").pop() || "";
-  const name = base.replace(/\.[a-z0-9]+$/i, "").trim().toLowerCase();
+  const name = base
+    .replace(/\.[a-z0-9]+$/i, "")
+    .trim()
+    .toLowerCase();
 
   // ST sometimes points to /img/default-expressions/null.png when no
   // expression is active; treat that as neutral for activity display.
@@ -766,7 +770,10 @@ function enqueueImageGeneration(chatId, fn) {
           Promise.resolve()
             .then(fn)
             .catch((err) => {
-              console.error("[Discord Bridge] Image generation queue error:", err);
+              console.error(
+                "[Discord Bridge] Image generation queue error:",
+                err,
+              );
             })
             .finally(release);
         }),
@@ -823,7 +830,8 @@ function generateAndSendImage(chatId, requestId, prompt) {
       if (observer) observer.disconnect();
       clearTimeout(hardTimeoutId);
       cleanupFn();
-      if (activeImageJobs.get(chatId) === cancelJob) activeImageJobs.delete(chatId);
+      if (activeImageJobs.get(chatId) === cancelJob)
+        activeImageJobs.delete(chatId);
       resolve({ status, reason });
     };
 
@@ -884,7 +892,11 @@ function generateAndSendImage(chatId, requestId, prompt) {
         console.warn(
           `[Discord Bridge] Image generation timed out after ${IMAGE_GENERATION_TIMEOUT_MS / 1000}s.`,
         );
-        sendImageError(chatId, requestId, "Image generation timed out. Please try again.");
+        sendImageError(
+          chatId,
+          requestId,
+          "Image generation timed out. Please try again.",
+        );
       });
     }, IMAGE_GENERATION_TIMEOUT_MS);
 
@@ -1342,7 +1354,9 @@ async function handleExecuteCommand(data) {
           break;
         }
 
-        const mode = String(data.args[0] || "").trim().toLowerCase();
+        const mode = String(data.args[0] || "")
+          .trim()
+          .toLowerCase();
         if (!EXPRESSION_MODE_VALUES.has(mode)) {
           replyText =
             "Invalid mode. Use one of: off, activity, activity_and_image.";
@@ -1390,7 +1404,9 @@ async function handleExecuteCommand(data) {
         const breakerState = getBreakerState(data.chatId);
         if (breakerState) {
           imageMetrics.breakerRejected += 1;
-          const seconds = Math.ceil((breakerState.openUntil - Date.now()) / 1000);
+          const seconds = Math.ceil(
+            (breakerState.openUntil - Date.now()) / 1000,
+          );
           replyText = `Image generation is temporarily paused after repeated failures. Try again in ~${seconds}s.`;
           break;
         }
@@ -1428,7 +1444,11 @@ async function handleExecuteCommand(data) {
             imageMetrics.inFlight,
           );
 
-          const result = await generateAndSendImage(data.chatId, requestId, prompt);
+          const result = await generateAndSendImage(
+            data.chatId,
+            requestId,
+            prompt,
+          );
           imageMetrics.inFlight = Math.max(0, imageMetrics.inFlight - 1);
 
           if (result?.status === "success") {
@@ -1452,33 +1472,47 @@ async function handleExecuteCommand(data) {
 
       case "status": {
         const breakerState = getBreakerState(data.chatId);
-        const breakerText = breakerState
-          ? `OPEN (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s remaining)`
-          : "CLOSED";
-
         const activeCharacter =
           context.characterId !== undefined
             ? context.characters?.[context.characterId]?.name || "(unknown)"
             : "(none)";
-
         const activeGroup = context.groupId
-          ? (context.groups || []).find((g) => g.id === context.groupId)?.name ||
-            "(unknown)"
+          ? (context.groups || []).find((g) => g.id === context.groupId)
+              ?.name || "(unknown)"
           : "(none)";
 
+        let lastErrorText = "";
+        if (imageMetrics.lastError) {
+          const errorTime = new Date(imageMetrics.lastErrorAt);
+          const minutesAgo = Math.floor(
+            (Date.now() - imageMetrics.lastErrorAt) / 60000,
+          );
+          const timeString =
+            minutesAgo < 1
+              ? "Just now"
+              : minutesAgo < 60
+                ? `${minutesAgo}m ago`
+                : minutesAgo < 1440
+                  ? `${Math.floor(minutesAgo / 60)}h ${minutesAgo % 60}m ago`
+                  : errorTime.toLocaleString();
+          lastErrorText = `\n**⚠️ Last error:**\n> \`${imageMetrics.lastError}\`\n> _${timeString}_`;
+        }
+
         replyText =
-          "## __Bridge Status__\n" +
-          `- WebSocket: ${ws?.readyState === WebSocket.OPEN ? "Connected" : "Disconnected"}\n` +
-          `- Active character: ${activeCharacter}\n` +
-          `- Active group: ${activeGroup}\n` +
-          `- Stored mood snapshots: ${expressionCache.size}\n` +
-          `- Image queue active (this chat): ${imageQueues.has(data.chatId) ? "yes" : "no"}\n` +
-          `- Image generation in-flight (this chat): ${activeImageJobs.has(data.chatId) ? "yes" : "no"}\n` +
-          `- Image breaker: ${breakerText}\n` +
-          `- Image metrics: total=${imageMetrics.totalRequests}, success=${imageMetrics.succeeded}, timeout=${imageMetrics.timedOut}, failed=${imageMetrics.failed}, canceled=${imageMetrics.canceled}, rate_limited=${imageMetrics.rateLimited}, breaker_rejected=${imageMetrics.breakerRejected}, breaker_trips=${imageMetrics.breakerTrips}, in_flight=${imageMetrics.inFlight}, max_concurrent=${imageMetrics.maxConcurrentInFlight}` +
-          (imageMetrics.lastError
-            ? `\n- Last image error: ${imageMetrics.lastError} (${new Date(imageMetrics.lastErrorAt).toLocaleString()})`
-            : "");
+          "## 🛰️ Bridge Status\n" +
+          `**Connection:** ${ws?.readyState === WebSocket.OPEN ? "🟢 Online" : "🔴 Offline"}\n` +
+          `**Active:** ${activeGroup !== "(none)" ? `👥 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `👤 ${activeCharacter}` : "_Nothing loaded_"}\n` +
+          `**Mood snapshots cached:** ${expressionCache.size}\n\n` +
+          "**🖼️ Image Generation**\n" +
+          `> **Status:** ${!breakerState ? "✅ Ready" : `⏸️ Paused — cooling down (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s left, will resume automatically)`}\n` +
+          `> **Queue:** ${imageQueues.has(data.chatId) ? "⏳ Pending images" : "✅ Empty"}\n` +
+          `> **Currently generating:** ${activeImageJobs.has(data.chatId) ? "⚙️ Yes" : "—"}\n\n` +
+          "**📊 Image Stats** _(since last restart)_\n" +
+          `> ✅ Succeeded: **${imageMetrics.succeeded}** / 📨 Total requested: **${imageMetrics.totalRequests}**\n` +
+          `> ❌ Failed: **${imageMetrics.failed}** | ⏱️ Timed out: **${imageMetrics.timedOut}** | 🚫 Rate limited: **${imageMetrics.rateLimited}**\n` +
+          `> 🛑 Canceled: **${imageMetrics.canceled}** | ⚡ Concurrent now: **${imageMetrics.inFlight}** (peak: **${imageMetrics.maxConcurrentInFlight}**)\n` +
+          `> 🔁 Overload trips: **${imageMetrics.breakerTrips}** | 🚧 Requests blocked during cooldown: **${imageMetrics.breakerRejected}**\n` +
+          lastErrorText;
         break;
       }
 

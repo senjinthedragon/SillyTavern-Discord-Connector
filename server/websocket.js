@@ -211,9 +211,7 @@ wss.on("connection", (ws) => {
               if (!pending || pending.id !== msg.id) return;
               delete pendingImageMessages[pendingKey];
               pending
-                .edit(
-                  "⚠️ Image generation timed out. Please run /image again.",
-                )
+                .edit("⚠️ Image generation timed out. Please run /image again.")
                 .catch((err) => {
                   log(
                     "warn",

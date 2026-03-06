@@ -46,7 +46,12 @@ function withTimeout(promise, channelId) {
 function enqueue(channelId, fn) {
   const prev = channelQueues[channelId] || Promise.resolve();
   const next = prev
-    .then(() => withTimeout(Promise.resolve().then(() => fn()), channelId))
+    .then(() =>
+      withTimeout(
+        Promise.resolve().then(() => fn()),
+        channelId,
+      ),
+    )
     .catch((err) => {
       log("error", `[Queue] Error in channel ${channelId}:`, err.message);
     });
