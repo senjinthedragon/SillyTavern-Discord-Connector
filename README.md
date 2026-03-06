@@ -158,12 +158,15 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 | **`cancel`** | *Cancel the active image generation task* |
 
 > [!NOTE]
-> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready.\ 
-> If generation gets stuck, this message will change after a few minutes and tell you to try again.\ 
+> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready.
+>
+> If generation gets stuck, this message will change after a few minutes and tell you to try again.
+>
 > To keep things stable, the connector may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a little and run `/image` again.
 
 > [!TIP]
-> Expression updates can arrive a little after the chat text. That's normal.\ 
+> Expression updates can arrive a little after the chat text. That's normal.
+>
 > If you use `off` or `activity` mode for expressions, run `/mood` any time you want to post the current expression image in chat.
 
 > [!NOTE]
