@@ -1499,7 +1499,7 @@ async function handleExecuteCommand(data) {
         }
 
         replyText =
-          "## 🛰️ Bridge Status\n" +
+          "## __Bridge Status:__\n" +
           `**Connection:** ${ws?.readyState === WebSocket.OPEN ? "🟢 Online" : "🔴 Offline"}\n` +
           `**Active:** ${activeGroup !== "(none)" ? `👥 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `👤 ${activeCharacter}` : "_Nothing loaded_"}\n` +
           `**Mood snapshots cached:** ${expressionCache.size}\n\n` +
@@ -1518,7 +1518,7 @@ async function handleExecuteCommand(data) {
 
       case "sthelp":
         replyText =
-          "## __🐉 SillyTavern-Discord-Connector Commands:__\n" +
+          "## 🐉 __SillyTavern-Discord-Connector Commands:__\n" +
           "**System & Status**\n" +
           "> `/sthelp` - Show this menu\n" +
           "> `/status` - Check bridge and image pipeline health\n" +
