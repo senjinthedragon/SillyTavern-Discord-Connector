@@ -1537,7 +1537,7 @@ async function handleExecuteCommand(data) {
           "> `/image cancel` - Abort active image generation\n\n" +
           "~~                                                                                                                                          ~~\n" +
           "*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n" +
-          "*Please support my work:* <https://ko-fi.com/senjinthedragon>";
+          "*Please support my work:* <https://github.com/sponsors/senjinthedragon>";
         break;
 
       default: {
