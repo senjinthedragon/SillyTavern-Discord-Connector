@@ -1504,11 +1504,11 @@ async function handleExecuteCommand(data) {
           `**Active:** ${activeGroup !== "(none)" ? `👥 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `👤 ${activeCharacter}` : "_Nothing loaded_"}\n` +
           `**Mood snapshots cached:** ${expressionCache.size}\n\n` +
           "**🖼️ Image Generation**\n" +
-          `> **Status:** ${!breakerState ? "✅ Ready" : `⏸️ Paused — cooling down (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s left, will resume automatically)`}\n` +
+          `> **Status:** ${!breakerState ? "✅ Ready" : `⏸️ Paused - cooling down (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s left, will resume automatically)`}\n` +
           `> **Queue:** ${imageQueues.has(data.chatId) ? "⏳ Pending images" : "✅ Empty"}\n` +
-          `> **Currently generating:** ${activeImageJobs.has(data.chatId) ? "⚙️ Yes" : "—"}\n\n` +
+          `> **Currently generating:** ${activeImageJobs.has(data.chatId) ? "⚙️ Yes" : "-"}\n\n` +
           "**📊 Image Stats** _(since last restart)_\n" +
-          `> ✅ Succeeded: **${imageMetrics.succeeded}** / 📨 Total requested: **${imageMetrics.totalRequests}**\n` +
+          `> ✅ Succeeded: **${imageMetrics.succeeded}** / ✨ Total requested: **${imageMetrics.totalRequests}**\n` +
           `> ❌ Failed: **${imageMetrics.failed}** | ⏱️ Timed out: **${imageMetrics.timedOut}** | 🚫 Rate limited: **${imageMetrics.rateLimited}**\n` +
           `> 🛑 Canceled: **${imageMetrics.canceled}** | ⚡ Concurrent now: **${imageMetrics.inFlight}** (peak: **${imageMetrics.maxConcurrentInFlight}**)\n` +
           `> 🔁 Overload trips: **${imageMetrics.breakerTrips}** | 🚧 Requests blocked during cooldown: **${imageMetrics.breakerRejected}**\n` +
