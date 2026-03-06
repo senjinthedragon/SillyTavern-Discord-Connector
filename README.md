@@ -115,7 +115,6 @@ This will run the Bridge Server required to make Discord and SillyTavern talk to
 ### 5. Connect the extension
 
 - In SillyTavern, open the **Discord Connector** panel in the Extensions tab
-- The last number of the bridge URL should match your `wssPort`, 127.0.0.1 means 'this computer' (default: `ws://127.0.0.1:2333`)
 - Click **Connect** - or enable **Auto-connect** to connect on every page load
 - Start chatting in Discord to chat with the default character or use `switchchar` to select a different character from the list.
 
