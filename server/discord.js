@@ -59,18 +59,19 @@ function getSillyTavernClient() {
 const SLASH_COMMANDS = [
   {
     name: "image",
-    description: "Generate an AI image via SillyTavern.",
+    description: "Generate or cancel an AI image task.",
     options: [
       {
         name: "prompt",
         type: 3,
         description:
-          "Keyword (you, face, me, scene, last, raw_last, background) or a custom prompt",
+          "Prompt, keyword, or 'cancel'",
         required: true,
         autocomplete: true,
       },
     ],
   },
+  { name: "status", description: "Show bridge health and image pipeline stats" },
   { name: "sthelp", description: "Show all available bridge commands" },
   {
     name: "newchat",
