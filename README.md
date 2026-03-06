@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
 [![Author: Senjin the Dragon](https://img.shields.io/badge/Author-Senjin_the_Dragon-gold.svg)](https://github.com/senjinthedragon)
 
-Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming and image support.
+Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming, image and expression support.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/senjinthedragon/SillyTavern-Discord-Connector/main/assets/SillyTavern-Discord-Bridge_1.webp" width="57%" alt="Desktop Discord chat session with images">
@@ -74,15 +74,13 @@ cp config.example.js config.js
 ```
 
 **Both**:\
-Edit `config.js`:
+Edit `config.js` and change these lines:
 ```javascript
 discordToken: 'YOUR_BOT_TOKEN_HERE', // The one you copied to a safe place in part 2
-wssPort: 2333, // must match the bridge's port in the extension settings. E.g. 2333, NOT ws://127.0.0.1:2333
 allowedUserIds: [], // (optional) add your Discord user IDs here to make the bot private
 allowedChannelIds: [], // (optional) add your Discord channel IDs here to make the bot only respond to users in specific channels
-debug: false, // set this to true to enable verbose debug logging
-timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 ```
+You can change the other lines in the `config.js` as well, but the ones listed above are the important ones.
 
 > [!TIP]
 > To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
@@ -90,8 +88,6 @@ timezone: "Europe/Amsterdam", // (optional) set this to your timezone
 > To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
 > \
 > To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode\
-> \
-> You can find a list of all supported timezone identifiers [here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)\
 > \
 > You can move and rename the server folder to wherever you like. It doesn't have to sit in the extension's folder. Do mind that if you move it out, it won't be updated automatically.
 
@@ -119,7 +115,6 @@ This will run the Bridge Server required to make Discord and SillyTavern talk to
 
 - In SillyTavern, open the **Discord Connector** panel in the Extensions tab
 - The last number of the bridge URL should match your `wssPort`, 127.0.0.1 means 'this computer' (default: `ws://127.0.0.1:2333`)
-- Optional: choose an **Expression sync** mode (`Off`, `Discord activity only`, or `Activity + send expression image updates`)
 - Click **Connect** - or enable **Auto-connect** to connect on every page load
 - Start chatting in Discord to chat with the default character or use `switchchar` to select a different character from the list.
 
@@ -163,13 +158,13 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 | **`cancel`** | *Cancel the active image generation task* |
 
 > [!NOTE]
-> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready.
-> If generation gets stuck, this message will change after a few minutes and tell you to try again.
+> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready.\ 
+> If generation gets stuck, this message will change after a few minutes and tell you to try again.\ 
 > To keep things stable, the connector may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a little and run `/image` again.
 
 > [!TIP]
-> Expression updates can arrive a little after the chat text. That's normal.
-> If you use `activity` mode for expressions, run `/mood` any time you want to post the current expression image in chat.
+> Expression updates can arrive a little after the chat text. That's normal.\ 
+> If you use `off` or `activity` mode for expressions, run `/mood` any time you want to post the current expression image in chat.
 
 > [!NOTE]
 > Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.
