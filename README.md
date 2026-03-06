@@ -125,22 +125,22 @@ Use these slash commands in Discord to control the session:
 | Command | Description |
 |---|---|
 | **`/sthelp`** | *Show available commands* |
-| **`/newchat`** | *Start a fresh chat and receive the character's greeting* |
+| **`/status`** | *Show if everything is connected and how image requests are doing* |
+| **`/reaction <mode>`** | *Set reaction mode (`off`, `status`, or `full`)* |
 | **`/listchars`** | *List all characters with their shortcut numbers* |
+| **`/listgroups`** | *List all groups with their shortcut numbers* |
 | **`/switchchar <name>`** | *Switch to a character by name - supports live autocomplete* |
 | **`/switchchar_#`** | *Switch to a character by number from `/listchars`* |
-| **`/listgroups`** | *List all groups with their shortcut numbers* |
 | **`/switchgroup <name>`** | *Switch to a group by name - supports live autocomplete* |
 | **`/switchgroup_#`** | *Switch to a group by number from `/listgroups`* |
+| **`/newchat`** | *Start a fresh chat and receive the character's greeting* |
 | **`/listchats`** | *List saved chats for the current character with shortcut numbers* |
 | **`/switchchat <name>`** | *Load a saved chat by name - supports live autocomplete* |
 | **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
-| **`/charimage [name]`** | *Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat* |
 | **`/mood <name>`** | *Show the current character's visible mood (you can also pass a character name)* |
-| **`/reaction <mode>`** | *Set reaction mode (`off`, `status`, or `full`)* |
+| **`/charimage [name]`** | *Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat* |
 | **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
 | **`/image cancel`** | *Cancel the active image generation request* |
-| **`/status`** | *Show if everything is connected and how image requests are doing* |
 
 **`/image` keywords**
 
@@ -149,8 +149,8 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 | Keyword | Generates |
 |---|---|
 | **`you`** | *Full body portrait of the current character* |
-| **`face`** | *Close-up portrait of the current character* |
 | **`me`** | *Full body portrait of your player character* |
+| **`face`** | *Close-up portrait of the current character* |
 | **`scene`** | *An image based on the events of the entire chat* |
 | **`last`** | *An image based on the last message sent by the character* |
 | **`raw_last`** | *Uses the character's last message verbatim as the prompt* |
