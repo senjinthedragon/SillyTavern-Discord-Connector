@@ -142,7 +142,7 @@ Use these slash commands in Discord to control the session:
 | **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
 | **`/charimage [name]`** | *Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat* |
 | **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
-| **`/image cancel`** | *Cancel the active image generation in the current channel* |
+| **`/image cancel`** | *Try to stop the active image generation in the current channel* |
 
 **`/image` keywords**
 
@@ -165,6 +165,8 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 > If generation gets stuck, this message will change after a few minutes and tell you to try again.
 >
 > To keep things stable, the connector may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a little and run `/image` again.
+
+> If `/image cancel` says it cancelled but you still see work happening in SillyTavern, your image backend may not support remote stop commands.
 
 > [!NOTE]
 > Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.

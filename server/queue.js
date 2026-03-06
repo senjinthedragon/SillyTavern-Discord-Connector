@@ -19,7 +19,8 @@
 const { log } = require("./logger");
 
 const channelQueues = {};
-const QUEUE_TASK_TIMEOUT_MS = 30_000;
+const QUEUE_TASK_TIMEOUT_MS =
+  Number(process.env.STDC_QUEUE_TASK_TIMEOUT_MS) || 30_000;
 
 function withTimeout(promise, channelId) {
   let timeoutId;

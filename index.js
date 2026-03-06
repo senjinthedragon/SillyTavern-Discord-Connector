@@ -554,6 +554,31 @@ function markImageSuccess(chatId) {
   imageCircuitState.set(chatId, { consecutiveFailures: 0, openUntil: 0 });
 }
 
+/**
+ * Best-effort attempt to stop an in-progress SillyTavern image job.
+ *
+ * Different ST versions/extensions expose different stop commands.
+ * We try the common ones and ignore failures so /image cancel always responds.
+ *
+ * @returns {Promise<boolean>} True if at least one stop command succeeded.
+ */
+async function tryAbortSillyTavernImageGeneration() {
+  const candidates = ["/cancel", "/abort"];
+  let succeeded = false;
+
+  for (const cmd of candidates) {
+    try {
+      await executeSlashCommandsWithOptions(cmd);
+      succeeded = true;
+      break;
+    } catch {
+      // Continue trying fallback commands.
+    }
+  }
+
+  return succeeded;
+}
+
 function getImageQueue(chatId) {
   if (!imageQueues.has(chatId)) imageQueues.set(chatId, Promise.resolve());
   return imageQueues.get(chatId);
@@ -1113,9 +1138,12 @@ async function handleExecuteCommand(data) {
             break;
           }
 
+          const stAbortWorked = await tryAbortSillyTavernImageGeneration();
           activeJob.cancel();
           imageMetrics.canceled += 1;
-          replyText = "Cancelled active image generation.";
+          replyText = stAbortWorked
+            ? "Cancelled active image generation."
+            : "Cancelled active image generation (the generator may still finish in SillyTavern if stop is unsupported).";
           break;
         }
 
