@@ -31,7 +31,7 @@
 
 const WebSocket = require("ws");
 const { log } = require("./logger");
-const { wssPort } = require("./config-loader");
+const { config, wssPort } = require("./config-loader");
 const { enqueue, clearAllQueues } = require("./queue");
 const { sendLong, sendImagesToChannel } = require("./messaging");
 const {
@@ -81,7 +81,7 @@ const wss = new WebSocket.Server({
 console.log(`[Bridge] WebSocket server listening on port ${wssPort}`);
 
 let sillyTavernClient = null;
-const IMAGE_PLACEHOLDER_TIMEOUT_MS = 3 * 60 * 1000;
+const IMAGE_PLACEHOLDER_TIMEOUT_MS = config.imagePlaceholderTimeoutMs;
 
 function getSillyTavernClient() {
   return sillyTavernClient;

@@ -17,10 +17,10 @@
 "use strict";
 
 const { log } = require("./logger");
+const { config } = require("./config-loader");
 
 const channelQueues = {};
-const QUEUE_TASK_TIMEOUT_MS =
-  Number(process.env.STDC_QUEUE_TASK_TIMEOUT_MS) || 30_000;
+const QUEUE_TASK_TIMEOUT_MS = config.queueTaskTimeoutMs;
 
 function withTimeout(promise, channelId) {
   let timeoutId;

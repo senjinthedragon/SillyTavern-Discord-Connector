@@ -9,14 +9,20 @@ async function wait(ms) {
 }
 
 function loadQueueWithTimeout(timeoutMs) {
-  process.env.STDC_QUEUE_TASK_TIMEOUT_MS = String(timeoutMs);
-
   const loggerPath = path.join(__dirname, "logger.js");
   require.cache[loggerPath] = {
     id: loggerPath,
     filename: loggerPath,
     loaded: true,
     exports: { log: () => {} },
+  };
+
+  const configLoaderPath = path.join(__dirname, "config-loader.js");
+  require.cache[configLoaderPath] = {
+    id: configLoaderPath,
+    filename: configLoaderPath,
+    loaded: true,
+    exports: { config: { queueTaskTimeoutMs: timeoutMs } },
   };
 
   delete require.cache[path.join(__dirname, "queue.js")];

@@ -32,4 +32,4 @@ This release hardens the Discord ↔ SillyTavern bridge around image generation 
 - Added `server` test script: `npm test` runs Node's built-in test runner.
 
 ## Notes for maintainers
-- Queue timeout can now be overridden with `STDC_QUEUE_TASK_TIMEOUT_MS` for troubleshooting and tests.
+- Queue timeout is now configured in `server/config.js` via `queueTaskTimeoutMs` (with sensible defaults and validation).

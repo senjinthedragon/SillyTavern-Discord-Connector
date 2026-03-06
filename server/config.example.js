@@ -18,6 +18,15 @@ module.exports = {
   // To get a channel ID: enable Developer Mode in Discord, then right-click a channel and select "Copy ID".
   allowedChannelIds: [], // e.g., ['123456789012345678', '987654321098765432']
 
+
+  // Advanced timing settings (milliseconds)
+  // How long a queued Discord send/edit task may run before it is released.
+  queueTaskTimeoutMs: 30000,
+
+  // How long the "Generating image…" placeholder waits before switching to
+  // a timeout message when no result comes back.
+  imagePlaceholderTimeoutMs: 180000,
+
   // Set to true to enable verbose terminal logging
   debug: false,
 
