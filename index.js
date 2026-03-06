@@ -1484,24 +1484,23 @@ async function handleExecuteCommand(data) {
 
       case "sthelp":
         replyText =
-          "## __SillyTavern-Discord-Connector Commands:__\n" +
-          "**Navigation & Chat**\n" +
-          "`/sthelp` - Show this menu\n" +
-          "`/status` - Show bridge and image pipeline health\n" +
-          "`/mood [name]` - Show current expression (optionally for a specific visible group member)\n" +
-          "`/expressionsync <mode>` - Set expression sync mode (`off`, `activity`, `activity_and_image`)\n" +
-          "`/newchat` - Start a new chat with the active character or group\n" +
-          "`/listchats` - Show chat history for current character\n" +
-          "`/switchchat <chat name>` or `/switchchat_#` - Load a past chat\n\n" +
-          "**Characters & Groups**\n" +
-          "`/listchars` - List available characters\n" +
-          "`/switchchar <character name>` or `/switchchar_#` - Switch character\n" +
-          "`/listgroups` - List available groups\n" +
-          "`/switchgroup <group name>` or `/switchgroup_#` - Switch to a group\n\n" +
-          "**Media & Images**\n" +
-          "`/charimage [name]` - Show character's avatar\n" +
-          "`/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
-          "`/image cancel` - Cancel active image generation\n\n" +
+          "## __🐉 SillyTavern-Discord-Connector Commands:__\n" +
+          "**System & Status**\n" +
+          "> `/sthelp` - Show this menu\n" +
+          "> `/status` - Check bridge and image pipeline health\n" +
+          "> `/expressionsync <mode>` - Set sync (`off`, `activity`, `activity_and_image`)\n\n" +
+          "**Management**\n" +
+          "> `/listchars` | `/listgroups` - List available characters/groups\n" +
+          "> `/switchchar` | `/switchgroup` - Switch character/group\n" +
+          "> `/newchat` - Start a new chat with the active character or group\n" +
+          "> `/listchats` | `/switchchat` - List and switch to previous chat\n" +
+          "> *💡 Tip: You can also use `_#` (e.g., `/switchchar_3`) to select by index.*\n\n" +
+          "**Immersion & Mood**\n" +
+          "> `/mood` - Show character expression\n" +
+          "> `/charimage` - Show character's avatar\n\n" +
+          "**Image Generation**\n" +
+          "> `/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
+          "> `/image cancel` - Abort active image generation\n\n" +
           "~~                                                                                                                                          ~~\n" +
           "*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n" +
           "*Please support my work:* <https://ko-fi.com/senjinthedragon>";
