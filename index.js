@@ -1518,7 +1518,7 @@ async function handleExecuteCommand(data) {
 
       case "sthelp":
         replyText =
-          "## 🐉 __SillyTavern-Discord-Connector Commands:__\n" +
+          "## 🐉 __Bridge Commands:__\n" +
           "**System & Status**\n" +
           "> `/sthelp` - Show this menu\n" +
           "> `/status` - Check bridge and image pipeline health\n" +
