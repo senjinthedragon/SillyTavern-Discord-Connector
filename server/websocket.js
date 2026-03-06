@@ -58,7 +58,7 @@ const gold = canColor ? "\x1b[38;5;220m" : "";
 const reset = canColor ? "\x1b[0m" : "";
 
 const title = ` SILLYTAVERN DISCORD CONNECTOR - v${version}`;
-const credit = ` Developed by: Senjin the Dragon https://github.com/senjinthedragon`;
+const credit = ` Developed by Senjin the Dragon https://github.com/senjinthedragon`;
 const support = ` Please support my work: https://ko-fi.com/senjinthedragon`;
 
 console.log(`
