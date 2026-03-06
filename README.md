@@ -129,7 +129,7 @@ Use these slash commands in Discord to control the session:
 | Command | Description |
 |---|---|
 | **`/sthelp`** | *Show available commands* |
-| **`/status`** | *Show bridge health, queue state, and image pipeline metrics* |
+| **`/status`** | *Show if everything is connected and how image requests are doing* |
 | **`/newchat`** | *Start a fresh chat and receive the character's greeting* |
 | **`/listchars`** | *List all characters with their shortcut numbers* |
 | **`/switchchar <name>`** | *Switch to a character by name - supports live autocomplete* |
@@ -162,7 +162,9 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 > [!NOTE]
 > Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready.
 >
-> If generation stalls, the placeholder now times out automatically and tells you to retry. The `/image` pipeline also includes rate limiting and a temporary circuit breaker after repeated failures to prevent lockups.
+> If generation gets stuck, this message will change after a few minutes and tell you to try again.
+>
+> To keep things stable, the connector may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a little and run `/image` again.
 
 > [!NOTE]
 > Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.
