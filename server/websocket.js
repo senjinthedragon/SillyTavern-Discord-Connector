@@ -21,6 +21,7 @@
  *   error_message         - forward extension error to Discord channel
  *   intro_message         - post /newchat character greeting
  *   send_images           - post one or more images to a channel
+ *   expression_update     - update bot activity (+ optional expression image)
  *
  * On disconnect, all in-flight state (stream sessions, image placeholders,
  * autocomplete debouncers, pending interactions, channel queues) is cleaned up
@@ -44,6 +45,7 @@ const { client } = require("./client");
 const {
   getPendingAutocompletes,
   getAutocompleteDebouncers,
+  setBridgeActivity,
 } = require("./discord");
 
 const version = require("./package.json").version;
@@ -165,6 +167,23 @@ wss.on("connection", (ws) => {
         const channel = client.channels.cache.get(data.chatId);
         if (channel && data.text) {
           enqueue(data.chatId, () => sendLong(channel, data.text));
+        }
+      }
+      return;
+    }
+
+    // expression_update may omit chatId (activity-only mode), so handle it
+    // before the generic channel lookup below.
+    if (data.type === "expression_update") {
+      const expression = (data?.expression || "").trim().toLowerCase();
+      if (expression) setBridgeActivity(expression);
+
+      if (data?.image && data?.chatId) {
+        const targetChannel = client.channels.cache.get(data.chatId);
+        if (targetChannel) {
+          enqueue(data.chatId, () =>
+            sendImagesToChannel(targetChannel, [data.image], null),
+          );
         }
       }
       return;
@@ -375,6 +394,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     sillyTavernClient = null;
     console.log("[Bridge] SillyTavern disconnected");
+    setBridgeActivity(null);
 
     // Clean up orphaned stream sessions. Left alone they would block future
     // edits; a stale streamHandled entry would silently drop the next ai_reply.

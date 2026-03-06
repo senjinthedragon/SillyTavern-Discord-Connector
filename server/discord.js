@@ -38,6 +38,59 @@ const {
 const { log } = require("./logger");
 const { config, token } = require("./config-loader");
 const { client } = require("./client");
+const version = require("./package.json").version;
+
+const ACTIVITY_BASE = `SillyTavern Bridge v${version}`;
+const EXPRESSION_EMOJI_MAP = {
+  admiration: "😍",
+  amusement: "😄",
+  anger: "😠",
+  annoyance: "😒",
+  approval: "👍",
+  caring: "🤗",
+  confusion: "😕",
+  curiosity: "🤔",
+  desire: "💘",
+  disappointment: "😞",
+  disapproval: "👎",
+  disgust: "🤢",
+  embarrassment: "😳",
+  excitement: "🤩",
+  fear: "😨",
+  gratitude: "🙏",
+  grief: "😢",
+  joy: "😊",
+  love: "❤️",
+  nervousness: "😬",
+  optimism: "🌤️",
+  pride: "😌",
+  realization: "💡",
+  relief: "😮‍💨",
+  remorse: "🥺",
+  sadness: "😔",
+  surprise: "😲",
+  neutral: "😐",
+};
+
+let lastActivitySuffix = "";
+
+function setBridgeActivity(expression) {
+  if (!client?.user) return;
+
+  const normalized = String(expression || "").trim().toLowerCase();
+  let suffix = "";
+  if (normalized) {
+    const emoji = EXPRESSION_EMOJI_MAP[normalized] || "🎭";
+    suffix = ` ${emoji} ${normalized}`;
+  }
+
+  if (suffix === lastActivitySuffix) return;
+  lastActivitySuffix = suffix;
+
+  client.user.setActivity(`${ACTIVITY_BASE}${suffix}`, {
+    type: ActivityType.Playing,
+  });
+}
 
 // Required lazily inside handlers to break the discord.js ↔ websocket.js
 // circular dependency. By the time any handler fires, both modules are
@@ -68,6 +121,39 @@ const SLASH_COMMANDS = [
           "Prompt, keyword, or 'cancel'",
         required: true,
         autocomplete: true,
+      },
+    ],
+  },
+  {
+    name: "mood",
+    description: "Show the current SillyTavern expression for this character",
+    options: [
+      {
+        name: "name",
+        type: 3,
+        description: "Character name (group chat only)",
+        required: false,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
+    name: "expressionsync",
+    description: "Set how expressions are mirrored to Discord",
+    options: [
+      {
+        name: "mode",
+        type: 3,
+        description: "off, activity, or activity_and_image",
+        required: true,
+        choices: [
+          { name: "Off", value: "off" },
+          { name: "Activity only", value: "activity" },
+          {
+            name: "Activity + expression image updates",
+            value: "activity_and_image",
+          },
+        ],
       },
     ],
   },
@@ -147,11 +233,7 @@ const SLASH_COMMANDS = [
 client.login(token);
 
 client.on(Events.ClientReady, async (c) => {
-  const version = require("./package.json").version;
-
-  client.user.setActivity(`SillyTavern Bridge v${version}`, {
-    type: ActivityType.Playing,
-  });
+  setBridgeActivity(null);
 
   console.log(`[Discord] Ready! Logged in as ${c.user.tag}`);
   const rest = new REST({ version: "10" }).setToken(token);
@@ -185,6 +267,7 @@ const AUTOCOMPLETE_LIST_MAP = {
   switchgroup: "groups",
   switchchat: "chats",
   charimage: "group_members",
+  mood: "group_members",
   image: "image_prompts",
 };
 
@@ -347,4 +430,8 @@ client.on("messageCreate", (message) => {
   }
 });
 
-module.exports = { getPendingAutocompletes, getAutocompleteDebouncers };
+module.exports = {
+  getPendingAutocompletes,
+  getAutocompleteDebouncers,
+  setBridgeActivity,
+};

@@ -40,6 +40,11 @@
  *   Character and group lists are cached with a 60-second TTL. Chat lists are
  *   keyed by characterId and invalidated on newchat/switchchar/switchgroup
  *   rather than by TTL, keeping them perfectly current.
+ *
+ * Expression sync:
+ *   Watches #expression-image in the ST DOM and forwards expression updates.
+ *   Depending on extension settings, updates Discord activity only (default)
+ *   or activity plus expression image posts to the last active Discord channel.
  */
 
 // ---------------------------------------------------------------------------
@@ -72,6 +77,7 @@ const MODULE_NAME = "SillyTavern-Discord-Connector";
 const DEFAULT_SETTINGS = {
   bridgeUrl: "ws://127.0.0.1:2333",
   autoConnect: true,
+  expressionMode: "activity",
 };
 
 // String fallback covers older ST versions that don't export this event type.
@@ -82,15 +88,30 @@ let ws = null;
 let shouldReconnect = true;
 let reconnectTimeout = null;
 let heartbeatInterval = null;
+let expressionObserver = null;
+let expressionDebounceTimer = null;
+let lastExpressionSignature = "";
+let lastActiveChatId = null;
+const expressionCache = new Map();
 
 // ---------------------------------------------------------------------------
 // Settings helpers
 // ---------------------------------------------------------------------------
 
 function getSettings() {
-  if (!extensionSettings[MODULE_NAME]) {
-    extensionSettings[MODULE_NAME] = { ...DEFAULT_SETTINGS };
+  extensionSettings[MODULE_NAME] = {
+    ...DEFAULT_SETTINGS,
+    ...(extensionSettings[MODULE_NAME] || {}),
+  };
+
+  if (
+    !["off", "activity", "activity_and_image"].includes(
+      extensionSettings[MODULE_NAME].expressionMode,
+    )
+  ) {
+    extensionSettings[MODULE_NAME].expressionMode = DEFAULT_SETTINGS.expressionMode;
   }
+
   return extensionSettings[MODULE_NAME];
 }
 
@@ -339,6 +360,161 @@ async function sendLastMessageImages(chatId) {
 }
 
 // ---------------------------------------------------------------------------
+// Expression relay
+//
+// SillyTavern exposes the current expression in #expression-image. We observe
+// that element and forward updates to the bridge, where Discord activity can
+// be updated and (optionally) the expression image posted in-channel.
+// ---------------------------------------------------------------------------
+
+const EXPRESSION_DEBOUNCE_MS = 250;
+const EXPRESSION_MODE_VALUES = new Set([
+  "off",
+  "activity",
+  "activity_and_image",
+]);
+
+function normalizeExpressionOwnerName(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase();
+}
+
+function cacheExpressionSnapshot(snapshot) {
+  if (!snapshot?.ownerName) return;
+  const key = normalizeExpressionOwnerName(snapshot.ownerName);
+  if (!key) return;
+  expressionCache.set(key, {
+    ownerName: snapshot.ownerName,
+    expression: snapshot.expression,
+    image: snapshot.image || null,
+    updatedAt: Date.now(),
+  });
+}
+
+function getCachedExpressionSnapshot(name) {
+  const key = normalizeExpressionOwnerName(name);
+  if (!key) return null;
+  return expressionCache.get(key) || null;
+}
+
+function parseExpressionFromElement(imgEl) {
+  if (!imgEl) return null;
+
+  const explicit =
+    imgEl.getAttribute("data-expression") || imgEl.getAttribute("title") || "";
+  if (explicit.trim()) return explicit.trim().toLowerCase();
+
+  const src = imgEl.getAttribute("src") || "";
+  const base = src.split("?")[0].split("/").pop() || "";
+  const name = base.replace(/\.[a-z0-9]+$/i, "").trim().toLowerCase();
+
+  // ST sometimes points to /img/default-expressions/null.png when no
+  // expression is active; treat that as neutral for activity display.
+  if (!name || name === "null") return "neutral";
+  return name;
+}
+
+async function buildExpressionImagePayload(imgEl) {
+  if (!imgEl) return null;
+  const src = imgEl.getAttribute("src");
+  if (!src) return null;
+
+  const kind = classifyImageSrc(src);
+  if (!kind) return null;
+  if (kind === "local") {
+    const fetched = await fetchLocalImageAsBase64(src);
+    return fetched ? { type: "inline", ...fetched } : null;
+  }
+  return { type: "url", url: src };
+}
+
+/**
+ * Reads the current expression block from the DOM and returns expression +
+ * optional image payload.
+ *
+ * @param {boolean} includeImage
+ * @returns {Promise<{expression: string, image: object|null, ownerName: string|null}|null>}
+ */
+async function getCurrentExpressionSnapshot(includeImage = false) {
+  const imgEl = document.getElementById("expression-image");
+  if (!imgEl) return null;
+
+  const expression = parseExpressionFromElement(imgEl);
+  if (!expression) return null;
+
+  const image = includeImage ? await buildExpressionImagePayload(imgEl) : null;
+  const ownerName =
+    imgEl.getAttribute("data-sprite-folder-name")?.trim() || null;
+  const snapshot = { expression, image, ownerName };
+  cacheExpressionSnapshot(snapshot);
+  return snapshot;
+}
+
+async function sendExpressionUpdate(chatIdHint = null) {
+  if (ws?.readyState !== WebSocket.OPEN) return;
+
+  const settings = getSettings();
+  if (settings.expressionMode === "off") return;
+
+  const snapshot = await getCurrentExpressionSnapshot(
+    settings.expressionMode === "activity_and_image",
+  );
+  if (!snapshot) return;
+  const { expression, image } = snapshot;
+
+  const imgEl = document.getElementById("expression-image");
+  const src = imgEl.getAttribute("src") || "";
+  const signature = `${expression}|${src}`;
+  if (signature === lastExpressionSignature) return;
+  lastExpressionSignature = signature;
+
+  let chatId = null;
+  if (settings.expressionMode === "activity_and_image") {
+    chatId = chatIdHint || lastActiveChatId || null;
+  }
+
+  ws.send(
+    JSON.stringify({
+      type: "expression_update",
+      expression,
+      chatId,
+      image,
+    }),
+  );
+}
+
+function scheduleExpressionUpdate(chatIdHint = null) {
+  if (expressionDebounceTimer) clearTimeout(expressionDebounceTimer);
+  expressionDebounceTimer = setTimeout(() => {
+    sendExpressionUpdate(chatIdHint).catch((err) => {
+      console.warn("[Discord Bridge] Failed to send expression update:", err);
+    });
+  }, EXPRESSION_DEBOUNCE_MS);
+}
+
+function setupExpressionObserver() {
+  if (expressionObserver) return;
+
+  const target = document.getElementById("expression-wrapper") || document.body;
+  if (!target) return;
+
+  expressionObserver = new MutationObserver(() => {
+    scheduleExpressionUpdate();
+  });
+
+  expressionObserver.observe(target, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["src", "data-expression", "title"],
+  });
+
+  // Push initial state when connected and observer starts.
+  scheduleExpressionUpdate();
+}
+
+// ---------------------------------------------------------------------------
 // Autocomplete cache
 //
 // Character and group lists: TTL-based (60 s). Cheap to rebuild and change
@@ -554,31 +730,6 @@ function markImageSuccess(chatId) {
   imageCircuitState.set(chatId, { consecutiveFailures: 0, openUntil: 0 });
 }
 
-/**
- * Best-effort attempt to stop an in-progress SillyTavern image job.
- *
- * Different ST versions/extensions expose different stop commands.
- * We try the common ones and ignore failures so /image cancel always responds.
- *
- * @returns {Promise<boolean>} True if at least one stop command succeeded.
- */
-async function tryAbortSillyTavernImageGeneration() {
-  const candidates = ["/cancel", "/abort"];
-  let succeeded = false;
-
-  for (const cmd of candidates) {
-    try {
-      await executeSlashCommandsWithOptions(cmd);
-      succeeded = true;
-      break;
-    } catch {
-      // Continue trying fallback commands.
-    }
-  }
-
-  return succeeded;
-}
-
 function getImageQueue(chatId) {
   if (!imageQueues.has(chatId)) imageQueues.set(chatId, Promise.resolve());
   return imageQueues.get(chatId);
@@ -764,6 +915,7 @@ function generateAndSendImage(chatId, requestId, prompt) {
  * (normal completion, user stop, error) to prevent leaks across sessions.
  */
 async function handleUserMessage(data) {
+  lastActiveChatId = data.chatId || lastActiveChatId;
   const messageState = { chatId: data.chatId, isStreaming: false };
 
   if (ws?.readyState === WebSocket.OPEN) {
@@ -961,6 +1113,7 @@ async function handleUserMessage(data) {
  * SillyTavern's APIs and sends an ai_reply with the result text.
  */
 async function handleExecuteCommand(data) {
+  lastActiveChatId = data.chatId || lastActiveChatId;
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: "typing_action", chatId: data.chatId }));
   }
@@ -1121,6 +1274,96 @@ async function handleExecuteCommand(data) {
         break;
       }
 
+      case "mood": {
+        const requestedName = data.args?.join(" ").trim() || null;
+        let snapshot = await getCurrentExpressionSnapshot(true);
+        let usedCachedSnapshot = false;
+        if (!snapshot) {
+          if (requestedName) {
+            const cached = getCachedExpressionSnapshot(requestedName);
+            if (!cached) {
+              replyText =
+                "No active expression is available right now, and no stored mood exists for that character yet.";
+              break;
+            }
+            snapshot = cached;
+            usedCachedSnapshot = true;
+          } else {
+            replyText =
+              "No active expression is available right now. Make sure expressions are enabled in SillyTavern.";
+            break;
+          }
+        }
+
+        if (requestedName) {
+          const owner = snapshot.ownerName || "(unknown)";
+          if (
+            !snapshot.ownerName ||
+            snapshot.ownerName.toLowerCase() !== requestedName.toLowerCase()
+          ) {
+            const cached = getCachedExpressionSnapshot(requestedName);
+            if (!cached) {
+              replyText =
+                `Current visible mood is for **${owner}** (` +
+                `**${snapshot.expression}**). ` +
+                `Mood for **${requestedName}** is not currently visible in SillyTavern and has not been seen yet.`;
+              break;
+            }
+            snapshot = cached;
+            usedCachedSnapshot = true;
+          }
+        }
+
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "expression_update",
+              expression: snapshot.expression,
+              chatId: data.chatId,
+              image: snapshot.image,
+            }),
+          );
+        }
+
+        const ownerPrefix = snapshot.ownerName
+          ? `**${snapshot.ownerName}**: `
+          : "";
+        const cachedNote = usedCachedSnapshot ? " (last known mood)" : "";
+        replyText = snapshot.image
+          ? `Current mood: ${ownerPrefix}**${snapshot.expression}**${cachedNote} (image sent).`
+          : `Current mood: ${ownerPrefix}**${snapshot.expression}**${cachedNote} (no expression image available).`;
+        break;
+      }
+
+      case "expressionsync": {
+        if (!data.args?.length) {
+          replyText =
+            "Usage: /expressionsync <mode>\nModes: off, activity, activity_and_image";
+          break;
+        }
+
+        const mode = String(data.args[0] || "").trim().toLowerCase();
+        if (!EXPRESSION_MODE_VALUES.has(mode)) {
+          replyText =
+            "Invalid mode. Use one of: off, activity, activity_and_image.";
+          break;
+        }
+
+        getSettings().expressionMode = mode;
+        saveSettingsDebounced();
+        lastExpressionSignature = "";
+        scheduleExpressionUpdate(data.chatId);
+
+        const modeLabel =
+          mode === "off"
+            ? "Off"
+            : mode === "activity"
+              ? "Discord activity only"
+              : "Activity + expression image updates";
+        replyText = `Expression sync mode set to: **${modeLabel}**.`;
+        break;
+      }
+
       case "image": {
         if (!data.args?.length) {
           replyText =
@@ -1138,12 +1381,9 @@ async function handleExecuteCommand(data) {
             break;
           }
 
-          const stAbortWorked = await tryAbortSillyTavernImageGeneration();
           activeJob.cancel();
           imageMetrics.canceled += 1;
-          replyText = stAbortWorked
-            ? "Cancelled active image generation."
-            : "Cancelled active image generation (the generator may still finish in SillyTavern if stop is unsupported).";
+          replyText = "Cancelled active image generation.";
           break;
         }
 
@@ -1231,6 +1471,7 @@ async function handleExecuteCommand(data) {
           `- WebSocket: ${ws?.readyState === WebSocket.OPEN ? "Connected" : "Disconnected"}\n` +
           `- Active character: ${activeCharacter}\n` +
           `- Active group: ${activeGroup}\n` +
+          `- Stored mood snapshots: ${expressionCache.size}\n` +
           `- Image queue active (this chat): ${imageQueues.has(data.chatId) ? "yes" : "no"}\n` +
           `- Image generation in-flight (this chat): ${activeImageJobs.has(data.chatId) ? "yes" : "no"}\n` +
           `- Image breaker: ${breakerText}\n` +
@@ -1247,6 +1488,8 @@ async function handleExecuteCommand(data) {
           "**Navigation & Chat**\n" +
           "`/sthelp` - Show this menu\n" +
           "`/status` - Show bridge and image pipeline health\n" +
+          "`/mood [name]` - Show current expression (optionally for a specific visible group member)\n" +
+          "`/expressionsync <mode>` - Set expression sync mode (`off`, `activity`, `activity_and_image`)\n" +
           "`/newchat` - Start a new chat with the active character or group\n" +
           "`/listchats` - Show chat history for current character\n" +
           "`/switchchat <chat name>` or `/switchchat_#` - Load a past chat\n\n" +
@@ -1463,6 +1706,9 @@ function connect() {
   ws.onopen = () => {
     updateStatus("Connected", "green");
     console.log("[Discord Bridge] Connected to bridge server");
+    lastExpressionSignature = "";
+    setupExpressionObserver();
+    scheduleExpressionUpdate(lastActiveChatId);
     if (heartbeatInterval) clearInterval(heartbeatInterval);
     heartbeatInterval = setInterval(() => {
       if (ws?.readyState === WebSocket.OPEN)
@@ -1562,6 +1808,7 @@ jQuery(async () => {
     const settings = getSettings();
     $("#discord_bridge_url").val(settings.bridgeUrl);
     $("#discord_auto_connect").prop("checked", settings.autoConnect);
+    $("#discord_expression_mode").val(settings.expressionMode);
 
     $("#discord_bridge_url").on("input", () => {
       getSettings().bridgeUrl = $("#discord_bridge_url").val();
@@ -1571,6 +1818,13 @@ jQuery(async () => {
     $("#discord_auto_connect").on("change", () => {
       getSettings().autoConnect = $("#discord_auto_connect").prop("checked");
       saveSettingsDebounced();
+    });
+
+    $("#discord_expression_mode").on("change", () => {
+      getSettings().expressionMode = $("#discord_expression_mode").val();
+      lastExpressionSignature = "";
+      saveSettingsDebounced();
+      scheduleExpressionUpdate(lastActiveChatId);
     });
 
     $("#discord_connect_button").on("click", connect);

@@ -8,9 +8,20 @@ This release hardens the Discord ↔ SillyTavern bridge around image generation 
 - Added per-channel image request queuing so one stuck request does not block other channels.
 - Added request IDs for image placeholder/result/error correlation.
 - Added automatic timeout handling for image generation with a clear retry message.
-- Added `/image cancel` support.
-  - Cancellation is now **best-effort**: the bridge attempts to stop generation in SillyTavern using common stop commands.
-  - If the underlying image backend does not support remote stop, the bridge still cancels its own wait state so users can retry immediately.
+- Added `/image cancel` support to cancel the bridge-side image request immediately so users can retry without restarting.
+
+### Expression sync (new)
+- Added extension setting `Expression sync` with three modes:
+  - Off
+  - Discord activity only
+  - Activity + expression image updates
+- The extension now watches SillyTavern's `#expression-image` and sends expression updates to the bridge.
+- Discord activity now reflects the latest expression (with emoji for known default expressions).
+- Optional expression-image posting sends updates to the most recently active Discord channel.
+- Added `/mood [name]` command to fetch and post the current visible expression image on demand; in group chats, `name` can be provided for the currently visible member.
+- Added lightweight per-character mood memory so `/mood <name>` can return the last seen mood for a group member when that member is not currently visible.
+- Added `/expressionsync <mode>` command so expression mode can be changed remotely from Discord.
+- Expression handling supports asynchronous mood updates (text first, mood afterwards) and missing expression blocks when expressions are disabled.
 
 ### Stability protections
 - Added short-term image request throttling per channel.
