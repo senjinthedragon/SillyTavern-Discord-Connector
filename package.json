@@ -30,6 +30,7 @@
     "bump": "npm version patch && git push origin main --tags",
     "bump-minor": "npm version minor && git push origin main --tags",
     "bump-major": "npm version major && git push origin main --tags",
+    "verify-release": "cd server && npm test && cd .. && npm run test-package",
     "test-package": "npm pack --dry-run",
     "install-server": "cd server && npm install",
     "start": "cd server && node server.js"
