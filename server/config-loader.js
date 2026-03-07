@@ -23,64 +23,16 @@ if (!fs.existsSync(configPath)) {
 }
 
 const rawConfig = require("./config");
+const { createConfig } = require("./config-logic");
 
-const config = {
-  queueTaskTimeoutSeconds: 30,
-  imagePlaceholderTimeoutSeconds: 180,
-  ...rawConfig,
-};
-
-// Convert seconds to milliseconds for internal use. All other modules consume
-// the Ms-suffixed values so nothing else in the codebase needs to change.
-config.queueTaskTimeoutMs = config.queueTaskTimeoutSeconds * 1_000;
-config.imagePlaceholderTimeoutMs =
-  config.imagePlaceholderTimeoutSeconds * 1_000;
-
-if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
-  console.error("[ERROR] Set your Discord Bot Token in config.js!");
+let config;
+try {
+  const result = createConfig(rawConfig);
+  config = result.config;
+  result.warnings.forEach((warning) => console.warn(warning));
+} catch (err) {
+  console.error(`[ERROR] ${err.message}`);
   process.exit(1);
-}
-
-if (
-  !Number.isFinite(config.queueTaskTimeoutSeconds) ||
-  config.queueTaskTimeoutSeconds <= 0
-) {
-  console.error(
-    "[ERROR] config.queueTaskTimeoutSeconds must be a positive number (e.g. 30 for 30 seconds).",
-  );
-  process.exit(1);
-}
-
-if (
-  !Number.isFinite(config.imagePlaceholderTimeoutSeconds) ||
-  config.imagePlaceholderTimeoutSeconds <= 0
-) {
-  console.error(
-    "[ERROR] config.imagePlaceholderTimeoutSeconds must be a positive number (e.g. 180 for 3 minutes).",
-  );
-  process.exit(1);
-}
-
-if (config.timezone) {
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: config.timezone });
-  } catch {
-    console.warn(
-      `[Config] Invalid timezone "${config.timezone}" - falling back to UTC`,
-    );
-    config.timezone = "UTC";
-  }
-}
-
-if (config.locale) {
-  try {
-    Intl.DateTimeFormat(config.locale);
-  } catch {
-    console.warn(
-      `[Config] Invalid locale "${config.locale}" - falling back to system default`,
-    );
-    config.locale = null;
-  }
 }
 
 module.exports = {

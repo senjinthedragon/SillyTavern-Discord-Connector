@@ -41,48 +41,13 @@ const { client } = require("./client");
 const version = require("./package.json").version;
 
 const ACTIVITY_BASE = `SillyTavern Bridge v${version}`;
-const EXPRESSION_EMOJI_MAP = {
-  admiration: "😍",
-  amusement: "😄",
-  anger: "😠",
-  annoyance: "😒",
-  approval: "👍",
-  caring: "🤗",
-  confusion: "😕",
-  curiosity: "🤔",
-  desire: "💘",
-  disappointment: "😞",
-  disapproval: "👎",
-  disgust: "🤢",
-  embarrassment: "😳",
-  excitement: "🤩",
-  fear: "😨",
-  gratitude: "🙏",
-  grief: "😢",
-  joy: "😊",
-  love: "❤️",
-  nervousness: "😬",
-  optimism: "🌤️",
-  pride: "😌",
-  realization: "💡",
-  relief: "😮‍💨",
-  remorse: "🥺",
-  sadness: "😔",
-  surprise: "😲",
-  neutral: "😐",
-};
+const { formatBridgeActivity } = require("./activity-format");
 
 let lastActivityText = "";
 
 function setBridgeActivity(expression) {
   if (!client?.user) return;
-  const normalized = String(expression || "")
-    .trim()
-    .toLowerCase();
-
-  const activityText = normalized
-    ? `${EXPRESSION_EMOJI_MAP[normalized] || "🎭"} ${normalized}`
-    : ACTIVITY_BASE;
+  const activityText = formatBridgeActivity(ACTIVITY_BASE, expression);
 
   if (activityText === lastActivityText) return;
   lastActivityText = activityText;
