@@ -369,11 +369,7 @@ async function sendLastMessageImages(chatId) {
 // ---------------------------------------------------------------------------
 
 const EXPRESSION_DEBOUNCE_MS = 250;
-const EXPRESSION_MODE_VALUES = new Set([
-  "off",
-  "status",
-  "full",
-]);
+const EXPRESSION_MODE_VALUES = new Set(["off", "status", "full"]);
 
 function normalizeExpressionOwnerName(name) {
   return String(name || "")
@@ -1349,8 +1345,7 @@ async function handleExecuteCommand(data) {
 
       case "reaction": {
         if (!data.args?.length) {
-          replyText =
-            "Usage: /reaction <mode>\nModes: off, status, full";
+          replyText = "Usage: /reaction <mode>\nModes: off, status, full";
           break;
         }
 
@@ -1358,8 +1353,7 @@ async function handleExecuteCommand(data) {
           .trim()
           .toLowerCase();
         if (!EXPRESSION_MODE_VALUES.has(mode)) {
-          replyText =
-            "Invalid mode. Use one of: off, status, full.";
+          replyText = "Invalid mode. Use one of: off, status, full.";
           break;
         }
 
@@ -1675,19 +1669,19 @@ async function handleGetAutocomplete(data) {
       ];
     } else if (data.list === "group_members") {
       // Only active group members, not the full character library.
-      // Empty in solo chat - correct, since the dropdown doesn't appear there.
-      const activeGroup = (context.groups || []).find(
-        (g) => g.id === context.groupId,
-      );
+      // Use the global 'selected_group' if context.groupId is missing
+      const groupId = context.groupId || window.selected_group;
+      const activeGroup = (context.groups || []).find((g) => g.id === groupId);
+
       if (activeGroup?.members?.length) {
         allNames = activeGroup.members
-          .map(
-            (id) =>
-              context.characters.find((c) => c.id === id)?.name?.trim() || null,
-          )
+          .map((id) => {
+            const char = context.characters.find((c) => c.id === id);
+            return char?.name?.trim() || null;
+          })
           .filter(Boolean);
-      } else if (context.characterId !== undefine) {
-        // Fallback for solo: Show the current character name
+      } else if (context.characterId !== undefined) {
+        // Fallback: If not in a group, at least show the active character
         const soloChar = context.characters[context.characterId]?.name;
         if (soloChar) allNames = [soloChar];
       }
@@ -1700,11 +1694,7 @@ async function handleGetAutocomplete(data) {
   const query = (data.query || "").toLowerCase();
   const choices = allNames
     .filter((n) => n.toLowerCase().includes(query))
-    .slice(0, 25)
-    .map(name => ({
-      name: name,
-      value: name
-    }))
+    .slice(0, 25);
 
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(
