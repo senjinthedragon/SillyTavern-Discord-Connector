@@ -1668,22 +1668,36 @@ async function handleGetAutocomplete(data) {
         "cancel",
       ];
     } else if (data.list === "group_members") {
-      // Only active group members, not the full character library.
-      // Use the global 'selected_group' if context.groupId is missing
-      const groupId = context.groupId || window.selected_group;
-      const activeGroup = (context.groups || []).find((g) => g.id === groupId);
-
-      if (activeGroup?.members?.length) {
-        allNames = activeGroup.members
-          .map((id) => {
-            const char = context.characters.find((c) => c.id === id);
-            return char?.name?.trim() || null;
-          })
-          .filter(Boolean);
-      } else if (context.characterId !== undefined) {
-        // Fallback: If not in a group, at least show the active character
-        const soloChar = context.characters[context.characterId]?.name;
+      if (!context.groupId) {
+        // Solo chat - offer the active character's name as the only option.
+        const soloChar =
+          context.characters?.[context.characterId]?.name?.trim();
         if (soloChar) allNames = [soloChar];
+      } else {
+        const activeGroup = (context.groups || []).find(
+          (g) => g.id === context.groupId,
+        );
+
+        if (activeGroup) {
+          const groupBlocks = document.querySelectorAll(
+            ".group_select_container",
+          );
+          for (const block of groupBlocks) {
+            const nameEl = block.querySelector(".ch_name");
+            const listEl = block.querySelector(".group_select_block_list");
+            if (
+              nameEl?.textContent?.replace("[Group] ", "").trim() ===
+                activeGroup.name &&
+              listEl
+            ) {
+              allNames = listEl.textContent
+                .split(",")
+                .map((n) => n.trim())
+                .filter(Boolean);
+              break;
+            }
+          }
+        }
       }
     }
   } catch (err) {
