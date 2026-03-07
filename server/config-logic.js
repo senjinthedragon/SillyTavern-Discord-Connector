@@ -8,7 +8,8 @@ function createConfig(rawConfig) {
   };
 
   config.queueTaskTimeoutMs = config.queueTaskTimeoutSeconds * 1_000;
-  config.imagePlaceholderTimeoutMs = config.imagePlaceholderTimeoutSeconds * 1_000;
+  config.imagePlaceholderTimeoutMs =
+    config.imagePlaceholderTimeoutSeconds * 1_000;
 
   if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
     throw new Error("Set your Discord Bot Token in config.js!");
