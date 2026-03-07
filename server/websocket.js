@@ -21,6 +21,7 @@
  *   error_message         - forward extension error to Discord channel
  *   intro_message         - post /newchat character greeting
  *   send_images           - post one or more images to a channel
+ *   expression_update     - update bot activity (+ optional expression image)
  *
  * On disconnect, all in-flight state (stream sessions, image placeholders,
  * autocomplete debouncers, pending interactions, channel queues) is cleaned up
@@ -31,7 +32,7 @@
 
 const WebSocket = require("ws");
 const { log } = require("./logger");
-const { wssPort } = require("./config-loader");
+const { config, wssPort } = require("./config-loader");
 const { enqueue, clearAllQueues } = require("./queue");
 const { sendLong, sendImagesToChannel } = require("./messaging");
 const {
@@ -44,6 +45,7 @@ const { client } = require("./client");
 const {
   getPendingAutocompletes,
   getAutocompleteDebouncers,
+  setBridgeActivity,
 } = require("./discord");
 
 const version = require("./package.json").version;
@@ -81,6 +83,7 @@ const wss = new WebSocket.Server({
 console.log(`[Bridge] WebSocket server listening on port ${wssPort}`);
 
 let sillyTavernClient = null;
+const IMAGE_PLACEHOLDER_TIMEOUT_MS = config.imagePlaceholderTimeoutMs;
 
 function getSillyTavernClient() {
   return sillyTavernClient;
@@ -91,7 +94,15 @@ wss.on("connection", (ws) => {
   sillyTavernClient = ws;
 
   ws.on("message", async (message) => {
-    const data = JSON.parse(message);
+    let data;
+    try {
+      const payload =
+        typeof message === "string" ? message : message.toString("utf8");
+      data = JSON.parse(payload);
+    } catch (err) {
+      log("warn", `[Bridge] Dropping invalid JSON packet: ${err.message}`);
+      return;
+    }
 
     if (data.type === "heartbeat") {
       ws.send(JSON.stringify({ type: "heartbeat" }));
@@ -123,8 +134,9 @@ wss.on("connection", (ws) => {
       const channel = client.channels.cache.get(channelId);
       if (!channel) return;
 
-      const pending = pendingImageMessages[channelId];
-      delete pendingImageMessages[channelId];
+      const pendingKey = data.requestId || channelId;
+      const pending = pendingImageMessages[pendingKey];
+      delete pendingImageMessages[pendingKey];
 
       enqueue(channelId, async () => {
         if (pending)
@@ -142,14 +154,37 @@ wss.on("connection", (ws) => {
     }
 
     if (data.type === "generate_image_error") {
-      const pending = pendingImageMessages[data.chatId];
-      delete pendingImageMessages[data.chatId];
+      const pendingKey = data.requestId || data.chatId;
+      const pending = pendingImageMessages[pendingKey];
+      delete pendingImageMessages[pendingKey];
       if (pending) {
         await pending
           .edit(data.text || "Image generation failed.")
           .catch((err) => {
             log("warn", `[Image] Could not edit placeholder: ${err.message}`);
           });
+      } else {
+        const channel = client.channels.cache.get(data.chatId);
+        if (channel && data.text) {
+          enqueue(data.chatId, () => sendLong(channel, data.text));
+        }
+      }
+      return;
+    }
+
+    // expression_update may omit chatId (activity-only mode), so handle it
+    // before the generic channel lookup below.
+    if (data.type === "expression_update") {
+      const expression = (data?.expression || "").trim().toLowerCase();
+      if (expression) setBridgeActivity(expression);
+
+      if (data?.image && data?.chatId) {
+        const targetChannel = client.channels.cache.get(data.chatId);
+        if (targetChannel) {
+          enqueue(data.chatId, () =>
+            sendImagesToChannel(targetChannel, [data.image], null),
+          );
+        }
       }
       return;
     }
@@ -164,11 +199,28 @@ wss.on("connection", (ws) => {
         break;
 
       case "image_placeholder": {
+        const pendingKey = data.requestId || channelId;
         const placeholderText = data?.text || "🎨 Generating image…";
         enqueue(channelId, async () => {
           try {
             const msg = await channel.send(placeholderText);
-            pendingImageMessages[channelId] = msg;
+            pendingImageMessages[pendingKey] = msg;
+
+            setTimeout(() => {
+              const pending = pendingImageMessages[pendingKey];
+              if (!pending || pending.id !== msg.id) return;
+              delete pendingImageMessages[pendingKey];
+              pending
+                .edit(
+                  "⚠️ Image generation timed out. Please run /image again.",
+                )
+                .catch((err) => {
+                  log(
+                    "warn",
+                    `[Image] Could not edit timed-out placeholder: ${err.message}`,
+                  );
+                });
+            }, IMAGE_PLACEHOLDER_TIMEOUT_MS);
           } catch (err) {
             log("warn", `[Image] Could not send placeholder: ${err.message}`);
           }
@@ -342,6 +394,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     sillyTavernClient = null;
     console.log("[Bridge] SillyTavern disconnected");
+    setBridgeActivity(null);
 
     // Clean up orphaned stream sessions. Left alone they would block future
     // edits; a stale streamHandled entry would silently drop the next ai_reply.
@@ -353,11 +406,11 @@ wss.on("connection", (ws) => {
     streamHandled.clear();
 
     // Edit any outstanding image placeholders so they don't sit forever.
-    for (const [channelId, msg] of Object.entries(pendingImageMessages)) {
+    for (const [pendingKey, msg] of Object.entries(pendingImageMessages)) {
       msg
         .edit("🎨 Image generation was interrupted - bridge disconnected.")
         .catch(() => {});
-      delete pendingImageMessages[channelId];
+      delete pendingImageMessages[pendingKey];
     }
 
     clearAllQueues();

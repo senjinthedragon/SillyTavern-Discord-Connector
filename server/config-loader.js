@@ -22,10 +22,32 @@ if (!fs.existsSync(configPath)) {
   process.exit(1);
 }
 
-const config = require("./config");
+const rawConfig = require("./config");
+
+const config = {
+  queueTaskTimeoutMs: 30_000,
+  imagePlaceholderTimeoutMs: 180_000,
+  ...rawConfig,
+};
 
 if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
   console.error("[ERROR] Set your Discord Bot Token in config.js!");
+  process.exit(1);
+}
+
+
+if (!Number.isFinite(config.queueTaskTimeoutMs) || config.queueTaskTimeoutMs < 1000) {
+  console.error("[ERROR] config.queueTaskTimeoutMs must be a number >= 1000 (ms).");
+  process.exit(1);
+}
+
+if (
+  !Number.isFinite(config.imagePlaceholderTimeoutMs) ||
+  config.imagePlaceholderTimeoutMs < 1000
+) {
+  console.error(
+    "[ERROR] config.imagePlaceholderTimeoutMs must be a number >= 1000 (ms).",
+  );
   process.exit(1);
 }
 
