@@ -95,7 +95,7 @@ wss.on("connection", (ws) => {
 
   // Push bridge configuration to the extension immediately on connect so it
   // can format chat timestamps in the correct timezone and locale without a
-  // round-trip. Both fields are optional — the extension falls back gracefully
+  // round-trip. Both fields are optional - the extension falls back gracefully
   // if either is absent or invalid.
   ws.send(
     JSON.stringify({
@@ -132,7 +132,7 @@ wss.on("connection", (ws) => {
       delete pendingAutocompletes[data.requestId];
 
       // Discord rejects respond() if the array exceeds 25 entries.
-      // Choices arrive as {name, value} objects from the extension — name is
+      // Choices arrive as {name, value} objects from the extension - name is
       // the display label, value is what Discord sends back on selection.
       const choices = (data.choices || []).slice(0, 25);
       await pending.interaction.respond(choices).catch((err) => {

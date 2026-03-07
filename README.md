@@ -138,8 +138,8 @@ Use these slash commands in Discord to control the session:
 | **`/listchats`** | *List saved chats for the current character with shortcut numbers* |
 | **`/switchchat <name>`** | *Load a saved chat by name - supports live autocomplete* |
 | **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
-| **`/mood <name>`** | *Show the current character's visible mood (you can also pass a character name)* |
-| **`/charimage [name]`** | *Post a character's avatar. Omit the name in solo chat; autocompletes group members in group chat* |
+| **`/mood <n>`** | *Show a character's current mood and expression image. Autocompletes with group members in group chat, or the active character in solo chat* |
+| **`/charimage <n>`** | *Post a character's avatar. Autocompletes with group members in group chat, or the active character in solo chat* |
 | **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
 | **`/image cancel`** | *Cancel the active image generation request* |
 
@@ -171,7 +171,7 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 > If you use `off` or `status` mode for reactions, run `/mood` any time you want to post the current expression image in chat.
 
 > [!NOTE]
-> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. Chat history updates immediately after any `/newchat` or switch command issued through the bot.
+> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists are sorted alphabetically and refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. `/mood` and `/charimage` autocomplete with the members of your active group, or your solo character's name if you're in a solo chat. Chat history shows your most recent chats first and updates immediately after any `/newchat` or switch command issued through the bot.
 >
 > Numbered shortcuts (`/switchchar_3`, `/switchgroup_2`, `/switchchat_1` etc.) are not registered as slash commands because the number of entries varies for everyone. Type them as plain text messages - they work exactly the same way.
 
@@ -193,6 +193,9 @@ This intent must be explicitly enabled in the Discord Developer Portal under you
 
 **Port conflict:**\
 If port 2333 is in use, change `wssPort` in `config.js` and update the bridge URL in the extension settings to match.
+
+**Autocomplete shows "Loading options failed":**\
+This can happen if Discord has cached an old version of your slash commands. Simply restart your Discord app to force it to fetch the latest command definitions from the bot.
 
 **Slash commands don't appear in Discord:**\
 The `applications.commands` scope must be included when generating the bot's invite URL (see step 2).\

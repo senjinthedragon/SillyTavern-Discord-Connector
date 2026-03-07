@@ -1694,7 +1694,7 @@ async function handleGetAutocomplete(data) {
           allNames = chatFiles
             .map((c) => c.file_name.replace(".jsonl", ""))
             .filter((n) => n?.trim())
-            // Sort newest-first by raw filename — the timestamp suffix is
+            // Sort newest-first by raw filename - the timestamp suffix is
             // lexicographically ordered so no date parsing is needed here.
             .sort((a, b) => b.localeCompare(a))
             .map((raw) => {
@@ -1823,7 +1823,7 @@ function connect() {
       if (data.type === "heartbeat") return;
 
       if (data.type === "bridge_config") {
-        // Validate timezone and locale before storing — invalid values would
+        // Validate timezone and locale before storing - invalid values would
         // cause Intl.DateTimeFormat to throw at autocomplete time.
         if (data.timezone) {
           try {
