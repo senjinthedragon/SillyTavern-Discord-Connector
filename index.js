@@ -1669,35 +1669,29 @@ async function handleGetAutocomplete(data) {
       ];
     } else if (data.list === "group_members") {
       if (!context.groupId) {
-        // Solo chat - offer the active character's name as the only option.
-        const soloChar =
-          context.characters?.[context.characterId]?.name?.trim();
+        const soloChar = context.characters
+          ?.find((c) => c.id === context.characterId)
+          ?.name?.trim();
         if (soloChar) allNames = [soloChar];
       } else {
-        const activeGroup = (context.groups || []).find(
-          (g) => g.id === context.groupId,
+        console.log(
+          "[Discord Bridge] Autocomplete: group mode, groupId =",
+          context.groupId,
         );
-
-        if (activeGroup) {
-          const groupBlocks = document.querySelectorAll(
-            ".group_select_container",
-          );
-          for (const block of groupBlocks) {
-            const nameEl = block.querySelector(".ch_name");
-            const listEl = block.querySelector(".group_select_block_list");
-            if (
-              nameEl?.textContent?.replace("[Group] ", "").trim() ===
-                activeGroup.name &&
-              listEl
-            ) {
-              allNames = listEl.textContent
-                .split(",")
-                .map((n) => n.trim())
-                .filter(Boolean);
-              break;
-            }
-          }
-        }
+        const memberEls = document.querySelectorAll(
+          "#rm_group_members .group_member .ch_name",
+        );
+        console.log(
+          "[Discord Bridge] Found .ch_name elements:",
+          memberEls.length,
+        );
+        memberEls.forEach((el) =>
+          console.log("[Discord Bridge] Member:", el.textContent.trim()),
+        );
+        allNames = Array.from(memberEls)
+          .map((el) => el.textContent.trim())
+          .filter(Boolean);
+        console.log("[Discord Bridge] Final allNames:", allNames);
       }
     }
   } catch (err) {
