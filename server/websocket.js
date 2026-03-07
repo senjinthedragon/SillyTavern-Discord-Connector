@@ -93,6 +93,18 @@ wss.on("connection", (ws) => {
   console.log("[Bridge] SillyTavern connected");
   sillyTavernClient = ws;
 
+  // Push bridge configuration to the extension immediately on connect so it
+  // can format chat timestamps in the correct timezone and locale without a
+  // round-trip. Both fields are optional — the extension falls back gracefully
+  // if either is absent or invalid.
+  ws.send(
+    JSON.stringify({
+      type: "bridge_config",
+      timezone: config.timezone || null,
+      locale: config.locale || null,
+    }),
+  );
+
   ws.on("message", async (message) => {
     let data;
     try {
@@ -120,9 +132,9 @@ wss.on("connection", (ws) => {
       delete pendingAutocompletes[data.requestId];
 
       // Discord rejects respond() if the array exceeds 25 entries.
-      const choices = (data.choices || [])
-        .slice(0, 25)
-        .map((name) => ({ name, value: name }));
+      // Choices arrive as {name, value} objects from the extension — name is
+      // the display label, value is what Discord sends back on selection.
+      const choices = (data.choices || []).slice(0, 25);
       await pending.interaction.respond(choices).catch((err) => {
         log("warn", `[Autocomplete] respond() failed: ${err.message}`);
       });

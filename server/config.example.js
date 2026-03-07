@@ -29,6 +29,12 @@ module.exports = {
   // Set to true to enable verbose terminal logging
   debug: false,
 
-  // Timezone for log timestamps
-  timezone: "Europe/Amsterdam",
+  // Timezone for log timestamps and chat date formatting in Discord autocomplete.
+  // Use IANA timezone names e.g. "Europe/Amsterdam", "America/New_York", "Asia/Tokyo".
+  timezone: "America/New_York",
+
+  // Locale for date/time formatting in Discord autocomplete chat lists.
+  // Use BCP 47 language tags e.g. "nl-NL", "en-GB", "en-US", "de-DE".
+  // Leave unset or set to null to use the SillyTavern browser's default locale.
+  locale: "en-US",
 };

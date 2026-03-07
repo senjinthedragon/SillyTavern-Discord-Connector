@@ -20,7 +20,7 @@ const { config } = require("./config-loader");
 function log(level, ...args) {
   if (level === "log" && !config.debug) return;
 
-  const timestamp = new Date().toLocaleString("en-US", {
+  const timestamp = new Date().toLocaleString(config.locale || undefined, {
     timeZone: config.timezone || "UTC",
   });
 

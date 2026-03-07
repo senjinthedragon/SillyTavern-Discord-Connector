@@ -92,6 +92,8 @@ let expressionObserver = null;
 let expressionDebounceTimer = null;
 let lastExpressionSignature = "";
 let lastActiveChatId = null;
+let bridgeTimezone = null;
+let bridgeLocale = null;
 const expressionCache = new Map();
 
 // ---------------------------------------------------------------------------
@@ -1644,14 +1646,68 @@ async function handleGetAutocomplete(data) {
       }
     } else if (data.list === "chats") {
       // Only meaningful when a character is selected; empty list otherwise.
+      // Sorted newest-first using the raw filename (which is lexicographically
+      // ordered by timestamp), then reformatted for display using the timezone
+      // pushed from the bridge on connect.
       if (context.characterId !== undefined) {
         if (chatCache[context.characterId]) {
           allNames = chatCache[context.characterId].names;
         } else {
           const chatFiles = await getPastCharacterChats(context.characterId);
+
+          // Parse "Name - YYYY-MM-DD@HHhMMmSSsXXXms" into a Date for display.
+          // Returns null if the filename doesn't match the expected pattern.
+          const parseChatFilename = (name) => {
+            const m = name.match(
+              /(\d{4})-(\d{2})-(\d{2})@(\d{2})h(\d{2})m(\d{2})s(\d+)ms$/,
+            );
+            if (!m) return null;
+            const [, yr, mo, dy, hr, mn, sc, ms] = m;
+            return new Date(
+              Date.UTC(+yr, +mo - 1, +dy, +hr, +mn, +sc, +ms),
+            );
+          };
+
+          const fmt = (() => {
+            const tz = bridgeTimezone;
+            const opts = {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false,
+              ...(tz ? { timeZone: tz } : {}),
+            };
+            try {
+              return new Intl.DateTimeFormat(bridgeLocale || undefined, opts);
+            } catch {
+              return new Intl.DateTimeFormat(undefined, { ...opts, timeZone: undefined });
+            }
+          })();
+
+          // Produce {name, value} pairs: name is the human-readable label
+          // shown in Discord's dropdown; value is the raw filename that ST
+          // uses to actually load the chat.
           allNames = chatFiles
             .map((c) => c.file_name.replace(".jsonl", ""))
-            .filter((n) => n?.trim());
+            .filter((n) => n?.trim())
+            // Sort newest-first by raw filename — the timestamp suffix is
+            // lexicographically ordered so no date parsing is needed here.
+            .sort((a, b) => b.localeCompare(a))
+            .map((raw) => {
+              const date = parseChatFilename(raw);
+              if (!date) return { name: raw, value: raw };
+              // Replace the raw timestamp suffix with a human-readable label,
+              // keeping the raw filename as the value ST receives on selection.
+              const prefix = raw.replace(
+                / - \d{4}-\d{2}-\d{2}@\d{2}h\d{2}m\d{2}s\d+ms$/,
+                "",
+              );
+              return { name: `${prefix} - ${fmt.format(date)}`, value: raw };
+            });
+
           chatCache[context.characterId] = { names: allNames };
         }
       }
@@ -1669,29 +1725,22 @@ async function handleGetAutocomplete(data) {
       ];
     } else if (data.list === "group_members") {
       if (!context.groupId) {
+        // Solo chat - offer the active character's name as the only option.
         const soloChar = context.characters
           ?.find((c) => c.id === context.characterId)
           ?.name?.trim();
         if (soloChar) allNames = [soloChar];
       } else {
-        console.log(
-          "[Discord Bridge] Autocomplete: group mode, groupId =",
-          context.groupId,
-        );
+        // Read directly from the rendered group members panel and sort
+        // alphabetically, consistent with the other name lists.
         const memberEls = document.querySelectorAll(
           "#rm_group_members .group_member .ch_name",
         );
-        console.log(
-          "[Discord Bridge] Found .ch_name elements:",
-          memberEls.length,
+        allNames = sortAlpha(
+          Array.from(memberEls)
+            .map((el) => el.textContent.trim())
+            .filter(Boolean),
         );
-        memberEls.forEach((el) =>
-          console.log("[Discord Bridge] Member:", el.textContent.trim()),
-        );
-        allNames = Array.from(memberEls)
-          .map((el) => el.textContent.trim())
-          .filter(Boolean);
-        console.log("[Discord Bridge] Final allNames:", allNames);
       }
     }
   } catch (err) {
@@ -1700,9 +1749,21 @@ async function handleGetAutocomplete(data) {
   }
 
   const query = (data.query || "").toLowerCase();
+  // allNames entries are either plain strings (all lists except chats) or
+  // {name, value} objects (chats, where the display label differs from the
+  // raw filename that SillyTavern needs to load the chat). Normalise here so
+  // websocket.js always receives a consistent {name, value} array.
   const choices = allNames
-    .filter((n) => n.toLowerCase().includes(query))
-    .slice(0, 25);
+    .filter((entry) => {
+      const label = typeof entry === "string" ? entry : entry.name;
+      return label.toLowerCase().includes(query);
+    })
+    .slice(0, 25)
+    .map((entry) =>
+      typeof entry === "string"
+        ? { name: entry, value: entry }
+        : entry,
+    );
 
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(
@@ -1761,6 +1822,38 @@ function connect() {
       data = JSON.parse(event.data);
 
       if (data.type === "heartbeat") return;
+
+      if (data.type === "bridge_config") {
+        // Validate timezone and locale before storing — invalid values would
+        // cause Intl.DateTimeFormat to throw at autocomplete time.
+        if (data.timezone) {
+          try {
+            Intl.DateTimeFormat(undefined, { timeZone: data.timezone });
+            bridgeTimezone = data.timezone;
+          } catch {
+            console.warn(
+              `[Discord Bridge] Invalid timezone in bridge config: "${data.timezone}" - falling back to local time`,
+            );
+            bridgeTimezone = null;
+          }
+        } else {
+          bridgeTimezone = null;
+        }
+        if (data.locale) {
+          try {
+            Intl.DateTimeFormat(data.locale);
+            bridgeLocale = data.locale;
+          } catch {
+            console.warn(
+              `[Discord Bridge] Invalid locale in bridge config: "${data.locale}" - falling back to browser locale`,
+            );
+            bridgeLocale = null;
+          }
+        } else {
+          bridgeLocale = null;
+        }
+        return;
+      }
 
       if (data.type === "user_message") {
         await handleUserMessage(data);

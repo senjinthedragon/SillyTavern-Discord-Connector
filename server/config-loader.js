@@ -55,6 +55,28 @@ if (
   process.exit(1);
 }
 
+if (config.timezone) {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: config.timezone });
+  } catch {
+    console.warn(
+      `[Config] Invalid timezone "${config.timezone}" - falling back to UTC`,
+    );
+    config.timezone = "UTC";
+  }
+}
+
+if (config.locale) {
+  try {
+    Intl.DateTimeFormat(config.locale);
+  } catch {
+    console.warn(
+      `[Config] Invalid locale "${config.locale}" - falling back to system default`,
+    );
+    config.locale = null;
+  }
+}
+
 module.exports = {
   config,
   token: config.discordToken,
