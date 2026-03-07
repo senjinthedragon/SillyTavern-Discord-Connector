@@ -25,10 +25,16 @@ if (!fs.existsSync(configPath)) {
 const rawConfig = require("./config");
 
 const config = {
-  queueTaskTimeoutMs: 30_000,
-  imagePlaceholderTimeoutMs: 180_000,
+  queueTaskTimeoutSeconds: 30,
+  imagePlaceholderTimeoutSeconds: 180,
   ...rawConfig,
 };
+
+// Convert seconds to milliseconds for internal use. All other modules consume
+// the Ms-suffixed values so nothing else in the codebase needs to change.
+config.queueTaskTimeoutMs = config.queueTaskTimeoutSeconds * 1_000;
+config.imagePlaceholderTimeoutMs =
+  config.imagePlaceholderTimeoutSeconds * 1_000;
 
 if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
   console.error("[ERROR] Set your Discord Bot Token in config.js!");
@@ -36,21 +42,21 @@ if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
 }
 
 if (
-  !Number.isFinite(config.queueTaskTimeoutMs) ||
-  config.queueTaskTimeoutMs < 1000
+  !Number.isFinite(config.queueTaskTimeoutSeconds) ||
+  config.queueTaskTimeoutSeconds <= 0
 ) {
   console.error(
-    "[ERROR] config.queueTaskTimeoutMs must be a number >= 1000 (ms).",
+    "[ERROR] config.queueTaskTimeoutSeconds must be a positive number (e.g. 30 for 30 seconds).",
   );
   process.exit(1);
 }
 
 if (
-  !Number.isFinite(config.imagePlaceholderTimeoutMs) ||
-  config.imagePlaceholderTimeoutMs < 1000
+  !Number.isFinite(config.imagePlaceholderTimeoutSeconds) ||
+  config.imagePlaceholderTimeoutSeconds <= 0
 ) {
   console.error(
-    "[ERROR] config.imagePlaceholderTimeoutMs must be a number >= 1000 (ms).",
+    "[ERROR] config.imagePlaceholderTimeoutSeconds must be a positive number (e.g. 180 for 3 minutes).",
   );
   process.exit(1);
 }

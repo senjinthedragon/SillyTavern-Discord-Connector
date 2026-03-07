@@ -18,23 +18,23 @@ module.exports = {
   // To get a channel ID: enable Developer Mode in Discord, then right-click a channel and select "Copy ID".
   allowedChannelIds: [], // e.g., ['123456789012345678', '987654321098765432']
 
-  // Advanced timing settings (milliseconds)
-  // How long a queued Discord send/edit task may run before it is released.
-  queueTaskTimeoutMs: 30000,
+  // Advanced timing settings (seconds)
+  // How long a queued Discord send/edit task may run before it is abandoned.
+  queueTaskTimeoutSeconds: 30,
 
   // How long the "Generating image…" placeholder waits before switching to
   // a timeout message when no result comes back.
-  imagePlaceholderTimeoutMs: 180000,
+  imagePlaceholderTimeoutSeconds: 180,
 
   // Set to true to enable verbose terminal logging
   debug: false,
 
   // Timezone for log timestamps and chat date formatting in Discord autocomplete.
   // Use IANA timezone names e.g. "Europe/Amsterdam", "America/New_York", "Asia/Tokyo".
-  timezone: "America/New_York",
+  timezone: "Europe/Amsterdam",
 
   // Locale for date/time formatting in Discord autocomplete chat lists.
   // Use BCP 47 language tags e.g. "nl-NL", "en-GB", "en-US", "de-DE".
   // Leave unset or set to null to use the SillyTavern browser's default locale.
-  locale: "en-US",
+  locale: "nl-NL",
 };

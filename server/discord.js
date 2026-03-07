@@ -127,7 +127,8 @@ const SLASH_COMMANDS = [
       {
         name: "name",
         type: 3,
-        description: "Character name (optional in solo chat; autocompletes group members in group chat)",
+        description:
+          "Character name (optional in solo chat; autocompletes group members in group chat)",
         required: true,
         autocomplete: true,
       },

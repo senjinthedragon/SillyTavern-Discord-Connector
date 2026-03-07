@@ -1663,9 +1663,7 @@ async function handleGetAutocomplete(data) {
             );
             if (!m) return null;
             const [, yr, mo, dy, hr, mn, sc, ms] = m;
-            return new Date(
-              Date.UTC(+yr, +mo - 1, +dy, +hr, +mn, +sc, +ms),
-            );
+            return new Date(Date.UTC(+yr, +mo - 1, +dy, +hr, +mn, +sc, +ms));
           };
 
           const fmt = (() => {
@@ -1683,7 +1681,10 @@ async function handleGetAutocomplete(data) {
             try {
               return new Intl.DateTimeFormat(bridgeLocale || undefined, opts);
             } catch {
-              return new Intl.DateTimeFormat(undefined, { ...opts, timeZone: undefined });
+              return new Intl.DateTimeFormat(undefined, {
+                ...opts,
+                timeZone: undefined,
+              });
             }
           })();
 
@@ -1760,9 +1761,7 @@ async function handleGetAutocomplete(data) {
     })
     .slice(0, 25)
     .map((entry) =>
-      typeof entry === "string"
-        ? { name: entry, value: entry }
-        : entry,
+      typeof entry === "string" ? { name: entry, value: entry } : entry,
     );
 
   if (ws?.readyState === WebSocket.OPEN) {
