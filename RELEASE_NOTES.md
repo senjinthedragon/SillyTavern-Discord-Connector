@@ -1,8 +1,6 @@
-# v1.3.0 Release Notes
+# v1.3.0: Expressions, Moods, Smarter Autocomplete and a Polished Experience
 
-## Expressions, Moods, Smarter Autocomplete and a Polished Experience
-
-This release brings characters to life on Discord with expression and mood support, makes slash command autocomplete smarter and more reliable, and cleans up configuration so it's easier for everyone to set up.
+This release brings characters to life on Discord with expression and mood support, makes slash command autocomplete smarter and more reliable.
 
 ### Reactions, Expressions and Mood (new)
 - Added extension setting `Expression/Reaction Mode` with three modes:
@@ -16,15 +14,9 @@ This release brings characters to life on Discord with expression and mood suppo
 - Added `/reaction <mode>` command so expression mode can be changed remotely from Discord without touching SillyTavern.
 - Expression handling supports asynchronous reaction updates (text arrives first, reaction follows) and gracefully handles missing expression blocks when expressions are disabled.
 
-### Autocomplete fixes
-- Fixed `/mood` and `/charimage` autocomplete not firing at all - caused by stale Discord slash command registration. Both commands now show their dropdown immediately when you open them, without needing to type a letter first.
-- Fixed solo chat case for `/mood` and `/charimage`: when not in a group chat, the active character's name is now correctly offered as the only autocomplete choice.
-- Fixed incorrect solo character lookup that used array indexing on `context.characters` instead of `find()`.
-
 ### Autocomplete sorting and display
-- Character, group and group member autocomplete lists are now sorted alphabetically. Sorting ignores leading emoji and decorative characters so names like `🌟 Alice` sort naturally alongside plain names.
-- `/switchchat` autocomplete now shows human-readable dates and times (e.g. `Finn - Feb 28, 2026, 15:59:02`) instead of the raw internal filename format, and is sorted newest-first so your most recent chats are always at the top.
-- The raw filename is still sent as the selection value so SillyTavern loads the correct chat.
+- Character, group and group member autocomplete lists are sorted alphabetically. Sorting ignores leading emoji and decorative characters so names like `🌟 Alice` sort naturally alongside plain names.
+- `/switchchat` autocomplete shows human-readable dates and times (e.g. `Finn - Feb 28, 2026, 15:59:02`) instead of the raw internal filename format, and is sorted newest-first so your most recent chats are always at the top.
 
 ### `/image` improvements
 - Added per-channel image request queuing so one stuck request does not block other channels.
@@ -37,10 +29,7 @@ This release brings characters to life on Discord with expression and mood suppo
 - Added `locale` field to `config.example.js`. Defaults to `"en-US"`.
 - Both `timezone` and `locale` are validated at startup - invalid values produce a clear warning and fall back gracefully rather than crashing at runtime.
 
-### Configuration
-- Timeout settings renamed from milliseconds to seconds for clarity:
-  - `queueTaskTimeoutMs` → `queueTaskTimeoutSeconds` (e.g. `30`)
-  - `imagePlaceholderTimeoutMs` → `imagePlaceholderTimeoutSeconds` (e.g. `180`)
+### Status
 - Added `/status` slash command to inspect connection and image pipeline health at a glance.
 
 ### Stability and hardening
@@ -63,7 +52,4 @@ This release brings characters to life on Discord with expression and mood suppo
 - Keep the existing `test-package` script which performs `npm pack --dry-run` to verify package creation.
 
 ## Notes for maintainers
-- Autocomplete `choices` are now sent from the extension as `{name, value}` pairs rather than plain strings. `websocket.js` passes them straight through to Discord's `respond()` without remapping - the display label and the value ST receives on selection can now differ, which is used by the chat history list.
-- Conversion from seconds to milliseconds for timeouts happens once in `config-loader.js`; `queue.js`, `websocket.js` and `queue.test.js` consume the internal `Ms`-suffixed values and required no changes. `queue.test.js` bypasses `config-loader.js` entirely and is unaffected by the rename.
 - The `bridge_config` handshake packet now includes `locale` alongside `timezone`. The extension validates both using `Intl.DateTimeFormat` on receipt and falls back gracefully if either is absent or invalid.
-- Slash command options for `/mood` and `/charimage` are now `required: true` - this is what causes Discord to fire the autocomplete interaction immediately on command invocation rather than waiting for user input.
