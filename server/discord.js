@@ -122,12 +122,12 @@ const SLASH_COMMANDS = [
   },
   {
     name: "mood",
-    description: "Show the current SillyTavern expression for this character",
+    description: "Show the current expression for this character",
     options: [
       {
         name: "name",
         type: 3,
-        description: "Character name (group chat only)",
+        description: "Character name (optional in solo chat; autocompletes group members in group chat)",
         required: false,
         autocomplete: true,
       },

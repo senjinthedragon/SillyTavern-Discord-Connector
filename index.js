@@ -1686,6 +1686,10 @@ async function handleGetAutocomplete(data) {
               context.characters.find((c) => c.id === id)?.name?.trim() || null,
           )
           .filter(Boolean);
+      } else if (context.characterId !== undefine) {
+        // Fallback for solo: Show the current character name
+        const soloChar = context.characters[context.characterId]?.name;
+        if (soloChar) allNames = [soloChar];
       }
     }
   } catch (err) {
@@ -1696,7 +1700,11 @@ async function handleGetAutocomplete(data) {
   const query = (data.query || "").toLowerCase();
   const choices = allNames
     .filter((n) => n.toLowerCase().includes(query))
-    .slice(0, 25);
+    .slice(0, 25)
+    .map(name => ({
+      name: name,
+      value: name
+    }))
 
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(
