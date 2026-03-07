@@ -52,12 +52,15 @@ This release brings characters to life on Discord with expression and mood suppo
 - Added per-channel queue task timeout protection to avoid queue deadlocks.
 
 ### Tests and validation
+- Add a "Release Check" section to `README.md` that instructs maintainers to run `npm run verify-release` before publishing a new version.
+- Add a `verify-release` npm script to `package.json` that runs `cd server && npm test` and then `npm run test-package` to validate server tests and packaging.
 - Added `server` test script: `npm test` runs Node's built-in test runner.
 - Added `server/queue.test.js` tests for queue ordering and queue recovery after timeout.
 - Added `server/activity-format.js` to encapsulate expression normalization and activity string formatting and replaced the inlined logic in `server/discord.js` to call `formatBridgeActivity` instead.
 - Added `server/activity-format.test.js` to cover normalization, known emoji mapping, unknown-expression fallback (`🎭`), and base-activity fallback for empty expressions.
 - Added `server/config-logic.js` to encapsulate config defaults, derived ms fields, validation, and timezone/locale fallback behavior, and updated `server/config-loader.js` to use it while preserving exit-on-error behavior.
 - Added `server/config-logic.test.js` to cover default values, millisecond derivation, validation failure paths, and timezone/locale fallback warnings, and kept existing `server/queue.test.js` unchanged.
+- Keep the existing `test-package` script which performs `npm pack --dry-run` to verify package creation.
 
 ## Notes for maintainers
 - Autocomplete `choices` are now sent from the extension as `{name, value}` pairs rather than plain strings. `websocket.js` passes them straight through to Discord's `respond()` without remapping - the display label and the value ST receives on selection can now differ, which is used by the chat history list.
