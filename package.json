@@ -1,6 +1,6 @@
 {
   "name": "@senjinthedragon/sillytavern-discord-connector",
-  "version": "1.2.5",
+  "version": "1.3.0",
   "description": "Full-featured Discord bridge for SillyTavern with image support and slash commands.",
   "keywords": [
     "sillytavern",
