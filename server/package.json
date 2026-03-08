@@ -17,7 +17,6 @@
   "dependencies": {
     "discord.js": "^14.14.1",
     "jimp": "^1.6.0",
-    "undici": "^6.0.0",
     "ws": "^8.18.0"
   },
   "engines": {
