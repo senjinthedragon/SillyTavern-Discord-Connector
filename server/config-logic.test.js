@@ -1,3 +1,18 @@
+/**
+ * config-logic.test.js - SillyTavern Discord Connector: Config Logic Tests
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ *
+ * Tests for the pure configuration logic in config-logic.js.
+ * Run with: npm test (from the server folder)
+ *
+ * Because config-logic.js is a pure module with no side effects (no file I/O,
+ * no process.exit), these tests can call createConfig() directly without any
+ * stubbing or mocking.
+ */
+
 "use strict";
 
 const test = require("node:test");
@@ -57,6 +72,7 @@ test("createConfig falls back when timezone or locale are invalid", () => {
     locale: "bad_locale_value",
   });
 
+  // Both invalid values should be replaced with safe fallbacks.
   assert.equal(config.timezone, "UTC");
   assert.equal(config.locale, null);
   assert.equal(warnings.length, 2);
