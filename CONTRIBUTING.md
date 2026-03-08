@@ -81,7 +81,7 @@ You'll need:
 
 To run the test suite:
 ```shell
-npm run verify-release
+npm test
 ```
 
 There is no separate build step - the project runs directly from source.
@@ -105,7 +105,7 @@ from the `server` folder to make sure your code is formatted consistently with t
 - Keep pull requests focused - one fix or feature per PR makes reviewing much easier.
 - If your change touches user-facing behavior, update the relevant section of `README.md`.
 - If your change is significant enough to mention in release notes, add a bullet point to `RELEASE_NOTES.md` under a new or appropriate section.
-- Make sure `npm run verify-release` passes before submitting.
+- Make sure `npm test` passes before submitting.
 - Target the `dev` branch, not `main`. Pull requests against `main` will be redirected.
 
 ---
