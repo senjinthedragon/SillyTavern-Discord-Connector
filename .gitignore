@@ -1,15 +1,9 @@
-# Node / runtime
+# Node
 node_modules/
 npm-debug.log
-yarn-error.log
 
-# OS junk
-.DS_Store
-Thumbs.db
-
-# Editor / IDE
+# Editor
 .vscode/
-.idea/
 
 # SillyTavern bridge private files
 server/config.js
@@ -17,3 +11,6 @@ server/config.local.js
 server/*.local.js
 server/.env
 server/.restart_protection
+
+# Personal notes
+notes/
