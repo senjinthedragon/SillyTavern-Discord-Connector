@@ -1,3 +1,15 @@
+/**
+ * text-chunking.test.js - SillyTavern Discord Connector: Text Chunking Tests
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ *
+ * Tests for long-message splitting in text-chunking.js, covering paragraph
+ * and word boundary preferences and hard-split fallback.
+ * Run with: npm test (from the server folder)
+ */
+
 "use strict";
 
 const test = require("node:test");

@@ -1,3 +1,15 @@
+/**
+ * websocket-router.test.js - SillyTavern Discord Connector: WebSocket Router Tests
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ *
+ * Packet-flow integration tests for websocket-router.js. All Discord and
+ * Telegram frontends are mocked so no real connections are needed.
+ * Run with: npm test (from the server folder)
+ */
+
 "use strict";
 
 const test = require("node:test");
@@ -45,6 +57,7 @@ function createDeps() {
     },
     streamSessions: {},
     streamHandled: new Set(),
+    streamReceived: new Set(),
     pendingImageMessages: {},
     setBridgeActivity: () => {},
     getPendingAutocompletes: () => ({}),

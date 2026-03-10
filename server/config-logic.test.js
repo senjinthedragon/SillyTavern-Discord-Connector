@@ -1,5 +1,13 @@
 /**
  * config-logic.test.js - SillyTavern Discord Connector: Config Logic Tests
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ *
+ * Tests for configuration validation, defaults, derived millisecond fields,
+ * timezone/locale fallback, and circuit breaker validation in config-logic.js.
+ * Run with: npm test (from the server folder)
  */
 
 "use strict";

@@ -1,3 +1,17 @@
+/**
+ * frontend-manager-runtime.test.js - SillyTavern Discord Connector: Frontend Manager Runtime Tests
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See LICENSE file in the project root for full license information.
+ *
+ * Runtime integration tests for frontend-manager.js: fanout error isolation,
+ * route parsing with colons, and circuit breaker open/skip behaviour.
+ * Config-loader and logger are stubbed via the require cache so no real
+ * config file is needed.
+ * Run with: npm test (from the server folder)
+ */
+
 "use strict";
 
 const test = require("node:test");
