@@ -38,7 +38,13 @@ const {
 const { log } = require("./logger");
 const { config, token } = require("./config-loader");
 const { client } = require("./client");
+const { sendLong, sendImagesToChannel } = require("./messaging");
+const { enqueue } = require("./queue");
+const { addRoute, resolveConversationId } = require("./frontend-manager");
+const { streamSessions, scheduleEdit } = require("./streaming");
 const version = require("./package.json").version;
+
+const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes("discord");
 
 const ACTIVITY_BASE = `SillyTavern Bridge v${version}`;
 const { formatBridgeActivity } = require("./activity-format");
@@ -195,9 +201,10 @@ const SLASH_COMMANDS = [
   },
 ];
 
-client.login(token);
+if (DISCORD_PLUGIN_ENABLED) {
+  client.login(token);
 
-client.on(Events.ClientReady, async (c) => {
+  client.on(Events.ClientReady, async (c) => {
   setBridgeActivity(null);
 
   console.log(`[Discord] Ready! Logged in as ${c.user.tag}`);
@@ -341,10 +348,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
   const args = interaction.options.data
     .filter((opt) => opt.type === 3)
     .map((opt) => String(opt.value));
-  const chatId = interaction.channelId;
+  const conversationId = resolveConversationId("discord", interaction.channelId);
+  addRoute(conversationId, "discord", interaction.channelId);
 
   stClient.send(
-    JSON.stringify({ type: "execute_command", command, args, chatId }),
+    JSON.stringify({ type: "execute_command", command, args, chatId: conversationId }),
   );
 
   // Acknowledge immediately (ephemeral) to satisfy Discord's 3-second window.
@@ -380,23 +388,129 @@ client.on("messageCreate", (message) => {
     return;
   }
 
-  const chatId = message.channel.id;
+  const conversationId = resolveConversationId("discord", message.channel.id);
+  addRoute(conversationId, "discord", message.channel.id);
   const content = message.content;
 
   if (content.startsWith("/")) {
     const [command, ...args] = content.slice(1).split(" ");
     stClient.send(
-      JSON.stringify({ type: "execute_command", command, args, chatId }),
+      JSON.stringify({ type: "execute_command", command, args, chatId: conversationId }),
     );
   } else {
     stClient.send(
-      JSON.stringify({ type: "user_message", text: content, chatId }),
+      JSON.stringify({ type: "user_message", text: content, chatId: conversationId }),
     );
   }
 });
+}
+
+async function sendText(channelId, text) {
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
+  enqueue(channelId, () => sendLong(channel, text));
+}
+
+async function sendTyping(channelId) {
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
+  channel.sendTyping().catch(() => {});
+}
+
+async function sendImages(channelId, images, caption) {
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
+  enqueue(channelId, () => sendImagesToChannel(channel, images, caption));
+}
+
+async function sendExpression(channelId, expression, image) {
+  if (expression) setBridgeActivity(expression);
+  if (image) await sendImages(channelId, [image], null);
+}
+
+
+async function streamChunk(channelId, payload) {
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
+
+  const streamId = `${channelId}:${payload?.streamId || channelId}`;
+  const rawText = payload?.text || "";
+  if (!rawText.trim()) return;
+
+  const activeName = payload.characterName || null;
+  let processedText = rawText;
+  if (activeName) {
+    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, "i"), "");
+  }
+
+  if (!streamSessions[streamId]) {
+    streamSessions[streamId] = {
+      streamMessage: null,
+      pendingText: "",
+      characterName: activeName,
+      editInFlight: false,
+      nextEdit: false,
+      lastEditAt: 0,
+      streamDone: false,
+    };
+  }
+
+  const session = streamSessions[streamId];
+  if (session.streamDone) return;
+  session.pendingText = processedText;
+  session.characterName = activeName;
+  scheduleEdit(session, channel, streamId);
+}
+
+async function streamEnd(channelId, payload) {
+  const streamId = `${channelId}:${payload?.streamId || channelId}`;
+  const s = streamSessions[streamId];
+  if (!s) return false;
+
+  s.streamDone = true;
+  s.nextEdit = false;
+
+  if (s.editInFlight) {
+    await new Promise((resolve) => {
+      const poll = setInterval(() => {
+        if (!s.editInFlight) {
+          clearInterval(poll);
+          resolve();
+        }
+      }, 50);
+    });
+  }
+
+  const rawText = payload?.finalText != null ? payload.finalText : s.pendingText || "";
+  const activeName = payload?.characterName || null;
+  let processedText = rawText;
+  if (activeName) {
+    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, "i"), "");
+  }
+
+  const finalText = activeName ? `**${activeName}**\n${processedText}` : processedText;
+  const channel = client.channels.cache.get(channelId);
+  if (channel && finalText.trim()) {
+    if (s.streamMessage) {
+      await s.streamMessage.delete().catch(() => {});
+    }
+    await sendLong(channel, finalText);
+  }
+
+  delete streamSessions[streamId];
+  return true;
+}
 
 module.exports = {
   getPendingAutocompletes,
   getAutocompleteDebouncers,
   setBridgeActivity,
+  sendText,
+  sendTyping,
+  sendImages,
+  sendExpression,
+  streamChunk,
+  streamEnd,
 };
