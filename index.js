@@ -199,10 +199,10 @@ async function fetchLocalImageAsBase64(src) {
     const blob = await response.blob();
     const mimeType = blob.type || "image/png";
 
-    const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+    const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
     if (blob.size > MAX_IMAGE_BYTES) {
       console.warn(
-        `[Discord Bridge] Image too large (${(blob.size / 1024 / 1024).toFixed(1)} MB, limit 8 MB): ${url}`,
+        `[Discord Bridge] Image too large (${(blob.size / 1024 / 1024).toFixed(1)} MB, limit 50 MB): ${url}`,
       );
       return null;
     }
@@ -1620,6 +1620,18 @@ async function handleGetAutocomplete(data) {
     const context = SillyTavern.getContext();
     const now = Date.now();
 
+    // Sorts a name list alphabetically, ignoring leading emoji and non-letter
+    // characters so that e.g. "🌟 Alice" sorts alongside "Alice" rather than
+    // after all plain-ASCII names.
+    const sortAlpha = (names) =>
+      [...names].sort((a, b) =>
+        a.replace(/^[^\p{L}]+/u, "").localeCompare(
+          b.replace(/^[^\p{L}]+/u, ""),
+          undefined,
+          { sensitivity: "base" },
+        ),
+      );    
+
     if (data.list === "characters") {
       if (
         autocompleteCache.characters &&
@@ -1727,9 +1739,7 @@ async function handleGetAutocomplete(data) {
     } else if (data.list === "group_members") {
       if (!context.groupId) {
         // Solo chat - offer the active character's name as the only option.
-        const soloChar = context.characters
-          ?.find((c) => c.id === context.characterId)
-          ?.name?.trim();
+        const soloChar = context.characters?.[context.characterId]?.name?.trim();
         if (soloChar) allNames = [soloChar];
       } else {
         // Read directly from the rendered group members panel and sort

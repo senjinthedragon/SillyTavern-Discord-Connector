@@ -34,6 +34,10 @@ function createDiscordPlugin() {
       await discord.sendImages(chatId, images, caption);
     },
 
+    async sendGeneratedImage(chatId, images, caption) {
+      await discord.sendGeneratedImage(chatId, images, caption);
+    },
+
     async sendExpression(chatId, expression, image) {
       await discord.sendExpression(chatId, expression, image);
     },

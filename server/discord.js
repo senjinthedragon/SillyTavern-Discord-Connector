@@ -201,27 +201,6 @@ const SLASH_COMMANDS = [
   },
 ];
 
-if (DISCORD_PLUGIN_ENABLED) {
-  client.login(token);
-
-  client.on(Events.ClientReady, async (c) => {
-  setBridgeActivity(null);
-
-  console.log(`[Discord] Ready! Logged in as ${c.user.tag}`);
-  const rest = new REST({ version: "10" }).setToken(token);
-  try {
-    console.log("[Discord] Registering slash commands...");
-    await rest.put(Routes.applicationCommands(c.user.id), {
-      body: SLASH_COMMANDS,
-    });
-    console.log("[Discord] Slash commands registered.");
-  } catch (err) {
-    log("error", "[Discord] Failed to register slash commands:", err);
-  }
-});
-
-client.on("error", (err) => log("error", "[Discord] Client error:", err));
-
 // ---------------------------------------------------------------------------
 // Autocomplete debouncing
 // ---------------------------------------------------------------------------
@@ -230,6 +209,11 @@ const AUTOCOMPLETE_DEBOUNCE_MS = 250;
 const AUTOCOMPLETE_TIMEOUT_MS = 2800;
 const autocompleteDebouncers = {};
 const pendingAutocompletes = {};
+
+// Tracks the Discord message sent as an image placeholder ("🎨 Generating image…")
+// keyed by channelId. Deleted by sendImages when the real image arrives, or
+// edited to an error message if generation fails.
+const placeholderMessages = {};
 
 // Maps each autocomplete-enabled command to the list type the extension queries.
 // charimage uses "group_members" (active group only, not the full library).
@@ -250,6 +234,27 @@ function getPendingAutocompletes() {
 function getAutocompleteDebouncers() {
   return autocompleteDebouncers;
 }
+
+if (DISCORD_PLUGIN_ENABLED) {
+  client.login(token);
+
+  client.on(Events.ClientReady, async (c) => {
+  setBridgeActivity(null);
+
+  console.log(`[Discord] Ready! Logged in as ${c.user.tag}`);
+  const rest = new REST({ version: "10" }).setToken(token);
+  try {
+    console.log("[Discord] Registering slash commands...");
+    await rest.put(Routes.applicationCommands(c.user.id), {
+      body: SLASH_COMMANDS,
+    });
+    console.log("[Discord] Slash commands registered.");
+  } catch (err) {
+    log("error", "[Discord] Failed to register slash commands:", err);
+  }
+});
+
+client.on("error", (err) => log("error", "[Discord] Client error:", err));
 
 // ---------------------------------------------------------------------------
 // Interaction handler (autocomplete + slash commands)
@@ -408,9 +413,16 @@ client.on("messageCreate", (message) => {
 async function sendText(channelId, text) {
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
-  enqueue(channelId, () => sendLong(channel, text));
+  enqueue(channelId, async () => {
+    const msg = await sendLong(channel, text);
+    // Save the message reference so sendImages can delete it when the real
+    // image arrives. Keyed by channelId — only one placeholder per channel
+    // at a time since image generation is serialised per channel.
+    if (text.includes("🎨 Generating image")) {
+      placeholderMessages[channelId] = msg;
+    }
+  });
 }
-
 async function sendTyping(channelId) {
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
@@ -421,6 +433,24 @@ async function sendImages(channelId, images, caption) {
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
   enqueue(channelId, () => sendImagesToChannel(channel, images, caption));
+}
+
+// Dedicated path for generate_image_result packets. Deletes the placeholder
+// message before posting the real image. All other image sends (expressions,
+// charimage, inline images in messages) use sendImages and never touch the
+// placeholder — only a generated image result should clear it.
+async function sendGeneratedImage(channelId, images, caption) {
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
+  enqueue(channelId, async () => {
+    if (placeholderMessages[channelId]) {
+      await placeholderMessages[channelId].delete().catch((err) => {
+        log("warn", `[Images] Could not delete placeholder: ${err.message}`);
+      });
+      delete placeholderMessages[channelId];
+    }
+    await sendImagesToChannel(channel, images, caption);
+  });
 }
 
 async function sendExpression(channelId, expression, image) {
@@ -510,6 +540,7 @@ module.exports = {
   sendText,
   sendTyping,
   sendImages,
+  sendGeneratedImage,
   sendExpression,
   streamChunk,
   streamEnd,

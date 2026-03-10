@@ -204,3 +204,99 @@ If you invited the bot already, generate a new invite URL with the scope added a
 ## License
 
 MIT - see [LICENSE](LICENSE) file for full text
+
+---
+
+## Multi-Platform Plugins
+
+This free release ships with the **Discord plugin** built in.
+
+The connector architecture is plugin-ready, so additional frontends can be
+loaded as **external plugins** (for example private/pro plugins hosted in a
+separate repository).
+
+### Built-in plugin
+
+- `discord`
+
+### External plugin loading (private/pro)
+
+Configure private plugins in `server/config.js`:
+
+```javascript
+enabledPlugins: ["discord", "telegram", "signal"],
+externalPlugins: [
+  {
+    name: "telegram",
+    module: "../private-plugins/telegram-plugin.js",
+    config: {
+      botToken: "YOUR_TELEGRAM_TOKEN",
+    },
+  },
+  {
+    name: "signal",
+    module: "../private-plugins/signal-plugin.js",
+    config: {
+      baseUrl: "http://127.0.0.1:8080",
+      account: "+31123456789",
+    },
+  },
+],
+```
+
+### Conversation handover between apps
+
+Use `conversationLinks` to map frontends to one shared `conversationId`:
+
+```javascript
+conversationLinks: [
+  {
+    conversationId: "main-chat",
+    discordChannelId: "123456789012345678",
+    telegramChatId: "987654321",
+    signalChatId: "+31123456789",
+  },
+],
+```
+
+This lets users continue the same SillyTavern conversation across frontends.
+
+## Notes about Expressions / Mood across platforms
+
+- **Discord** supports activity status updates and expression image delivery.
+- Other frontends can implement equivalent behavior in their own plugin logic.
+
+## Release Checklist (for maintainers)
+
+Before publishing a release, run:
+
+```bash
+npm run release-checklist
+```
+
+This runs server tests and package dry-run checks, and verifies release documents are present. It is the recommended final gate before publishing.
+
+
+## Optional Plugin Circuit Breaker (Advanced)
+
+If a frontend is temporarily failing (API outage, auth issues, network errors), you can enable a circuit breaker so the bridge pauses sends to that plugin for a short cooldown period instead of retrying every packet.
+
+Example in `config.js`:
+
+```javascript
+plugins: {
+  discord: {
+    // ...existing settings
+    circuitBreaker: {
+      enabled: true,
+      failureThreshold: 5,
+      cooldownMs: 30000,
+    },
+  },
+}
+```
+
+- `failureThreshold`: how many consecutive failures before opening the circuit
+- `cooldownMs`: how long to wait before allowing sends again
+
+This is optional and off by default.

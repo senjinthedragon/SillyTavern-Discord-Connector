@@ -27,6 +27,7 @@ const { handleBridgePacket } = require("./websocket-router");
 let sillyTavernClient = null;
 const pendingImageMessages = {};
 const streamHandled = new Set();
+const streamReceived = new Set();
 
 function getSillyTavernClient() {
   return sillyTavernClient;
@@ -96,6 +97,7 @@ wss.on("connection", (ws) => {
       parseRoute,
       streamSessions,
       streamHandled,
+      streamReceived,
       pendingImageMessages,
       setBridgeActivity,
       getPendingAutocompletes,
@@ -111,6 +113,7 @@ wss.on("connection", (ws) => {
       delete streamSessions[key];
     }
     streamHandled.clear();
+    streamReceived.clear();
 
     for (const key of Object.keys(pendingImageMessages)) {
       delete pendingImageMessages[key];

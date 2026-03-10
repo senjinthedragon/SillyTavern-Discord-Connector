@@ -20,6 +20,7 @@ async function handleBridgePacket(data, deps) {
     parseRoute,
     streamSessions,
     streamHandled,
+    streamReceived,
     pendingImageMessages,
     setBridgeActivity,
     getPendingAutocompletes,
@@ -56,7 +57,11 @@ async function handleBridgePacket(data, deps) {
 
     case "generate_image_result":
       delete pendingImageMessages[data.requestId || conversationId];
-      if (data.image) await fanout(conversationId, "sendImages", [data.image], null);
+      // Use sendGeneratedImage rather than sendImages so each platform's plugin
+      // can delete its own placeholder before posting the real image. Plugins
+      // that have no placeholder concept (Telegram, Signal) should alias
+      // sendGeneratedImage to sendImages in their plugin implementation.
+      if (data.image) await fanout(conversationId, "sendGeneratedImage", [data.image], null);
       break;
 
     case "generate_image_error":
@@ -66,6 +71,7 @@ async function handleBridgePacket(data, deps) {
 
     case "stream_chunk": {
       const streamId = data.streamId || conversationId;
+      streamReceived.add(conversationId);
       streamSessions[streamId] = {
         pendingText: data.text || "",
         characterName: data.characterName || null,
@@ -112,8 +118,9 @@ async function handleBridgePacket(data, deps) {
     }
 
     case "ai_reply": {
-      if (streamHandled.has(conversationId)) {
+      if (streamReceived.has(conversationId) || streamHandled.has(conversationId)) {
         streamHandled.delete(conversationId);
+        streamReceived.delete(conversationId);
         break;
       }
 

@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Added plugin architecture primitives for frontend routing and packet fanout.
+- Added websocket packet-flow integration tests with mocked frontends (`server/websocket-router.test.js`).
+- Added optional per-plugin circuit breaker/backoff support in frontend fanout (`plugins.<name>.circuitBreaker`).
+- Added `scripts/release-checklist.js` and `npm run release-checklist` for pre-release automation.
+
+### Changed
+- Refactored bridge routing through a testable router layer (`server/websocket-router.js`).
+- Kept Discord as the built-in free frontend and unbundled Telegram/Signal implementations for separate private/pro distribution.
+- Added support for loading external frontend plugins via `config.externalPlugins`.
+- Strengthened startup validation and reconnect cleanup behavior.
+
+### Fixed
+- Alphabetical autocomplete sorting for character, group and group member lists was documented as a 1.3.0 feature but the sort function was missing from the released code.
+
 ## [1.3.1] - 2026-03-06
 
 ### Fixed
