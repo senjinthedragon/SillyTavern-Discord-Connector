@@ -1625,12 +1625,12 @@ async function handleGetAutocomplete(data) {
     // after all plain-ASCII names.
     const sortAlpha = (names) =>
       [...names].sort((a, b) =>
-        a.replace(/^[^\p{L}]+/u, "").localeCompare(
-          b.replace(/^[^\p{L}]+/u, ""),
-          undefined,
-          { sensitivity: "base" },
-        ),
-      );    
+        a
+          .replace(/^[^\p{L}]+/u, "")
+          .localeCompare(b.replace(/^[^\p{L}]+/u, ""), undefined, {
+            sensitivity: "base",
+          }),
+      );
 
     if (data.list === "characters") {
       if (
@@ -1739,7 +1739,8 @@ async function handleGetAutocomplete(data) {
     } else if (data.list === "group_members") {
       if (!context.groupId) {
         // Solo chat - offer the active character's name as the only option.
-        const soloChar = context.characters?.[context.characterId]?.name?.trim();
+        const soloChar =
+          context.characters?.[context.characterId]?.name?.trim();
         if (soloChar) allNames = [soloChar];
       } else {
         // Read directly from the rendered group members panel and sort
