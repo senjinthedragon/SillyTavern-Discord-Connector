@@ -25,7 +25,7 @@ function getCircuitPolicy(platform) {
   return {
     enabled: Boolean(breaker.enabled),
     failureThreshold: Number(breaker.failureThreshold || 5),
-    cooldownMs: Number(breaker.cooldownMs || 30000),
+    cooldownMs: Number(breaker.cooldownSeconds ?? 30) * 1000,
   };
 }
 
@@ -67,7 +67,7 @@ function recordFailure(platform) {
     state.openedAt = Date.now();
     log(
       "warn",
-      `[Frontends] Circuit opened for ${platform} after ${state.failures} failures. Cooldown: ${policy.cooldownMs}ms`,
+      `[Frontends] Circuit opened for ${platform} after ${state.failures} failures. Cooldown: ${policy.cooldownMs / 1000}s`,
     );
   }
 }
@@ -166,10 +166,6 @@ async function fanout(conversationId, fnName, ...args) {
   return invoked;
 }
 
-function getRegisteredPlatforms() {
-  return new Set(frontends.keys());
-}
-
 module.exports = {
   addRoute,
   resolveConversationId,
@@ -178,7 +174,6 @@ module.exports = {
   getRoutes,
   fanout,
   parseRoute,
-  getRegisteredPlatforms,
   // Exported for tests.
   canAttemptPlatform,
   recordFailure,

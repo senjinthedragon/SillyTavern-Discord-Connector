@@ -1,50 +1,9 @@
-/**
- * config-logic.js - SillyTavern Connector: Configuration Logic
- * Copyright (c) 2026 Senjin the Dragon.
- * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
- * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
- *
- * Pure configuration logic: applies defaults, validates required fields,
- * derives millisecond timeout fields, and sanitises timezone/locale.
- */
-
 "use strict";
-
-function validateCircuitBreaker(pluginName, pluginConfig) {
-  const breaker = pluginConfig?.circuitBreaker;
-  if (!breaker) return;
-
-  if (breaker.failureThreshold != null) {
-    if (
-      !Number.isFinite(breaker.failureThreshold) ||
-      breaker.failureThreshold < 1
-    ) {
-      throw new Error(
-        `config.plugins.${pluginName}.circuitBreaker.failureThreshold must be a positive number.`,
-      );
-    }
-  }
-
-  if (breaker.cooldownMs != null) {
-    if (!Number.isFinite(breaker.cooldownMs) || breaker.cooldownMs <= 0) {
-      throw new Error(
-        `config.plugins.${pluginName}.circuitBreaker.cooldownMs must be a positive number.`,
-      );
-    }
-  }
-}
 
 function createConfig(rawConfig) {
   const config = {
     queueTaskTimeoutSeconds: 30,
     imagePlaceholderTimeoutSeconds: 180,
-    enabledPlugins: ["discord"],
-    externalPlugins: [],
-    plugins: {
-      discord: {},
-    },
-    conversationLinks: [],
     ...rawConfig,
   };
 
@@ -52,37 +11,29 @@ function createConfig(rawConfig) {
   config.imagePlaceholderTimeoutMs =
     config.imagePlaceholderTimeoutSeconds * 1_000;
 
+  if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
+    throw new Error("Set your Discord Bot Token in config.js!");
+  }
+
   if (
-    !Array.isArray(config.enabledPlugins) ||
-    config.enabledPlugins.length === 0
+    config.enabledPlugins !== undefined &&
+    (!Array.isArray(config.enabledPlugins) ||
+      config.enabledPlugins.some(
+        (p) => typeof p !== "string" || p.trim() === "",
+      ))
   ) {
     throw new Error(
-      "config.enabledPlugins must contain at least one plugin name.",
+      'config.enabledPlugins entries must be non-empty strings (e.g. ["discord"]).',
     );
   }
 
-  for (const pluginName of config.enabledPlugins) {
-    if (typeof pluginName !== "string" || !pluginName.trim()) {
-      throw new Error(
-        "config.enabledPlugins entries must be non-empty strings.",
-      );
-    }
-  }
-
-  const enabled = new Set(config.enabledPlugins);
-  if (enabled.has("discord")) {
-    if (
-      !config.discordToken ||
-      config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE"
-    ) {
-      throw new Error(
-        "Set your Discord Bot Token in config.js when Discord plugin is enabled.",
-      );
-    }
-  }
-
-  if (!Array.isArray(config.externalPlugins)) {
-    throw new Error("config.externalPlugins must be an array.");
+  if (
+    config.externalPlugins !== undefined &&
+    !Array.isArray(config.externalPlugins)
+  ) {
+    throw new Error(
+      "config.externalPlugins must be an array of plugin objects.",
+    );
   }
 
   if (
@@ -103,8 +54,26 @@ function createConfig(rawConfig) {
     );
   }
 
-  for (const [pluginName, pluginCfg] of Object.entries(config.plugins || {})) {
-    validateCircuitBreaker(pluginName, pluginCfg || {});
+  for (const [platform, pluginCfg] of Object.entries(config.plugins || {})) {
+    const breaker = pluginCfg?.circuitBreaker;
+    if (!breaker) continue;
+    if (
+      !Number.isFinite(breaker.failureThreshold) ||
+      breaker.failureThreshold <= 0
+    ) {
+      throw new Error(
+        `config.plugins.${platform}.circuitBreaker.failureThreshold must be a positive number.`,
+      );
+    }
+    if (
+      breaker.cooldownSeconds !== undefined &&
+      (!Number.isFinite(breaker.cooldownSeconds) ||
+        breaker.cooldownSeconds <= 0)
+    ) {
+      throw new Error(
+        `config.plugins.${platform}.circuitBreaker.cooldownSeconds must be a positive number.`,
+      );
+    }
   }
 
   const warnings = [];
@@ -134,4 +103,6 @@ function createConfig(rawConfig) {
   return { config, warnings };
 }
 
-module.exports = { createConfig };
+module.exports = {
+  createConfig,
+};
