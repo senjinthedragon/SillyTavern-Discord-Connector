@@ -79,15 +79,15 @@ cp config.example.js config.js
 Edit `config.js` and change these lines:
 ```javascript
 discordToken: 'YOUR_BOT_TOKEN_HERE', // The one you copied to a safe place in part 2
-allowedUserIds: [], // add your Discord user ID here to keep the bot private to yourself
+allowedUserIds: [], // add your Discord User ID here to keep the bot private to yourself
 allowedChannelIds: [], // (optional) restrict the bot to specific channels only
 ```
 You can change the other lines in the `config.js` as well, but the ones listed above are the important ones.
 
 > [!TIP]
-> To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
+> To get a Discord User ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
 > \
-> To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
+> To get a Discord Uhannel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
 > \
 > To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode\
 > \
@@ -206,7 +206,7 @@ If you invited the bot already, generate a new invite URL with the scope added a
 
 Want to take your roleplay beyond Discord? **Telegram** and **Signal** plugins are available as a paid add-on, letting you chat with your SillyTavern character through those platforms using the same commands and features you already know.
 
-- **[Get the pro plugins on Ko-fi](https://ko-fi.com/senjinthedragon)**
+- **[Contact me to get the pro plugins](https://github.com/senjinthedragon)**
 
 Each plugin comes with its own setup guide. Purchasing also directly supports continued development of the free Discord connector.
 

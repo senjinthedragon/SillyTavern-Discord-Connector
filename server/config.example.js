@@ -12,15 +12,15 @@ module.exports = {
   discordToken: "YOUR_DISCORD_BOT_TOKEN_HERE",
 
   // Restrict which Discord users can talk to the bot.
-  // Add your own Discord user ID here to keep the bot private to yourself.
+  // Add your own Discord User ID here to keep the bot private to yourself.
   // Leave empty to allow anyone - not recommended unless your server is private.
-  // To get a user ID: enable Developer Mode in Discord settings, then right-click
+  // To get a User ID: enable Developer Mode in Discord settings, then right-click
   // a user and select "Copy User ID".
   allowedUserIds: [], // e.g. ["123456789012345678", "987654321098765432"]
 
   // Restrict which Discord channels the bot will respond in.
   // Leave empty to allow all channels in your server.
-  // To get a channel ID: enable Developer Mode in Discord settings, then
+  // To get a Channel ID: enable Developer Mode in Discord settings, then
   // right-click a channel and select "Copy Channel ID".
   allowedChannelIds: [], // e.g. ["123456789012345678"]
 
