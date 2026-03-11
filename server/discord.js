@@ -153,6 +153,34 @@ const SLASH_COMMANDS = [
     ],
   },
   {
+    name: "continue",
+    description: "Continue the last AI message",
+  },
+  {
+    name: "impersonate",
+    description: "Have the AI write your next response in character",
+    options: [
+      {
+        name: "prompt",
+        type: 3,
+        description: "Optional prompt to guide the impersonation",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "persona",
+    description: "Switch your active persona by name",
+    options: [
+      {
+        name: "name",
+        type: 3,
+        description: "The name of the persona to switch to",
+        required: true,
+      },
+    ],
+  },
+  {
     name: "switchchar",
     description: "Switch to a character by exact name",
     options: [

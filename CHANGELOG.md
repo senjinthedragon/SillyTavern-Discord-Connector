@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added platform status line to `/status` output showing each known platform as active 🟢, not loaded ⚫, or unhealthy 🔴.
 - Added startup credits banner with version number, author, and support link.
 - Added `/note` command to set or read the author's note for the current chat directly from Discord (or any connected platform).
+- Added `/continue` command to trigger a proper AI continuation of the last message.
+- Added `/impersonate` command to have the AI write your next response in character, with an optional guiding prompt.
+- Added `/persona` command to switch your active SillyTavern persona by name.
 
 ### Changed
 - Refactored bridge routing through a testable router layer (`server/websocket-router.js`).

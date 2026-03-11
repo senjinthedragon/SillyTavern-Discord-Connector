@@ -17,8 +17,13 @@ Expression images, character avatars, and inline images no longer accidentally d
 ### Status Improvements (Free)
 `/status` now shows a platform line indicating which frontends are loaded and active. Free version users see Telegram and Signal as ⚫ - a hint that pro plugins are available.
 
-### Author's Note Command
-You can now set or read the author's note for the current chat directly from Discord using `/note <text>`. Omit the text to see what's currently set. This lets you guide the direction of the scene without leaving your chat client.
+### New Immersion Commands
+Four new commands let you control your session more deeply without ever leaving Discord:
+
+- `/note <text>` — set or read the author's note to guide how the scene develops
+- `/continue` — trigger a proper AI continuation of the last message
+- `/impersonate` — have the AI write your next response in character, with an optional guiding prompt
+- `/persona <name>` — switch your active SillyTavern persona by name
 
 ### Configuration File Reorganized
 `config.example.js` is now divided into three clearly labeled sections - Essential, General, and Advanced - so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.

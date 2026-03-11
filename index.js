@@ -1467,13 +1467,40 @@ async function handleExecuteCommand(data) {
         return;
       }
 
+      case "continue": {
+        await executeSlashCommandsWithOptions("/continue");
+        replyText = "Continuing...";
+        break;
+      }
+
+      case "impersonate": {
+        const prompt = data.args?.[0] ?? "";
+        await executeSlashCommandsWithOptions(
+          prompt ? `/impersonate ${prompt}` : "/impersonate",
+        );
+        replyText = "Impersonating...";
+        break;
+      }
+
+      case "persona": {
+        const personaName = data.args?.[0] ?? "";
+        if (!personaName) {
+          replyText = "Please provide a persona name. Example: `/persona Aria`";
+          break;
+        }
+        await executeSlashCommandsWithOptions(`/persona-set ${personaName}`);
+        replyText = `Persona set to: _${personaName}_`;
+        break;
+      }
+
       case "note": {
         const noteText = data.args?.[0] ?? "";
         if (noteText) {
           await executeSlashCommandsWithOptions(`/note ${noteText}`);
           replyText = `Author's note set to: _${noteText}_`;
         } else {
-          const current = SillyTavern.getContext().chatMetadata?.note_prompt ?? "";
+          const current =
+            SillyTavern.getContext().chatMetadata?.note_prompt ?? "";
           replyText = current
             ? `Current author's note: _${current}_`
             : "No author's note is currently set.";
@@ -1563,7 +1590,10 @@ async function handleExecuteCommand(data) {
           "**Immersion & Mood**\n" +
           "> `/mood` - Show character expression\n" +
           "> `/charimage` - Show character's avatar\n" +
-          "> `/note <text>` - Set the author's note for the current chat; omit text to read the current note\n\n" +
+          "> `/note <text>` - Set the author's note for the current chat; omit text to read the current note\n" +
+          "> `/persona <name>` - Switch your active persona by name\n" +
+          "> `/impersonate` - Have the AI write your next response in character\n" +
+          "> `/continue` - Continue the last AI message\n\n" +
           "**Image Generation**\n" +
           "> `/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
           "> `/image cancel` - Abort active image generation\n\n" +
