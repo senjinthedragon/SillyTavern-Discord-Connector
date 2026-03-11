@@ -241,14 +241,14 @@ if (DISCORD_PLUGIN_ENABLED) {
   client.on(Events.ClientReady, async (c) => {
   setBridgeActivity(null);
 
-  console.log(`[Discord] Ready! Logged in as ${c.user.tag}`);
+  log("log", `[Discord] Ready! Logged in as ${c.user.tag}`);
   const rest = new REST({ version: "10" }).setToken(token);
   try {
-    console.log("[Discord] Registering slash commands...");
+    log("log", "[Discord] Registering slash commands...");
     await rest.put(Routes.applicationCommands(c.user.id), {
       body: SLASH_COMMANDS,
     });
-    console.log("[Discord] Slash commands registered.");
+    log("log", "[Discord] Slash commands registered.");
   } catch (err) {
     log("error", "[Discord] Failed to register slash commands:", err);
   }
