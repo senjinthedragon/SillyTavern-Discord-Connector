@@ -24,6 +24,27 @@ const {
 } = require("./discord");
 const { handleBridgePacket } = require("./websocket-router");
 
+const version = require("./package.json").version;
+const width = 70;
+
+const canColor = process.stdout.isTTY && process.env.TERM !== "dumb";
+
+const purple = canColor ? "[38;5;93m" : "";
+const gold = canColor ? "[38;5;220m" : "";
+const reset = canColor ? "[0m" : "";
+
+const title = ` SILLYTAVERN DISCORD CONNECTOR - v${version}`;
+const credit = ` Developed by Senjin the Dragon https://github.com/senjinthedragon`;
+const support = ` Please support my work: https://github.com/sponsors/senjinthedragon`;
+
+console.log(`
+${purple}╔${"═".repeat(width)}╗
+║${gold}${title.padEnd(width)}${purple}║
+║${gold}${credit.padEnd(width)}${purple}║
+║${gold}${support.padEnd(width)}${purple}║
+╚${"═".repeat(width)}╝${reset}
+`);
+
 let sillyTavernClient = null;
 const pendingImageMessages = {};
 const streamHandled = new Set();
