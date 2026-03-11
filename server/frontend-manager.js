@@ -166,12 +166,17 @@ async function fanout(conversationId, fnName, ...args) {
   return invoked;
 }
 
+function getRegisteredPlatforms() {
+  return new Set(frontends.keys());
+}
+
 module.exports = {
   addRoute,
   resolveConversationId,
   registerFrontend,
   getFrontend,
   getRoutes,
+  getRegisteredPlatforms,
   fanout,
   parseRoute,
   // Exported for tests.
