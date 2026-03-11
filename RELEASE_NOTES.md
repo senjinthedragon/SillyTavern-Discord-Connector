@@ -1,4 +1,4 @@
-# v2.0.0: Plugin Architecture, Multi-Platform Support, and a Polished Core
+# v1.4.0: Plugin Architecture, Multi-Platform Support, and a Polished Core
 
 This release introduces a fully extensible plugin system, bringing the bridge architecture up to a new level of flexibility and testability. Discord remains the built-in free frontend, while Telegram and Signal are available as separately licensed pro plugins.
 
