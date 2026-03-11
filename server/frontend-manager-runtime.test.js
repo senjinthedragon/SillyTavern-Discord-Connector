@@ -28,7 +28,13 @@ function loadFrontendManager() {
       config: {
         conversationLinks: [],
         plugins: {
-          telegram: { circuitBreaker: { enabled: true, failureThreshold: 1, cooldownMs: 60000 } },
+          telegram: {
+            circuitBreaker: {
+              enabled: true,
+              failureThreshold: 1,
+              cooldownMs: 60000,
+            },
+          },
           signal: { circuitBreaker: { enabled: false } },
         },
       },
@@ -73,14 +79,12 @@ test("fanout continues when one frontend throws", async () => {
   assert.ok(!invoked.includes("bad:456"));
 });
 
-
 test("parseRoute keeps native chat id when it contains colons", () => {
   const manager = loadFrontendManager();
   const parsed = manager.parseRoute("signal:+12:34:56");
   assert.equal(parsed.platform, "signal");
   assert.equal(parsed.nativeChatId, "+12:34:56");
 });
-
 
 test("circuit breaker opens after threshold and skips attempts", async () => {
   const manager = loadFrontendManager();

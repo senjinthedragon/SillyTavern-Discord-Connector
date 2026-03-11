@@ -1494,9 +1494,29 @@ async function handleExecuteCommand(data) {
           lastErrorText = `\n**⚠️ Last error:**\n> \`${imageMetrics.lastError}\`\n> _${timeString}_`;
         }
 
+        const PLATFORM_LABELS = {
+          discord: "Discord",
+          telegram: "Telegram",
+          signal: "Signal",
+        };
+        const PLATFORM_ICONS = {
+          active: "🟢",
+          not_loaded: "⚫",
+          inactive: "🔴",
+        };
+        const platformLine = bridgePlugins
+          ? Object.entries(bridgePlugins)
+              .map(
+                ([p, s]) =>
+                  `${PLATFORM_LABELS[p] || p} ${PLATFORM_ICONS[s] || "⚫"}`,
+              )
+              .join(" | ")
+          : "Unknown";
+
         replyText =
           "## 🐲 __Bridge Status:__\n" +
           `**Connection:** ${ws?.readyState === WebSocket.OPEN ? "🟢 Online" : "🔴 Offline"}\n` +
+          `**🔌 Platforms:** ${platformLine}\n` +
           `**Active:** ${activeGroup !== "(none)" ? `👥 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `👤 ${activeCharacter}` : "_Nothing loaded_"}\n` +
           `**Mood snapshots cached:** ${expressionCache.size}\n\n` +
           "**🖼️ Image Generation**\n" +
@@ -1862,6 +1882,7 @@ function connect() {
         } else {
           bridgeLocale = null;
         }
+        bridgePlugins = data.plugins || null;
         return;
       }
 

@@ -53,7 +53,10 @@ function createDeps() {
     getFrontend: (platform) => frontends[platform],
     parseRoute: (route) => {
       const idx = route.indexOf(":");
-      return { platform: route.slice(0, idx), nativeChatId: route.slice(idx + 1) };
+      return {
+        platform: route.slice(0, idx),
+        nativeChatId: route.slice(idx + 1),
+      };
     },
     streamSessions: {},
     streamHandled: new Set(),
@@ -89,10 +92,13 @@ test("handleBridgePacket stream_end falls back sendText for non-streaming fronte
     deps,
   );
 
-  assert.ok(deps.__calls.some((c) => c[0] === "discord" && c[1] === "streamEnd"));
+  assert.ok(
+    deps.__calls.some((c) => c[0] === "discord" && c[1] === "streamEnd"),
+  );
   assert.ok(
     deps.__calls.some(
-      (c) => c[0] === "telegram" && c[1] === "sendText" && /\*\*Bot\*\*/.test(c[3]),
+      (c) =>
+        c[0] === "telegram" && c[1] === "sendText" && /\*\*Bot\*\*/.test(c[3]),
     ),
   );
 });
@@ -122,7 +128,10 @@ test("handleBridgePacket send_images fans out full images array", async () => {
     {
       type: "send_images",
       chatId: "conv1",
-      images: [{ type: "inline", data: "a" }, { type: "url", url: "https://x" }],
+      images: [
+        { type: "inline", data: "a" },
+        { type: "url", url: "https://x" },
+      ],
     },
     deps,
   );

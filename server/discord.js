@@ -44,7 +44,9 @@ const { addRoute, resolveConversationId } = require("./frontend-manager");
 const { streamSessions, scheduleEdit } = require("./streaming");
 const version = require("./package.json").version;
 
-const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes("discord");
+const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes(
+  "discord",
+);
 
 const ACTIVITY_BASE = `SillyTavern Bridge v${version}`;
 const { formatBridgeActivity } = require("./activity-format");
@@ -239,175 +241,192 @@ if (DISCORD_PLUGIN_ENABLED) {
   client.login(token);
 
   client.on(Events.ClientReady, async (c) => {
-  setBridgeActivity(null);
+    setBridgeActivity(null);
 
-  log("log", `[Discord] Ready! Logged in as ${c.user.tag}`);
-  const rest = new REST({ version: "10" }).setToken(token);
-  try {
-    log("log", "[Discord] Registering slash commands...");
-    await rest.put(Routes.applicationCommands(c.user.id), {
-      body: SLASH_COMMANDS,
-    });
-    log("log", "[Discord] Slash commands registered.");
-  } catch (err) {
-    log("error", "[Discord] Failed to register slash commands:", err);
-  }
-});
+    log("log", `[Discord] Ready! Logged in as ${c.user.tag}`);
+    const rest = new REST({ version: "10" }).setToken(token);
+    try {
+      log("log", "[Discord] Registering slash commands...");
+      await rest.put(Routes.applicationCommands(c.user.id), {
+        body: SLASH_COMMANDS,
+      });
+      log("log", "[Discord] Slash commands registered.");
+    } catch (err) {
+      log("error", "[Discord] Failed to register slash commands:", err);
+    }
+  });
 
-client.on("error", (err) => log("error", "[Discord] Client error:", err));
+  client.on("error", (err) => log("error", "[Discord] Client error:", err));
 
-// ---------------------------------------------------------------------------
-// Interaction handler (autocomplete + slash commands)
-// ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Interaction handler (autocomplete + slash commands)
+  // ---------------------------------------------------------------------------
 
-client.on(Events.InteractionCreate, async (interaction) => {
-  if (interaction.isAutocomplete()) {
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (interaction.isAutocomplete()) {
+      const stClient = getSillyTavernClient();
+      if (!stClient) {
+        await interaction.respond([]).catch(() => {});
+        return;
+      }
+
+      const command = interaction.commandName;
+      const focusedValue = interaction.options.getFocused();
+      const list = AUTOCOMPLETE_LIST_MAP[command];
+      if (!list) return;
+
+      const debounceKey = `${interaction.user.id}:${command}`;
+      if (autocompleteDebouncers[debounceKey]) {
+        clearTimeout(autocompleteDebouncers[debounceKey].timer);
+        autocompleteDebouncers[debounceKey].interaction
+          .respond([])
+          .catch(() => {});
+      }
+
+      autocompleteDebouncers[debounceKey] = {
+        interaction,
+        timer: setTimeout(async () => {
+          delete autocompleteDebouncers[debounceKey];
+
+          const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+          const timeout = setTimeout(async () => {
+            if (!pendingAutocompletes[requestId]) return;
+            delete pendingAutocompletes[requestId];
+            log("warn", `[Autocomplete] Request ${requestId} timed out`);
+            await interaction.respond([]).catch(() => {});
+          }, AUTOCOMPLETE_TIMEOUT_MS);
+
+          pendingAutocompletes[requestId] = { interaction, timeout };
+
+          stClient.send(
+            JSON.stringify({
+              type: "get_autocomplete",
+              requestId,
+              list,
+              query: focusedValue,
+            }),
+          );
+        }, AUTOCOMPLETE_DEBOUNCE_MS),
+      };
+      return;
+    }
+
+    if (!interaction.isChatInputCommand()) return;
+
+    if (
+      config.allowedUserIds?.length > 0 &&
+      !config.allowedUserIds.includes(interaction.user.id)
+    ) {
+      await interaction
+        .reply({
+          content: "You are not authorised to use this bot.",
+          flags: [MessageFlags.Ephemeral],
+        })
+        .catch(() => {});
+      return;
+    }
+
+    if (
+      config.allowedChannelIds?.length > 0 &&
+      !config.allowedChannelIds.includes(interaction.channelId)
+    ) {
+      await interaction
+        .reply({
+          content: "This bot is not enabled in this channel.",
+          flags: [MessageFlags.Ephemeral],
+        })
+        .catch(() => {});
+      return;
+    }
+
     const stClient = getSillyTavernClient();
     if (!stClient) {
-      await interaction.respond([]).catch(() => {});
+      await interaction
+        .reply({
+          content: "Bridge is not connected to SillyTavern.",
+          flags: [MessageFlags.Ephemeral],
+        })
+        .catch(() => {});
       return;
     }
 
     const command = interaction.commandName;
-    const focusedValue = interaction.options.getFocused();
-    const list = AUTOCOMPLETE_LIST_MAP[command];
-    if (!list) return;
+    const args = interaction.options.data
+      .filter((opt) => opt.type === 3)
+      .map((opt) => String(opt.value));
+    const conversationId = resolveConversationId(
+      "discord",
+      interaction.channelId,
+    );
+    addRoute(conversationId, "discord", interaction.channelId);
 
-    const debounceKey = `${interaction.user.id}:${command}`;
-    if (autocompleteDebouncers[debounceKey]) {
-      clearTimeout(autocompleteDebouncers[debounceKey].timer);
-      autocompleteDebouncers[debounceKey].interaction
-        .respond([])
-        .catch(() => {});
+    stClient.send(
+      JSON.stringify({
+        type: "execute_command",
+        command,
+        args,
+        chatId: conversationId,
+      }),
+    );
+
+    // Acknowledge immediately (ephemeral) to satisfy Discord's 3-second window.
+    // Ephemeral also prevents messageCreate from seeing this echo as a new "/" message.
+    await interaction
+      .reply({
+        content: `✓ ${command}${args.length ? " " + args.join(" ") : ""}`,
+        flags: [MessageFlags.Ephemeral],
+      })
+      .catch(() => {});
+  });
+
+  // ---------------------------------------------------------------------------
+  // Incoming Discord messages → SillyTavern
+  // ---------------------------------------------------------------------------
+
+  client.on("messageCreate", (message) => {
+    if (message.author.bot) return;
+    if (
+      config.allowedUserIds?.length > 0 &&
+      !config.allowedUserIds.includes(message.author.id)
+    )
+      return;
+    if (
+      config.allowedChannelIds?.length > 0 &&
+      !config.allowedChannelIds.includes(message.channel.id)
+    )
+      return;
+
+    const stClient = getSillyTavernClient();
+    if (!stClient) {
+      message.reply("Bridge is not connected to SillyTavern.").catch(() => {});
+      return;
     }
 
-    autocompleteDebouncers[debounceKey] = {
-      interaction,
-      timer: setTimeout(async () => {
-        delete autocompleteDebouncers[debounceKey];
+    const conversationId = resolveConversationId("discord", message.channel.id);
+    addRoute(conversationId, "discord", message.channel.id);
+    const content = message.content;
 
-        const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-
-        const timeout = setTimeout(async () => {
-          if (!pendingAutocompletes[requestId]) return;
-          delete pendingAutocompletes[requestId];
-          log("warn", `[Autocomplete] Request ${requestId} timed out`);
-          await interaction.respond([]).catch(() => {});
-        }, AUTOCOMPLETE_TIMEOUT_MS);
-
-        pendingAutocompletes[requestId] = { interaction, timeout };
-
-        stClient.send(
-          JSON.stringify({
-            type: "get_autocomplete",
-            requestId,
-            list,
-            query: focusedValue,
-          }),
-        );
-      }, AUTOCOMPLETE_DEBOUNCE_MS),
-    };
-    return;
-  }
-
-  if (!interaction.isChatInputCommand()) return;
-
-  if (
-    config.allowedUserIds?.length > 0 &&
-    !config.allowedUserIds.includes(interaction.user.id)
-  ) {
-    await interaction
-      .reply({
-        content: "You are not authorised to use this bot.",
-        flags: [MessageFlags.Ephemeral],
-      })
-      .catch(() => {});
-    return;
-  }
-
-  if (
-    config.allowedChannelIds?.length > 0 &&
-    !config.allowedChannelIds.includes(interaction.channelId)
-  ) {
-    await interaction
-      .reply({
-        content: "This bot is not enabled in this channel.",
-        flags: [MessageFlags.Ephemeral],
-      })
-      .catch(() => {});
-    return;
-  }
-
-  const stClient = getSillyTavernClient();
-  if (!stClient) {
-    await interaction
-      .reply({
-        content: "Bridge is not connected to SillyTavern.",
-        flags: [MessageFlags.Ephemeral],
-      })
-      .catch(() => {});
-    return;
-  }
-
-  const command = interaction.commandName;
-  const args = interaction.options.data
-    .filter((opt) => opt.type === 3)
-    .map((opt) => String(opt.value));
-  const conversationId = resolveConversationId("discord", interaction.channelId);
-  addRoute(conversationId, "discord", interaction.channelId);
-
-  stClient.send(
-    JSON.stringify({ type: "execute_command", command, args, chatId: conversationId }),
-  );
-
-  // Acknowledge immediately (ephemeral) to satisfy Discord's 3-second window.
-  // Ephemeral also prevents messageCreate from seeing this echo as a new "/" message.
-  await interaction
-    .reply({
-      content: `✓ ${command}${args.length ? " " + args.join(" ") : ""}`,
-      flags: [MessageFlags.Ephemeral],
-    })
-    .catch(() => {});
-});
-
-// ---------------------------------------------------------------------------
-// Incoming Discord messages → SillyTavern
-// ---------------------------------------------------------------------------
-
-client.on("messageCreate", (message) => {
-  if (message.author.bot) return;
-  if (
-    config.allowedUserIds?.length > 0 &&
-    !config.allowedUserIds.includes(message.author.id)
-  )
-    return;
-  if (
-    config.allowedChannelIds?.length > 0 &&
-    !config.allowedChannelIds.includes(message.channel.id)
-  )
-    return;
-
-  const stClient = getSillyTavernClient();
-  if (!stClient) {
-    message.reply("Bridge is not connected to SillyTavern.").catch(() => {});
-    return;
-  }
-
-  const conversationId = resolveConversationId("discord", message.channel.id);
-  addRoute(conversationId, "discord", message.channel.id);
-  const content = message.content;
-
-  if (content.startsWith("/")) {
-    const [command, ...args] = content.slice(1).split(" ");
-    stClient.send(
-      JSON.stringify({ type: "execute_command", command, args, chatId: conversationId }),
-    );
-  } else {
-    stClient.send(
-      JSON.stringify({ type: "user_message", text: content, chatId: conversationId }),
-    );
-  }
-});
+    if (content.startsWith("/")) {
+      const [command, ...args] = content.slice(1).split(" ");
+      stClient.send(
+        JSON.stringify({
+          type: "execute_command",
+          command,
+          args,
+          chatId: conversationId,
+        }),
+      );
+    } else {
+      stClient.send(
+        JSON.stringify({
+          type: "user_message",
+          text: content,
+          chatId: conversationId,
+        }),
+      );
+    }
+  });
 }
 
 async function sendText(channelId, text) {
@@ -457,7 +476,6 @@ async function sendExpression(channelId, expression, image) {
   if (expression) setBridgeActivity(expression);
   if (image) await sendImages(channelId, [image], null);
 }
-
 
 async function streamChunk(channelId, payload) {
   const channel = client.channels.cache.get(channelId);
@@ -512,7 +530,8 @@ async function streamEnd(channelId, payload) {
     });
   }
 
-  const rawText = payload?.finalText != null ? payload.finalText : s.pendingText || "";
+  const rawText =
+    payload?.finalText != null ? payload.finalText : s.pendingText || "";
   const activeName = payload?.characterName || null;
   let processedText = rawText;
   if (activeName) {
@@ -520,7 +539,9 @@ async function streamEnd(channelId, payload) {
     processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, "i"), "");
   }
 
-  const finalText = activeName ? `**${activeName}**\n${processedText}` : processedText;
+  const finalText = activeName
+    ? `**${activeName}**\n${processedText}`
+    : processedText;
   const channel = client.channels.cache.get(channelId);
   if (channel && finalText.trim()) {
     if (s.streamMessage) {

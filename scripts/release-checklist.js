@@ -12,7 +12,11 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 
 function run(command, args, cwd = process.cwd()) {
-  const result = spawnSync(command, args, { stdio: "inherit", cwd, shell: false });
+  const result = spawnSync(command, args, {
+    stdio: "inherit",
+    cwd,
+    shell: false,
+  });
   return result.status === 0;
 }
 

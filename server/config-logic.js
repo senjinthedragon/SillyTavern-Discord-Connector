@@ -16,14 +16,21 @@ function validateCircuitBreaker(pluginName, pluginConfig) {
   if (!breaker) return;
 
   if (breaker.failureThreshold != null) {
-    if (!Number.isFinite(breaker.failureThreshold) || breaker.failureThreshold < 1) {
-      throw new Error(`config.plugins.${pluginName}.circuitBreaker.failureThreshold must be a positive number.`);
+    if (
+      !Number.isFinite(breaker.failureThreshold) ||
+      breaker.failureThreshold < 1
+    ) {
+      throw new Error(
+        `config.plugins.${pluginName}.circuitBreaker.failureThreshold must be a positive number.`,
+      );
     }
   }
 
   if (breaker.cooldownMs != null) {
     if (!Number.isFinite(breaker.cooldownMs) || breaker.cooldownMs <= 0) {
-      throw new Error(`config.plugins.${pluginName}.circuitBreaker.cooldownMs must be a positive number.`);
+      throw new Error(
+        `config.plugins.${pluginName}.circuitBreaker.cooldownMs must be a positive number.`,
+      );
     }
   }
 }
@@ -42,21 +49,32 @@ function createConfig(rawConfig) {
   };
 
   config.queueTaskTimeoutMs = config.queueTaskTimeoutSeconds * 1_000;
-  config.imagePlaceholderTimeoutMs = config.imagePlaceholderTimeoutSeconds * 1_000;
+  config.imagePlaceholderTimeoutMs =
+    config.imagePlaceholderTimeoutSeconds * 1_000;
 
-  if (!Array.isArray(config.enabledPlugins) || config.enabledPlugins.length === 0) {
-    throw new Error("config.enabledPlugins must contain at least one plugin name.");
+  if (
+    !Array.isArray(config.enabledPlugins) ||
+    config.enabledPlugins.length === 0
+  ) {
+    throw new Error(
+      "config.enabledPlugins must contain at least one plugin name.",
+    );
   }
 
   for (const pluginName of config.enabledPlugins) {
     if (typeof pluginName !== "string" || !pluginName.trim()) {
-      throw new Error("config.enabledPlugins entries must be non-empty strings.");
+      throw new Error(
+        "config.enabledPlugins entries must be non-empty strings.",
+      );
     }
   }
 
   const enabled = new Set(config.enabledPlugins);
   if (enabled.has("discord")) {
-    if (!config.discordToken || config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
+    if (
+      !config.discordToken ||
+      config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE"
+    ) {
       throw new Error(
         "Set your Discord Bot Token in config.js when Discord plugin is enabled.",
       );

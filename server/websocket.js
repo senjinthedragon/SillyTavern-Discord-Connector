@@ -16,7 +16,14 @@ const { log } = require("./logger");
 const { config, wssPort } = require("./config-loader");
 const { streamSessions } = require("./streaming");
 const { createPluginLoader } = require("./plugin-loader");
-const { fanout, addRoute, resolveConversationId, getRoutes, getFrontend, parseRoute } = require("./frontend-manager");
+const {
+  fanout,
+  addRoute,
+  resolveConversationId,
+  getRoutes,
+  getFrontend,
+  parseRoute,
+} = require("./frontend-manager");
 const {
   setBridgeActivity,
   getPendingAutocompletes,
@@ -55,7 +62,8 @@ function getSillyTavernClient() {
 }
 
 function sendToSillyTavern(payload) {
-  if (!sillyTavernClient || sillyTavernClient.readyState !== WebSocket.OPEN) return;
+  if (!sillyTavernClient || sillyTavernClient.readyState !== WebSocket.OPEN)
+    return;
   sillyTavernClient.send(JSON.stringify(payload));
 }
 
@@ -91,11 +99,23 @@ wss.on("connection", (ws) => {
   sillyTavernClient = ws;
   log("log", "[Bridge] SillyTavern connected");
 
+  // Build plugin status map for all known platforms. Platforms in
+  // enabledPlugins are marked "active"; others are "not_loaded".
+  const KNOWN_PLATFORMS = ["discord", "telegram", "signal"];
+  const enabledPlugins = config.enabledPlugins || ["discord"];
+  const pluginStatus = Object.fromEntries(
+    KNOWN_PLATFORMS.map((p) => [
+      p,
+      enabledPlugins.includes(p) ? "active" : "not_loaded",
+    ]),
+  );
+
   ws.send(
     JSON.stringify({
       type: "bridge_config",
       timezone: config.timezone || null,
       locale: config.locale || null,
+      plugins: pluginStatus,
     }),
   );
 

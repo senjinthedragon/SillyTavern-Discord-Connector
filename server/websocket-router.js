@@ -38,7 +38,9 @@ async function handleBridgePacket(data, deps) {
     if (!pending) return;
     clearTimeout(pending.timeout);
     delete pendingAutocompletes[data.requestId];
-    await pending.interaction.respond((data.choices || []).slice(0, 25)).catch(() => {});
+    await pending.interaction
+      .respond((data.choices || []).slice(0, 25))
+      .catch(() => {});
     return;
   }
 
@@ -52,7 +54,11 @@ async function handleBridgePacket(data, deps) {
 
     case "image_placeholder":
       pendingImageMessages[data.requestId || conversationId] = true;
-      await fanout(conversationId, "sendText", data?.text || "🎨 Generating image…");
+      await fanout(
+        conversationId,
+        "sendText",
+        data?.text || "🎨 Generating image…",
+      );
       break;
 
     case "generate_image_result":
@@ -61,12 +67,17 @@ async function handleBridgePacket(data, deps) {
       // can delete its own placeholder before posting the real image. Plugins
       // that have no placeholder concept (Telegram, Signal) should alias
       // sendGeneratedImage to sendImages in their plugin implementation.
-      if (data.image) await fanout(conversationId, "sendGeneratedImage", [data.image], null);
+      if (data.image)
+        await fanout(conversationId, "sendGeneratedImage", [data.image], null);
       break;
 
     case "generate_image_error":
       delete pendingImageMessages[data.requestId || conversationId];
-      await fanout(conversationId, "sendText", data.text || "Image generation failed.");
+      await fanout(
+        conversationId,
+        "sendText",
+        data.text || "Image generation failed.",
+      );
       break;
 
     case "stream_chunk": {
@@ -87,7 +98,8 @@ async function handleBridgePacket(data, deps) {
     case "stream_end": {
       const streamId = data.streamId || conversationId;
       const s = streamSessions[streamId];
-      const finalText = data.finalText != null ? data.finalText : s?.pendingText || "";
+      const finalText =
+        data.finalText != null ? data.finalText : s?.pendingText || "";
 
       const streamPayload = {
         streamId,
@@ -95,7 +107,9 @@ async function handleBridgePacket(data, deps) {
         characterName: data.characterName || null,
       };
 
-      const streamedRoutes = new Set(await fanout(conversationId, "streamEnd", streamPayload));
+      const streamedRoutes = new Set(
+        await fanout(conversationId, "streamEnd", streamPayload),
+      );
 
       if (finalText.trim()) {
         const text = data.characterName
@@ -118,13 +132,17 @@ async function handleBridgePacket(data, deps) {
     }
 
     case "ai_reply": {
-      if (streamReceived.has(conversationId) || streamHandled.has(conversationId)) {
+      if (
+        streamReceived.has(conversationId) ||
+        streamHandled.has(conversationId)
+      ) {
         streamHandled.delete(conversationId);
         streamReceived.delete(conversationId);
         break;
       }
 
-      const messages = data?.messages || (data?.text ? [{ name: "", text: data.text }] : []);
+      const messages =
+        data?.messages || (data?.text ? [{ name: "", text: data.text }] : []);
       for (const msg of messages.filter((m) => m?.text?.trim())) {
         const text = msg.name
           ? `**${msg.name}**\n${msg.text.trim()}`
@@ -136,7 +154,8 @@ async function handleBridgePacket(data, deps) {
 
     case "error_message":
     case "intro_message":
-      if (data?.text?.trim()) await fanout(conversationId, "sendText", data.text.trim());
+      if (data?.text?.trim())
+        await fanout(conversationId, "sendText", data.text.trim());
       break;
 
     case "send_images":
@@ -151,7 +170,12 @@ async function handleBridgePacket(data, deps) {
     case "expression_update": {
       const expression = (data.expression || "").trim().toLowerCase();
       if (expression) setBridgeActivity(expression);
-      await fanout(conversationId, "sendExpression", expression, data.image || null);
+      await fanout(
+        conversationId,
+        "sendExpression",
+        expression,
+        data.image || null,
+      );
       break;
     }
 

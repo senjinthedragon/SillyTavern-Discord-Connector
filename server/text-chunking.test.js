@@ -27,5 +27,8 @@ test("splitLongText prefers paragraph/word boundaries", () => {
 test("splitLongText hard-splits when no whitespace exists", () => {
   const msg = "x".repeat(25);
   const chunks = splitLongText(msg, 10);
-  assert.deepEqual(chunks.map((c) => c.length), [10, 10, 5]);
+  assert.deepEqual(
+    chunks.map((c) => c.length),
+    [10, 10, 5],
+  );
 });

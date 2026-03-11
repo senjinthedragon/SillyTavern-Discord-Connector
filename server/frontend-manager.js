@@ -91,9 +91,12 @@ function resolveConversationId(platform, nativeChatId) {
   const links = config.conversationLinks || [];
   for (const link of links) {
     const match =
-      (platform === "discord" && String(link.discordChannelId || "") === String(nativeChatId)) ||
-      (platform === "telegram" && String(link.telegramChatId || "") === String(nativeChatId)) ||
-      (platform === "signal" && String(link.signalChatId || "") === String(nativeChatId));
+      (platform === "discord" &&
+        String(link.discordChannelId || "") === String(nativeChatId)) ||
+      (platform === "telegram" &&
+        String(link.telegramChatId || "") === String(nativeChatId)) ||
+      (platform === "signal" &&
+        String(link.signalChatId || "") === String(nativeChatId));
 
     if (match && link.conversationId) {
       return String(link.conversationId);
@@ -141,7 +144,10 @@ async function fanout(conversationId, fnName, ...args) {
     if (!frontend || typeof frontend[fnName] !== "function") continue;
 
     if (!canAttemptPlatform(platform)) {
-      log("warn", `[Frontends] Circuit open for ${platform}; skipping ${fnName}.`);
+      log(
+        "warn",
+        `[Frontends] Circuit open for ${platform}; skipping ${fnName}.`,
+      );
       continue;
     }
 
