@@ -4,7 +4,7 @@
 
 module.exports = {
   // =========================================================================
-  // ESSENTIAL SETTINGS — fill these in to get the bridge running
+  // ESSENTIAL SETTINGS - fill these in to get the bridge running
   // =========================================================================
 
   // Your Discord Bot Token.
@@ -13,7 +13,7 @@ module.exports = {
 
   // Restrict which Discord users can talk to the bot.
   // Add your own Discord user ID here to keep the bot private to yourself.
-  // Leave empty to allow anyone — not recommended unless your server is private.
+  // Leave empty to allow anyone - not recommended unless your server is private.
   // To get a user ID: enable Developer Mode in Discord settings, then right-click
   // a user and select "Copy User ID".
   allowedUserIds: [], // e.g. ["123456789012345678", "987654321098765432"]
@@ -25,7 +25,7 @@ module.exports = {
   allowedChannelIds: [], // e.g. ["123456789012345678"]
 
   // =========================================================================
-  // GENERAL SETTINGS — safe to leave as-is, but worth a look
+  // GENERAL SETTINGS - safe to leave as-is, but worth a look
   // =========================================================================
 
   // The port number the bridge listens on.
@@ -47,7 +47,7 @@ module.exports = {
   debug: false,
 
   // =========================================================================
-  // ADVANCED SETTINGS — no need to touch these unless you know what you're
+  // ADVANCED SETTINGS - no need to touch these unless you know what you're
   // doing. Defaults are sensible for most setups.
   // =========================================================================
 

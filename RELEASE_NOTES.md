@@ -15,10 +15,10 @@ The bridge now routes all outbound packets through a clean plugin system. Each p
 Expression images, character avatars, and inline images no longer accidentally delete the "🎨 Generating image…" placeholder. Only an actual `generate_image_result` packet clears it.
 
 ### Status Improvements (Free)
-`/status` now shows a platform line indicating which frontends are loaded and active. Free version users see Telegram and Signal as ⚫ — a hint that pro plugins are available.
+`/status` now shows a platform line indicating which frontends are loaded and active. Free version users see Telegram and Signal as ⚫ - a hint that pro plugins are available.
 
 ### Configuration File Reorganized
-`config.example.js` is now divided into three clearly labeled sections — Essential, General, and Advanced — so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.
+`config.example.js` is now divided into three clearly labeled sections - Essential, General, and Advanced - so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.
 
 ### Telegram Plugin (Pro)
 - Full inbound/outbound support via the Telegram Bot API.
@@ -34,10 +34,10 @@ Expression images, character avatars, and inline images no longer accidentally d
 
 ## Configuration Changes
 
-- `enabledPlugins` — array of active frontend names. Defaults to `["discord"]`.
-- `externalPlugins` — array of `{ name, module, config }` objects for pro plugins.
-- `plugins.<name>.circuitBreaker` — optional per-plugin failure protection.
-- `conversationLinks` — optional array linking a single `conversationId` across multiple platform chat IDs for cross-platform fanout.
+- `enabledPlugins` - array of active frontend names. Defaults to `["discord"]`.
+- `externalPlugins` - array of `{ name, module, config }` objects for pro plugins.
+- `plugins.<name>.circuitBreaker` - optional per-plugin failure protection.
+- `conversationLinks` - optional array linking a single `conversationId` across multiple platform chat IDs for cross-platform fanout.
 
 ## Notes for Pro Plugin Users
 

@@ -435,7 +435,7 @@ async function sendText(channelId, text) {
   enqueue(channelId, async () => {
     const msg = await sendLong(channel, text);
     // Save the message reference so sendImages can delete it when the real
-    // image arrives. Keyed by channelId — only one placeholder per channel
+    // image arrives. Keyed by channelId - only one placeholder per channel
     // at a time since image generation is serialised per channel.
     if (text.includes("🎨 Generating image")) {
       placeholderMessages[channelId] = msg;
@@ -457,7 +457,7 @@ async function sendImages(channelId, images, caption) {
 // Dedicated path for generate_image_result packets. Deletes the placeholder
 // message before posting the real image. All other image sends (expressions,
 // charimage, inline images in messages) use sendImages and never touch the
-// placeholder — only a generated image result should clear it.
+// placeholder - only a generated image result should clear it.
 async function sendGeneratedImage(channelId, images, caption) {
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
