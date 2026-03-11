@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added active plugin status to the `bridge_config` handshake packet so the extension can display which frontends are loaded.
 - Added platform status line to `/status` output showing each known platform as active 🟢, not loaded ⚫, or unhealthy 🔴.
 - Added startup credits banner with version number, author, and support link.
+- Added `/note` command to set or read the author's note for the current chat directly from Discord (or any connected platform).
 
 ### Changed
 - Refactored bridge routing through a testable router layer (`server/websocket-router.js`).

@@ -1467,6 +1467,20 @@ async function handleExecuteCommand(data) {
         return;
       }
 
+      case "note": {
+        const noteText = data.args?.[0] ?? "";
+        if (noteText) {
+          await executeSlashCommandsWithOptions(`/note ${noteText}`);
+          replyText = `Author's note set to: _${noteText}_`;
+        } else {
+          const current = SillyTavern.getContext().chatMetadata?.note_prompt ?? "";
+          replyText = current
+            ? `Current author's note: _${current}_`
+            : "No author's note is currently set.";
+        }
+        break;
+      }
+
       case "status": {
         const breakerState = getBreakerState(data.chatId);
         const activeCharacter =
@@ -1548,7 +1562,8 @@ async function handleExecuteCommand(data) {
           "> *💡 Tip: You can also use `_#` (e.g., `/switchchar_3`) to select by index.*\n\n" +
           "**Immersion & Mood**\n" +
           "> `/mood` - Show character expression\n" +
-          "> `/charimage` - Show character's avatar\n\n" +
+          "> `/charimage` - Show character's avatar\n" +
+          "> `/note <text>` - Set the author's note for the current chat; omit text to read the current note\n\n" +
           "**Image Generation**\n" +
           "> `/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
           "> `/image cancel` - Abort active image generation\n\n" +

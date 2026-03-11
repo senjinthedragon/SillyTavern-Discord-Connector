@@ -141,6 +141,18 @@ const SLASH_COMMANDS = [
     description: "List all characters (includes numbered shortcuts)",
   },
   {
+    name: "note",
+    description: "Set or read the author's note for the current chat",
+    options: [
+      {
+        name: "text",
+        type: 3,
+        description: "The author's note text (omit to read the current note)",
+        required: false,
+      },
+    ],
+  },
+  {
     name: "switchchar",
     description: "Switch to a character by exact name",
     options: [
