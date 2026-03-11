@@ -41,7 +41,17 @@ async function loadExternalPlugins(handlers) {
       }
       log("log", `[Plugins] External plugin loaded: ${plugin.name}`);
     } catch (err) {
-      log("warn", `[Plugins] Failed to load external plugin: ${err.message}`);
+      if (err.code === "MODULE_NOT_FOUND") {
+        log(
+          "warn",
+          `[Plugins] Plugin "${plugin.name}" not found at: ${plugin.module}`,
+        );
+      } else {
+        log(
+          "warn",
+          `[Plugins] Failed to load external plugin "${plugin.name}": ${err.message}`,
+        );
+      }
     }
   }
 }

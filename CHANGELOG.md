@@ -10,15 +10,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added websocket packet-flow integration tests with mocked frontends (`server/websocket-router.test.js`).
 - Added optional per-plugin circuit breaker/backoff support in frontend fanout (`plugins.<name>.circuitBreaker`).
 - Added `scripts/release-checklist.js` and `npm run release-checklist` for pre-release automation.
+- Added `sendGeneratedImage` fanout path so expression images, character images and inline images never accidentally delete an image generation placeholder.
+- Added active plugin status to the `bridge_config` handshake packet so the extension can display which frontends are loaded.
+- Added platform status line to `/status` output showing each known platform as active 🟢, not loaded ⚫, or unhealthy 🔴.
+- Added startup credits banner with version number, author, and support link.
 
 ### Changed
 - Refactored bridge routing through a testable router layer (`server/websocket-router.js`).
 - Kept Discord as the built-in free frontend and unbundled Telegram/Signal implementations for separate private/pro distribution.
 - Added support for loading external frontend plugins via `config.externalPlugins`.
 - Strengthened startup validation and reconnect cleanup behavior.
+- Replaced bare `console.log` calls in `websocket.js` and `discord.js` with the timestamped `log()` function for consistent log formatting.
+- Missing plugin files now log a concise "not found" message instead of a full Node.js require stack trace.
+- Image generation placeholder message is now correctly deleted when the generated image arrives, regardless of other images (expressions, avatars, inline) arriving in the meantime.
 
 ### Fixed
 - Alphabetical autocomplete sorting for character, group and group member lists was documented as a 1.3.0 feature but the sort function was missing from the released code.
+- Solo chat character lookup in autocomplete used `find()` with an object id that no longer exists in recent SillyTavern versions; fixed to use direct array index.
+- Browser-side image fetch limit raised from 8 MB to 50 MB so uncompressed images from local generators are no longer rejected before the server can compress them.
+
+### Added _(Pro version only)_
+- Telegram frontend plugin: inbound polling via `getUpdates`, outbound text, typing indicator, images, expressions, and streaming via final-text send.
+- Telegram plugin registers bridge slash commands in the Telegram `/` command menu on startup.
+- Signal frontend plugin: inbound message subscription via WebSocket (`signal-cli-rest-api` json-rpc mode), outbound text, images, and expressions.
+- Signal plugin includes helper scripts (`start-signal-bridge.bat` / `.sh`) to spin up the required Docker container.
 
 ## [1.3.1] - 2026-03-06
 

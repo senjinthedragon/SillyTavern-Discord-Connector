@@ -166,6 +166,10 @@ async function fanout(conversationId, fnName, ...args) {
   return invoked;
 }
 
+function getRegisteredPlatforms() {
+  return new Set(frontends.keys());
+}
+
 module.exports = {
   addRoute,
   resolveConversationId,
@@ -174,6 +178,7 @@ module.exports = {
   getRoutes,
   fanout,
   parseRoute,
+  getRegisteredPlatforms,
   // Exported for tests.
   canAttemptPlatform,
   recordFailure,

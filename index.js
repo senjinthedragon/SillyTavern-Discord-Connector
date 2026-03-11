@@ -94,6 +94,7 @@ let lastExpressionSignature = "";
 let lastActiveChatId = null;
 let bridgeTimezone = null;
 let bridgeLocale = null;
+let bridgePlugins = null;
 const expressionCache = new Map();
 
 // ---------------------------------------------------------------------------
@@ -1516,7 +1517,7 @@ async function handleExecuteCommand(data) {
         replyText =
           "## 🐲 __Bridge Status:__\n" +
           `**Connection:** ${ws?.readyState === WebSocket.OPEN ? "🟢 Online" : "🔴 Offline"}\n` +
-          `**🔌 Platforms:** ${platformLine}\n` +
+          `**Plugins:** ${platformLine}\n` +
           `**Active:** ${activeGroup !== "(none)" ? `👥 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `👤 ${activeCharacter}` : "_Nothing loaded_"}\n` +
           `**Mood snapshots cached:** ${expressionCache.size}\n\n` +
           "**🖼️ Image Generation**\n" +

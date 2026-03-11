@@ -23,6 +23,7 @@ const {
   getRoutes,
   getFrontend,
   parseRoute,
+  getRegisteredPlatforms,
 } = require("./frontend-manager");
 const {
   setBridgeActivity,
@@ -99,14 +100,16 @@ wss.on("connection", (ws) => {
   sillyTavernClient = ws;
   log("log", "[Bridge] SillyTavern connected");
 
-  // Build plugin status map for all known platforms. Platforms in
-  // enabledPlugins are marked "active"; others are "not_loaded".
+  // Build plugin status map for all known platforms. Only platforms that
+  // successfully registered via registerFrontend() are marked "active".
+  // Others show as "not_loaded" so the extension can tease pro platforms
+  // to free version users.
   const KNOWN_PLATFORMS = ["discord", "telegram", "signal"];
-  const enabledPlugins = config.enabledPlugins || ["discord"];
+  const registeredPlatforms = getRegisteredPlatforms();
   const pluginStatus = Object.fromEntries(
     KNOWN_PLATFORMS.map((p) => [
       p,
-      enabledPlugins.includes(p) ? "active" : "not_loaded",
+      registeredPlatforms.has(p) ? "active" : "not_loaded",
     ]),
   );
 
