@@ -17,6 +17,9 @@ Expression images, character avatars, and inline images no longer accidentally d
 ### Status Improvements (Free)
 `/status` now shows a platform line indicating which frontends are loaded and active. Free version users see Telegram and Signal as ⚫ — a hint that pro plugins are available.
 
+### Configuration File Reorganized
+`config.example.js` is now divided into three clearly labeled sections — Essential, General, and Advanced — so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.
+
 ### Telegram Plugin (Pro)
 - Full inbound/outbound support via the Telegram Bot API.
 - Slash commands registered in the Telegram `/` menu on startup.
@@ -27,6 +30,7 @@ Expression images, character avatars, and inline images no longer accidentally d
 - Inbound messages received via WebSocket subscription with automatic reconnect.
 - Supports text, images, and expression updates.
 - Includes Docker helper scripts to spin up the required `signal-cli-rest-api` container.
+- Signal credentials are stored in `data/signal-data/` in the repo root and mounted as a Docker volume, so your registration survives container restarts and rebuilds.
 
 ## Configuration Changes
 

@@ -98,7 +98,7 @@ module.exports = {
   // When enabled, the bridge will temporarily stop sending to a plugin if it
   // keeps failing, rather than hammering a broken connection on every message.
   // failureThreshold: how many consecutive failures before pausing.
-  // cooldownMs: how long to pause before trying again (milliseconds).
+  // cooldownSeconds: how long to pause before trying again (in seconds).
   plugins: {
     discord: {
       circuitBreaker: {
@@ -111,14 +111,14 @@ module.exports = {
     //   circuitBreaker: {
     //     enabled: false,
     //     failureThreshold: 5,
-    //     cooldownMs: 30000,
+    //     cooldownSeconds: 30,
     //   },
     // },
     // signal: {
     //   circuitBreaker: {
     //     enabled: false,
     //     failureThreshold: 5,
-    //     cooldownMs: 30000,
+    //     cooldownSeconds: 30,
     //   },
     // },
   },

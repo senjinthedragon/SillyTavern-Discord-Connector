@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Replaced bare `console.log` calls in `websocket.js` and `discord.js` with the timestamped `log()` function for consistent log formatting.
 - Missing plugin files now log a concise "not found" message instead of a full Node.js require stack trace.
 - Image generation placeholder message is now correctly deleted when the generated image arrives, regardless of other images (expressions, avatars, inline) arriving in the meantime.
+- `config.example.js` reorganized into clearly labeled sections (Essential, General, Advanced) to make initial setup easier. Existing `config.js` files from v1.3.1 continue to work without changes.
 
 ### Fixed
 - Alphabetical autocomplete sorting for character, group and group member lists was documented as a 1.3.0 feature but the sort function was missing from the released code.
@@ -34,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Telegram plugin registers bridge slash commands in the Telegram `/` command menu on startup.
 - Signal frontend plugin: inbound message subscription via WebSocket (`signal-cli-rest-api` json-rpc mode), outbound text, images, and expressions.
 - Signal plugin includes helper scripts (`start-signal-bridge.bat` / `.sh`) to spin up the required Docker container.
+- Signal credentials and registration data are stored in `data/signal-data/` in the repo root, mounted as a Docker volume so data survives container restarts and rebuilds.
 
 ## [1.3.1] - 2026-03-06
 
