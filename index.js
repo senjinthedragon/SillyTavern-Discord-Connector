@@ -1494,7 +1494,7 @@ async function handleExecuteCommand(data) {
         const impersonatedText = String($("#send_textarea").val()).trim();
         if (impersonatedText) {
           $("#send_textarea").val("").trigger("input");
-          replyText = `💬 *Suggested response* _(feel free to copy, edit and send as your own)_:\n${impersonatedText}`;
+          replyText = `💭 *Suggested response* _(feel free to copy, edit and send as your own)_:\n${impersonatedText}`;
         } else {
           replyText = "Impersonation returned nothing.";
         }
