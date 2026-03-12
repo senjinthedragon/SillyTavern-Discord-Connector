@@ -29,12 +29,12 @@ Four new commands let you control your session more deeply without ever leaving 
 ### Configuration File Reorganized
 `config.example.js` is now divided into three clearly labeled sections - Essential, General, and Advanced - so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.
 
-### Telegram Plugin [(Pro)](README.md#pro-plugins)
+### Telegram Plugin ([Pro](README.md#pro-plugins))
 - Full inbound/outbound support via the Telegram Bot API.
 - Slash commands registered in the Telegram `/` menu on startup.
 - Supports text, typing indicators, images, expression updates, and streaming via final-text delivery.
 
-### Signal Plugin [(Pro)](README.md#pro-plugins)
+### Signal Plugin ([Pro](README.md#pro-plugins))
 - Full inbound/outbound support via `signal-cli-rest-api` in json-rpc mode.
 - Inbound messages received via WebSocket subscription with automatic reconnect.
 - Supports text, images, and expression updates.
