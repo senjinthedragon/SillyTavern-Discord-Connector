@@ -4,17 +4,17 @@ This release introduces a fully extensible plugin system, bringing the bridge ar
 
 ## Highlights
 
-### Plugin Architecture (Free)
+### Plugin Architecture
 The bridge now routes all outbound packets through a clean plugin system. Each platform registers as a frontend plugin, enabling true multi-platform fanout from a single SillyTavern session. The routing layer is fully unit-tested with mocked frontends.
 
 - `enabledPlugins` in config selects which frontends are active.
 - `externalPlugins` allows loading pro plugin modules from outside the public repo.
 - Optional per-plugin circuit breaker protects the bridge when a frontend becomes unresponsive.
 
-### Image Placeholder Fix (Free)
+### Image Placeholder Fix
 Expression images, character avatars, and inline images no longer accidentally delete the "🎨 Generating image…" placeholder. Only an actual `generate_image_result` packet clears it.
 
-### Status Improvements (Free)
+### Status Improvements
 `/status` now shows a platform line indicating which frontends are loaded and active. Free version users see Telegram and Signal as ⚫ - a hint that pro plugins are available.
 
 ### New Immersion Commands
@@ -29,12 +29,12 @@ Four new commands let you control your session more deeply without ever leaving 
 ### Configuration File Reorganized
 `config.example.js` is now divided into three clearly labeled sections - Essential, General, and Advanced - so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.
 
-### Telegram Plugin (Pro)
+### Telegram Plugin [(Pro)](README.md#pro-plugins)
 - Full inbound/outbound support via the Telegram Bot API.
 - Slash commands registered in the Telegram `/` menu on startup.
 - Supports text, typing indicators, images, expression updates, and streaming via final-text delivery.
 
-### Signal Plugin (Pro)
+### Signal Plugin [(Pro)](README.md#pro-plugins)
 - Full inbound/outbound support via `signal-cli-rest-api` in json-rpc mode.
 - Inbound messages received via WebSocket subscription with automatic reconnect.
 - Supports text, images, and expression updates.
@@ -50,7 +50,7 @@ Four new commands let you control your session more deeply without ever leaving 
 
 ## Notes for Pro Plugin Users
 
-Pro plugins (Telegram, Signal) are distributed separately and loaded via `externalPlugins` in `config.js`. They are not included in this public repository. See the pro plugin documentation for setup instructions.
+[Pro plugins](README.md#pro-plugins) (Telegram, Signal) are distributed separately and loaded via `externalPlugins` in `config.js`. They are not included in this public repository. See the pro plugin documentation for setup instructions.
 
 Signal requires a running `signal-cli-rest-api` Docker container and a dedicated phone number. Telegram requires a bot token from BotFather.
 
