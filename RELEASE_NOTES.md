@@ -20,11 +20,11 @@ Expression images, character avatars, and inline images no longer accidentally d
 ### New Immersion Commands
 Four new commands let you control your session more deeply without ever leaving Discord:
 
-- `/note <text>` — set or read the author's note to guide how the scene develops
-- `/continue` — trigger a proper AI continuation of the last message
-- `/impersonate` — have the AI write your next response in character, with an optional guiding prompt
-- `/persona <name>` — switch your active SillyTavern persona by name, with live autocomplete from your defined personas; typing an unlisted name creates a temporary persona on the fly
-- `/listpersonas` — list all personas defined in SillyTavern
+- `/note <text>` - set or read the author's note to guide how the scene develops
+- `/continue` - trigger a proper AI continuation of the last message
+- `/impersonate` - have the AI write your next response in character, with an optional guiding prompt
+- `/persona <name>` - switch your active SillyTavern persona by name, with live autocomplete from your defined personas; typing an unlisted name creates a temporary persona on the fly
+- `/listpersonas` - list all personas defined in SillyTavern
 
 ### Configuration File Reorganized
 `config.example.js` is now divided into three clearly labeled sections - Essential, General, and Advanced - so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.

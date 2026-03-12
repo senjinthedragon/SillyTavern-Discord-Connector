@@ -1835,7 +1835,7 @@ async function handleGetAutocomplete(data) {
         "cancel",
       ];
     } else if (data.list === "personas") {
-      // Always fresh — persona list is small and changes rarely.
+      // Always fresh - persona list is small and changes rarely.
       allNames = Object.values(
         context.powerUserSettings?.personas ?? {},
       ).filter((n) => n?.trim());
