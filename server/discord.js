@@ -177,8 +177,13 @@ const SLASH_COMMANDS = [
         type: 3,
         description: "The name of the persona to switch to",
         required: true,
+        autocomplete: true,
       },
     ],
+  },
+  {
+    name: "listpersonas",
+    description: "List your available personas",
   },
   {
     name: "switchchar",
@@ -261,6 +266,7 @@ const placeholderMessages = {};
 // charimage uses "group_members" (active group only, not the full library).
 // image uses "image_prompts" (a static keyword list built inline by the extension).
 const AUTOCOMPLETE_LIST_MAP = {
+  persona: "personas",
   switchchar: "characters",
   switchgroup: "groups",
   switchchat: "chats",

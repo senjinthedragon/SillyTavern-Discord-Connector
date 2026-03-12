@@ -1468,17 +1468,48 @@ async function handleExecuteCommand(data) {
       }
 
       case "continue": {
-        await executeSlashCommandsWithOptions("/continue");
-        replyText = "Continuing...";
+        const { chat: chatBefore } = SillyTavern.getContext();
+        const lastMsgBefore = [...chatBefore].reverse().find(m => !m.is_user && m.mes?.trim());
+        const textBefore = lastMsgBefore?.mes?.trim() ?? "";
+
+        await executeSlashCommandsWithOptions("/continue await=true");
+
+        const { chat: chatAfter } = SillyTavern.getContext();
+        const lastMsgAfter = [...chatAfter].reverse().find(m => !m.is_user && m.mes?.trim());
+        const textAfter = lastMsgAfter?.mes?.trim() ?? "";
+
+        const newText = textAfter.startsWith(textBefore)
+          ? textAfter.slice(textBefore.length).trim()
+          : textAfter;
+
+        replyText = newText || "Continuation returned nothing.";
         break;
       }
 
       case "impersonate": {
         const prompt = data.args?.[0] ?? "";
         await executeSlashCommandsWithOptions(
-          prompt ? `/impersonate ${prompt}` : "/impersonate",
+          prompt ? `/impersonate await=true ${prompt}` : "/impersonate await=true",
         );
-        replyText = "Impersonating...";
+        const impersonatedText = String($("#send_textarea").val()).trim();
+        if (impersonatedText) {
+          $("#send_textarea").val("").trigger("input");
+          replyText = `💬 *Suggested response* _(feel free to copy, edit and send as your own)_:\n${impersonatedText}`;
+        } else {
+          replyText = "Impersonation returned nothing.";
+        }
+        break;
+      }
+
+      case "listpersonas": {
+        const personas = Object.values(
+          SillyTavern.getContext().powerUserSettings?.personas ?? {},
+        ).filter((n) => n?.trim());
+        replyText =
+          personas.length > 0
+            ? "Available personas:\n\n" +
+              personas.map((n, i) => `${i + 1}. ${n}`).join("\n")
+            : "No personas found.";
         break;
       }
 
@@ -1592,7 +1623,7 @@ async function handleExecuteCommand(data) {
           "> `/charimage` - Show character's avatar\n" +
           "> `/note <text>` - Set the author's note for the current chat; omit text to read the current note\n" +
           "> `/persona <name>` - Switch your active persona by name\n" +
-          "> `/impersonate` - Have the AI write your next response in character\n" +
+          "> `/impersonate [prompt]` - Have the AI write your next response in character, with an optional guiding prompt\n" +
           "> `/continue` - Continue the last AI message\n\n" +
           "**Image Generation**\n" +
           "> `/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
@@ -1802,6 +1833,11 @@ async function handleGetAutocomplete(data) {
         "background",
         "cancel",
       ];
+    } else if (data.list === "personas") {
+      // Always fresh — persona list is small and changes rarely.
+      allNames = Object.values(
+        context.powerUserSettings?.personas ?? {},
+      ).filter((n) => n?.trim());
     } else if (data.list === "group_members") {
       if (!context.groupId) {
         // Solo chat - offer the active character's name as the only option.
