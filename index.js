@@ -1623,6 +1623,7 @@ async function handleExecuteCommand(data) {
           "> `/charimage` - Show character's avatar\n" +
           "> `/note <text>` - Set the author's note for the current chat; omit text to read the current note\n" +
           "> `/persona <name>` - Switch your active persona by name\n" +
+          "> `/listpersonas` - List your available personas\n" +
           "> `/impersonate [prompt]` - Have the AI write your next response in character, with an optional guiding prompt\n" +
           "> `/continue` - Continue the last AI message\n\n" +
           "**Image Generation**\n" +
