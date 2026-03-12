@@ -139,6 +139,7 @@ Use these slash commands in Discord to control the session:
 | **`/listchats`** | *List saved chats for the current character with shortcut numbers* |
 | **`/switchchat <name>`** | *Load a saved chat by name - supports live autocomplete* |
 | **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
+| **`/history <n>`** | *Show the last n exchanges from the current chat, assumes 5 when not specified* |
 | **`/mood <n>`** | *Show a character's current mood and expression image. Autocompletes with group members in group chat, or the active character in solo chat* |
 | **`/charimage <n>`** | *Post a character's avatar. Autocompletes with group members in group chat, or the active character in solo chat* |
 | **`/note <text>`** | *Set the author's note for the current chat to guide how the scene develops. Omit text to read the current note* |

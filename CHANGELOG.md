@@ -5,6 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.0] - Upcoming
+
+### Added
+- Added automatic chat recap on character, group, and chat switches. After a successful `/switchchar`, `/switchgroup`, `/switchchat`, or their numbered variants, the bridge waits for SillyTavern's `chatLoaded` event and then posts the last complete exchange from the newly loaded chat as a `recap_message` packet. On Discord this renders as styled embeds; on Telegram and Signal as plain text. Both use the persona name from `msg.name` on user entries - no separate persona lookup required.
+- Added `buildLastExchange(chat)` helper to `index.js` that walks `context.chat` backwards to collect the last user message and all trailing AI replies. AI messages are soft-capped at 10 per recap for large groups, with a note pointing to `/history` if any were omitted.
+- Added `scheduleRecap(chatId)` to `index.js` that registers a one-shot `chatLoaded` listener immediately before triggering a switch, scoping the listener tightly to the load just caused.
+- Added `recap_message` packet type to `websocket-router.js`, fanned out via `sendRecap` on all registered frontend plugins.
+- Added `sendRecap(channelId, entries)` to `server/discord.js`: splits each entry with `splitLongText` at 4000 chars and wraps each chunk in an `EmbedBuilder` embed (colour `0x5865f2`). First embed carries the `📜 Last exchange` title.
+- Added `sendRecap` to `server/plugins/discord.js` wrapper, `plugins/telegram.js`, and `plugins/signal.js`.
+- Added `/history [n]` command to `index.js` using new `buildHistory(chat, n)` helper. Collects the last `n` complete exchanges oldest-first (`n = 0` returns everything). Sends a `recap_message` packet directly - no `chatLoaded` wait needed since the current chat is already loaded. Defaults to 5 exchanges if no argument is given, no upper cap.
+- Added `/history` to Discord slash commands as a native integer-option command (type 4). Broadened the interaction arg filter in `discord.js` from `type === 3` only to `type === 3 || type === 4` so integer option values reach SillyTavern.
+- Added `/history` to Telegram's registered bot command list.
+- Added `/history` to `/sthelp` output.
+- Added `EmbedBuilder` to `discord.js` imports and `splitLongText` from `text-chunking.js`.
+
+### Fixed
+- Added `/listpersonas` to `/sthelp`
+
 ## [1.4.0] - 2026-03-12
 
 ### Added
@@ -160,7 +178,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-[Unreleased]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.2.5...v1.3.0
