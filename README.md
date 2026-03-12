@@ -207,7 +207,7 @@ This can happen if Discord has cached an old version of your slash commands. Sim
 The `applications.commands` scope must be included when generating the bot's invite URL (see step 2).\
 If you invited the bot already, generate a new invite URL with the scope added and open it in a browser - you do not need to kick and re-invite the bot, visiting the new URL is enough to grant the missing scope. Slash commands can also take up to an hour to appear in Discord after the bridge first starts.
 
-## 🔌 Pro Plugins
+## Pro Plugins
 
 Want to take your roleplay beyond Discord? **Telegram** and **Signal** plugins are available as a paid add-on, letting you chat with your SillyTavern character through those platforms using the same commands and features you already know.
 
