@@ -33,12 +33,14 @@ const {
   Routes,
   MessageFlags,
   ActivityType,
+  EmbedBuilder,
 } = require("discord.js");
 
 const { log } = require("./logger");
 const { config, token } = require("./config-loader");
 const { client } = require("./client");
 const { sendLong, sendImagesToChannel } = require("./messaging");
+const { splitLongText } = require("./text-chunking");
 const { enqueue } = require("./queue");
 const { addRoute, resolveConversationId } = require("./frontend-manager");
 const { streamSessions, scheduleEdit } = require("./streaming");
@@ -523,6 +525,53 @@ async function sendExpression(channelId, expression, image) {
   if (image) await sendImages(channelId, [image], null);
 }
 
+// Discord embed colour for recap messages — a muted indigo that reads as
+// "context / system" rather than a live message.
+const RECAP_EMBED_COLOR = 0x5865f2;
+
+// Discord limits: 4096 chars per embed description, 2000 per plain message.
+const RECAP_EMBED_MAX = 4000;
+
+/**
+ * Sends a chat recap to a Discord channel as a series of styled embeds.
+ * Each entry in the entries array becomes one or more embeds (split at word
+ * boundaries if the text exceeds the embed description limit). The first embed
+ * carries the 📜 Last exchange header; subsequent embeds are continuations.
+ *
+ * @param {string} channelId
+ * @param {Array<{name: string, text: string, isUser: boolean}>} entries
+ */
+async function sendRecap(channelId, entries) {
+  if (!entries?.length) return;
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
+
+  enqueue(channelId, async () => {
+    let isFirst = true;
+    for (const entry of entries) {
+      const label = entry.name ? `**${entry.name}**` : null;
+      const chunks = splitLongText(entry.text, RECAP_EMBED_MAX);
+
+      for (let i = 0; i < chunks.length; i++) {
+        const isContinuation = i > 0;
+        const description =
+          label && !isContinuation ? `${label}\n${chunks[i]}` : chunks[i];
+
+        const embed = new EmbedBuilder()
+          .setColor(RECAP_EMBED_COLOR)
+          .setDescription(description);
+
+        if (isFirst) {
+          embed.setTitle("📜 Last exchange");
+          isFirst = false;
+        }
+
+        await channel.send({ embeds: [embed] });
+      }
+    }
+  });
+}
+
 async function streamChunk(channelId, payload) {
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
@@ -609,6 +658,7 @@ module.exports = {
   sendImages,
   sendGeneratedImage,
   sendExpression,
+  sendRecap,
   streamChunk,
   streamEnd,
 };

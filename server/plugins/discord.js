@@ -49,6 +49,10 @@ function createDiscordPlugin() {
     async streamEnd(chatId, payload) {
       return discord.streamEnd(chatId, payload);
     },
+
+    async sendRecap(chatId, entries) {
+      await discord.sendRecap(chatId, entries);
+    },
   };
 }
 

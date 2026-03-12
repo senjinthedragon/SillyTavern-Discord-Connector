@@ -158,6 +158,10 @@ async function handleBridgePacket(data, deps) {
         await fanout(conversationId, "sendText", data.text.trim());
       break;
 
+    case "recap_message":
+      await fanout(conversationId, "sendRecap", data.entries || []);
+      break;
+
     case "send_images":
       await fanout(
         conversationId,

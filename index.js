@@ -1119,6 +1119,95 @@ async function handleUserMessage(data) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Chat recap
+//
+// After a successful character, group, or chat switch, a recap_message packet
+// is sent to the bridge once the new chat has fully loaded. The bridge renders
+// it as a styled embed on Discord and plain text on other platforms.
+// ---------------------------------------------------------------------------
+
+const RECAP_MAX_AI_MESSAGES = 10;
+
+/**
+ * Walks the chat array backwards to find the last user message and all AI
+ * messages that follow it (the last complete exchange). Returns an object
+ * with the entries array and the user's display name, or null if the chat
+ * has no user messages yet (e.g. only a greeting).
+ *
+ * @param {Array} chat
+ * @returns {{entries: Array<{name: string, text: string, isUser: boolean}>, userLabel: string}|null}
+ */
+function buildLastExchange(chat) {
+  if (!Array.isArray(chat) || chat.length === 0) return null;
+
+  // Collect trailing AI messages first (everything after the last user turn).
+  const aiMessages = [];
+  let i = chat.length - 1;
+  while (i >= 0 && !chat[i].is_user) {
+    const msg = chat[i];
+    if (msg.mes?.trim())
+      aiMessages.unshift({
+        name: msg.name || "",
+        text: msg.mes.trim(),
+        isUser: false,
+      });
+    i--;
+  }
+
+  // i now points at the last user message, or -1 if there is none.
+  if (i < 0) return null;
+
+  const userMsg = chat[i];
+  if (!userMsg.mes?.trim()) return null;
+
+  const userLabel = userMsg.name?.trim() || "You";
+
+  // Cap AI messages to avoid flooding on very large groups.
+  const cappedAi = aiMessages.slice(-RECAP_MAX_AI_MESSAGES);
+  const truncated = aiMessages.length > RECAP_MAX_AI_MESSAGES;
+
+  const entries = [
+    { name: userLabel, text: userMsg.mes.trim(), isUser: true },
+    ...cappedAi,
+  ];
+
+  if (truncated) {
+    entries.push({
+      name: "",
+      text: `_${aiMessages.length - RECAP_MAX_AI_MESSAGES} earlier message(s) not shown — use /history to see more._`,
+      isUser: false,
+    });
+  }
+
+  return { entries, userLabel };
+}
+
+/**
+ * Registers a one-shot chatLoaded listener and sends a recap_message packet
+ * to the bridge once the new chat's context is available.
+ * Called immediately after a successful switch so the listener is scoped
+ * tightly to the chat load we just triggered.
+ *
+ * @param {string} chatId
+ */
+function scheduleRecap(chatId) {
+  eventSource.once(event_types.CHAT_LOADED, () => {
+    const { chat } = SillyTavern.getContext();
+    const result = buildLastExchange(chat);
+    if (!result) return;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: "recap_message",
+          chatId,
+          entries: result.entries,
+        }),
+      );
+    }
+  });
+}
+
 /**
  * Handles execute_command: runs the requested slash command against
  * SillyTavern's APIs and sends an ai_reply with the result text.
@@ -1162,6 +1251,7 @@ async function handleExecuteCommand(data) {
         const targetName = data.args.join(" ");
         const target = context.characters.find((c) => c.name === targetName);
         if (target) {
+          scheduleRecap(data.chatId);
           await selectCharacterById(context.characters.indexOf(target));
           invalidateChatCache();
           replyText = `Switched to "${targetName}".`;
@@ -1194,6 +1284,7 @@ async function handleExecuteCommand(data) {
           (g) => g.name === targetName,
         );
         if (target) {
+          scheduleRecap(data.chatId);
           await executeSlashCommandsWithOptions(`/go ${target.name}`);
           invalidateChatCache();
           replyText = `Switched to group "${targetName}".`;
@@ -1230,6 +1321,7 @@ async function handleExecuteCommand(data) {
         }
         const targetChatFile = data.args.join(" ");
         try {
+          scheduleRecap(data.chatId);
           await openCharacterChat(targetChatFile);
           replyText = `Loaded chat: ${targetChatFile}`;
         } catch {
@@ -1469,13 +1561,17 @@ async function handleExecuteCommand(data) {
 
       case "continue": {
         const { chat: chatBefore } = SillyTavern.getContext();
-        const lastMsgBefore = [...chatBefore].reverse().find(m => !m.is_user && m.mes?.trim());
+        const lastMsgBefore = [...chatBefore]
+          .reverse()
+          .find((m) => !m.is_user && m.mes?.trim());
         const textBefore = lastMsgBefore?.mes?.trim() ?? "";
 
         await executeSlashCommandsWithOptions("/continue await=true");
 
         const { chat: chatAfter } = SillyTavern.getContext();
-        const lastMsgAfter = [...chatAfter].reverse().find(m => !m.is_user && m.mes?.trim());
+        const lastMsgAfter = [...chatAfter]
+          .reverse()
+          .find((m) => !m.is_user && m.mes?.trim());
         const textAfter = lastMsgAfter?.mes?.trim() ?? "";
 
         const newText = textAfter.startsWith(textBefore)
@@ -1489,7 +1585,9 @@ async function handleExecuteCommand(data) {
       case "impersonate": {
         const prompt = data.args?.[0] ?? "";
         await executeSlashCommandsWithOptions(
-          prompt ? `/impersonate await=true ${prompt}` : "/impersonate await=true",
+          prompt
+            ? `/impersonate await=true ${prompt}`
+            : "/impersonate await=true",
         );
         const impersonatedText = String($("#send_textarea").val()).trim();
         if (impersonatedText) {
@@ -1641,6 +1739,7 @@ async function handleExecuteCommand(data) {
           const characters = context.characters.filter((c) => c.name?.trim());
           if (index >= 0 && index < characters.length) {
             const target = characters[index];
+            scheduleRecap(data.chatId);
             await selectCharacterById(context.characters.indexOf(target));
             invalidateChatCache();
             replyText = `Switched to "${target.name}".`;
@@ -1661,6 +1760,7 @@ async function handleExecuteCommand(data) {
           if (index >= 0 && index < chatFiles.length) {
             const chatName = chatFiles[index].file_name.replace(".jsonl", "");
             try {
+              scheduleRecap(data.chatId);
               await openCharacterChat(chatName);
               replyText = `Loaded chat: ${chatName}`;
             } catch {
@@ -1677,6 +1777,7 @@ async function handleExecuteCommand(data) {
           const index = parseInt(groupMatch[1]) - 1;
           const groups = context.groups || [];
           if (index >= 0 && index < groups.length) {
+            scheduleRecap(data.chatId);
             await executeSlashCommandsWithOptions(`/go ${groups[index].name}`);
             invalidateChatCache();
             replyText = `Switched to group "${groups[index].name}".`;
