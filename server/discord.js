@@ -222,6 +222,18 @@ const SLASH_COMMANDS = [
     description: "List chat history for the current character",
   },
   {
+    name: "history",
+    description: "Show past chat exchanges in this channel",
+    options: [
+      {
+        name: "exchanges",
+        type: 4,
+        description: "Number of exchanges to show (default: 5)",
+        required: false,
+      },
+    ],
+  },
+  {
     name: "switchchat",
     description: "Load a past chat by name (omit .jsonl)",
     options: [
@@ -401,7 +413,7 @@ if (DISCORD_PLUGIN_ENABLED) {
 
     const command = interaction.commandName;
     const args = interaction.options.data
-      .filter((opt) => opt.type === 3)
+      .filter((opt) => opt.type === 3 || opt.type === 4)
       .map((opt) => String(opt.value));
     const conversationId = resolveConversationId(
       "discord",

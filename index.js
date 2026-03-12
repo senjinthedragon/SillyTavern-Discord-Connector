@@ -1184,6 +1184,54 @@ function buildLastExchange(chat) {
 }
 
 /**
+ * Walks the chat array to collect the last n exchanges (user message + all
+ * following AI messages), oldest first. Skips the greeting (index 0 if it's
+ * an AI message with no preceding user message). Returns an entries array
+ * ready for a recap_message packet, or null if there is nothing to show.
+ *
+ * @param {Array} chat
+ * @param {number} n  Number of exchanges to collect (0 = all).
+ * @returns {Array<{name: string, text: string, isUser: boolean}>|null}
+ */
+function buildHistory(chat, n) {
+  if (!Array.isArray(chat) || chat.length === 0) return null;
+
+  // Walk backwards collecting complete exchanges (user msg + trailing AI msgs).
+  const exchanges = [];
+  let i = chat.length - 1;
+
+  while (i >= 0) {
+    // Collect trailing AI messages for this exchange.
+    const aiMessages = [];
+    while (i >= 0 && !chat[i].is_user) {
+      const msg = chat[i];
+      if (msg.mes?.trim())
+        aiMessages.unshift({ name: msg.name || "", text: msg.mes.trim(), isUser: false });
+      i--;
+    }
+
+    // Now i should point at a user message.
+    if (i < 0) break;
+
+    const userMsg = chat[i];
+    i--;
+
+    if (!userMsg.mes?.trim()) continue;
+
+    const userLabel = userMsg.name?.trim() || "You";
+    exchanges.unshift([
+      { name: userLabel, text: userMsg.mes.trim(), isUser: true },
+      ...aiMessages,
+    ]);
+
+    if (n > 0 && exchanges.length >= n) break;
+  }
+
+  if (exchanges.length === 0) return null;
+  return exchanges.flat();
+}
+
+/**
  * Registers a one-shot chatLoaded listener and sends a recap_message packet
  * to the bridge once the new chat's context is available.
  * Called immediately after a successful switch so the listener is scoped
@@ -1715,6 +1763,7 @@ async function handleExecuteCommand(data) {
           "> `/switchchar` | `/switchgroup` - Switch character/group\n" +
           "> `/newchat` - Start a new chat with the active character or group\n" +
           "> `/listchats` | `/switchchat` - List and switch to previous chat\n" +
+          "> `/history [n]` - Show last n exchanges (default: 5, omit n for all)\n" +
           "> *💡 Tip: You can also use `_#` (e.g., `/switchchar_3`) to select by index.*\n\n" +
           "**Immersion & Mood**\n" +
           "> `/mood` - Show character expression\n" +
@@ -1731,6 +1780,25 @@ async function handleExecuteCommand(data) {
           "*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n" +
           "*Please support my work:* <https://github.com/sponsors/senjinthedragon>";
         break;
+
+      case "history": {
+        const { chat } = SillyTavern.getContext();
+        const n = data.args?.length ? Math.max(0, parseInt(data.args[0]) || 0) : 5;
+        const entries = buildHistory(chat, n);
+        if (!entries) {
+          replyText = "No chat history found.";
+          break;
+        }
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: "recap_message",
+            chatId: data.chatId,
+            entries,
+          }));
+        }
+        replyText = `Showing last ${n > 0 ? n : "all"} exchange(s).`;
+        break;
+      }
 
       default: {
         const charMatch = data.command.match(/^switchchar_(\d+)$/);
