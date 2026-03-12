@@ -79,15 +79,15 @@ cp config.example.js config.js
 Edit `config.js` and change these lines:
 ```javascript
 discordToken: 'YOUR_BOT_TOKEN_HERE', // The one you copied to a safe place in part 2
-allowedUserIds: [], // (optional) add your Discord user IDs here to make the bot private
-allowedChannelIds: [], // (optional) add your Discord channel IDs here to make the bot only respond to users in specific channels
+allowedUserIds: [], // add your Discord User ID here to keep the bot private to yourself
+allowedChannelIds: [], // (optional) restrict the bot to specific channels only
 ```
 You can change the other lines in the `config.js` as well, but the ones listed above are the important ones.
 
 > [!TIP]
-> To get a Discord user ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
+> To get a Discord User ID: enable Developer Mode in Discord settings, then right-click a user and select **Copy User ID**.\
 > \
-> To get a Discord channel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
+> To get a Discord Uhannel ID: enable Developer Mode in Discord settings, then right-click a channel and select **Copy Channel ID**.\
 > \
 > To enable **Developer Mode**: Discord settings → ...Advanced → Developer Mode\
 > \
@@ -95,7 +95,8 @@ You can change the other lines in the `config.js` as well, but the ones listed a
 
 > [!CAUTION]
 > SECURITY WARNING: If you leave `allowedUserIds` empty, the bot is public.\
-> ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server. It is highly recommended to add your User ID.
+> ANYONE who finds your bot on Discord can trigger generations on your SillyTavern server.\
+> It is highly recommended to add your own user ID to `allowedUserIds` before sharing your bot invite link with anyone.
 
 ### 4. Start the bridge server
 
@@ -140,6 +141,11 @@ Use these slash commands in Discord to control the session:
 | **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
 | **`/mood <n>`** | *Show a character's current mood and expression image. Autocompletes with group members in group chat, or the active character in solo chat* |
 | **`/charimage <n>`** | *Post a character's avatar. Autocompletes with group members in group chat, or the active character in solo chat* |
+| **`/note <text>`** | *Set the author's note for the current chat to guide how the scene develops. Omit text to read the current note* |
+| **`/listpersonas`** | *List your available personas* |
+| **`/persona <name>`** | *Switch your active persona by name - supports live autocomplete* |
+| **`/impersonate`** | *Have the AI write your next response in character, with an optional prompt to guide it* |
+| **`/continue`** | *Continue the last AI message* |
 | **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
 | **`/image cancel`** | *Cancel the active image generation request* |
 
@@ -171,7 +177,7 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 > If you use `off` or `status` mode for reactions, run `/mood` any time you want to post the current expression image in chat.
 
 > [!NOTE]
-> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists are sorted alphabetically and refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. `/mood` and `/charimage` autocomplete with the members of your active group, or your solo character's name if you're in a solo chat. Chat history shows your most recent chats first and updates immediately after any `/newchat` or switch command issued through the bot.
+> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists are sorted alphabetically and refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. `/mood` and `/charimage` autocomplete with the members of your active group, or your solo character's name if you're in a solo chat. `/persona` autocompletes with the personas you have defined in SillyTavern — you can also type a name that isn't in the list to create a temporary persona on the fly. Chat history shows your most recent chats first and updates immediately after any `/newchat` or switch command issued through the bot.
 >
 > Numbered shortcuts (`/switchchar_3`, `/switchgroup_2`, `/switchchat_1` etc.) are not registered as slash commands because the number of entries varies for everyone. Type them as plain text messages - they work exactly the same way.
 
@@ -200,6 +206,14 @@ This can happen if Discord has cached an old version of your slash commands. Sim
 **Slash commands don't appear in Discord:**\
 The `applications.commands` scope must be included when generating the bot's invite URL (see step 2).\
 If you invited the bot already, generate a new invite URL with the scope added and open it in a browser - you do not need to kick and re-invite the bot, visiting the new URL is enough to grant the missing scope. Slash commands can also take up to an hour to appear in Discord after the bridge first starts.
+
+## Pro Plugins
+
+Want to take your roleplay beyond Discord? **Telegram** and **Signal** plugins are available as a paid add-on, letting you chat with your SillyTavern character through those platforms using the same commands and features you already know.
+
+- **[Contact me to get the pro plugins](https://github.com/senjinthedragon)**
+
+Each plugin comes with its own setup guide. Purchasing also directly supports continued development of the free Discord connector.
 
 ## License
 

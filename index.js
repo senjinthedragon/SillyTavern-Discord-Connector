@@ -94,6 +94,7 @@ let lastExpressionSignature = "";
 let lastActiveChatId = null;
 let bridgeTimezone = null;
 let bridgeLocale = null;
+let bridgePlugins = null;
 const expressionCache = new Map();
 
 // ---------------------------------------------------------------------------
@@ -199,10 +200,10 @@ async function fetchLocalImageAsBase64(src) {
     const blob = await response.blob();
     const mimeType = blob.type || "image/png";
 
-    const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+    const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
     if (blob.size > MAX_IMAGE_BYTES) {
       console.warn(
-        `[Discord Bridge] Image too large (${(blob.size / 1024 / 1024).toFixed(1)} MB, limit 8 MB): ${url}`,
+        `[Discord Bridge] Image too large (${(blob.size / 1024 / 1024).toFixed(1)} MB, limit 50 MB): ${url}`,
       );
       return null;
     }
@@ -1466,6 +1467,78 @@ async function handleExecuteCommand(data) {
         return;
       }
 
+      case "continue": {
+        const { chat: chatBefore } = SillyTavern.getContext();
+        const lastMsgBefore = [...chatBefore].reverse().find(m => !m.is_user && m.mes?.trim());
+        const textBefore = lastMsgBefore?.mes?.trim() ?? "";
+
+        await executeSlashCommandsWithOptions("/continue await=true");
+
+        const { chat: chatAfter } = SillyTavern.getContext();
+        const lastMsgAfter = [...chatAfter].reverse().find(m => !m.is_user && m.mes?.trim());
+        const textAfter = lastMsgAfter?.mes?.trim() ?? "";
+
+        const newText = textAfter.startsWith(textBefore)
+          ? textAfter.slice(textBefore.length).trim()
+          : textAfter;
+
+        replyText = newText || "Continuation returned nothing.";
+        break;
+      }
+
+      case "impersonate": {
+        const prompt = data.args?.[0] ?? "";
+        await executeSlashCommandsWithOptions(
+          prompt ? `/impersonate await=true ${prompt}` : "/impersonate await=true",
+        );
+        const impersonatedText = String($("#send_textarea").val()).trim();
+        if (impersonatedText) {
+          $("#send_textarea").val("").trigger("input");
+          replyText = `💭 *Suggested response* _(feel free to copy, edit and send as your own)_:\n${impersonatedText}`;
+        } else {
+          replyText = "Impersonation returned nothing.";
+        }
+        break;
+      }
+
+      case "listpersonas": {
+        const personas = Object.values(
+          SillyTavern.getContext().powerUserSettings?.personas ?? {},
+        ).filter((n) => n?.trim());
+        replyText =
+          personas.length > 0
+            ? "Available personas:\n\n" +
+              personas.map((n, i) => `${i + 1}. ${n}`).join("\n")
+            : "No personas found.";
+        break;
+      }
+
+      case "persona": {
+        const personaName = data.args?.[0] ?? "";
+        if (!personaName) {
+          replyText = "Please provide a persona name. Example: `/persona Aria`";
+          break;
+        }
+        await executeSlashCommandsWithOptions(`/persona-set ${personaName}`);
+        replyText = `Persona set to: _${personaName}_`;
+        break;
+      }
+
+      case "note": {
+        const noteText = data.args?.[0] ?? "";
+        if (noteText) {
+          await executeSlashCommandsWithOptions(`/note ${noteText}`);
+          replyText = `Author's note set to: _${noteText}_`;
+        } else {
+          const current =
+            SillyTavern.getContext().chatMetadata?.note_prompt ?? "";
+          replyText = current
+            ? `Current author's note: _${current}_`
+            : "No author's note is currently set.";
+        }
+        break;
+      }
+
       case "status": {
         const breakerState = getBreakerState(data.chatId);
         const activeCharacter =
@@ -1494,9 +1567,29 @@ async function handleExecuteCommand(data) {
           lastErrorText = `\n**⚠️ Last error:**\n> \`${imageMetrics.lastError}\`\n> _${timeString}_`;
         }
 
+        const PLATFORM_LABELS = {
+          discord: "Discord",
+          telegram: "Telegram",
+          signal: "Signal",
+        };
+        const PLATFORM_ICONS = {
+          active: "🟢",
+          not_loaded: "⚫",
+          inactive: "🔴",
+        };
+        const platformLine = bridgePlugins
+          ? Object.entries(bridgePlugins)
+              .map(
+                ([p, s]) =>
+                  `${PLATFORM_LABELS[p] || p} ${PLATFORM_ICONS[s] || "⚫"}`,
+              )
+              .join(" | ")
+          : "Unknown";
+
         replyText =
           "## 🐲 __Bridge Status:__\n" +
           `**Connection:** ${ws?.readyState === WebSocket.OPEN ? "🟢 Online" : "🔴 Offline"}\n` +
+          `**Plugins:** ${platformLine}\n` +
           `**Active:** ${activeGroup !== "(none)" ? `👥 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `👤 ${activeCharacter}` : "_Nothing loaded_"}\n` +
           `**Mood snapshots cached:** ${expressionCache.size}\n\n` +
           "**🖼️ Image Generation**\n" +
@@ -1527,7 +1620,11 @@ async function handleExecuteCommand(data) {
           "> *💡 Tip: You can also use `_#` (e.g., `/switchchar_3`) to select by index.*\n\n" +
           "**Immersion & Mood**\n" +
           "> `/mood` - Show character expression\n" +
-          "> `/charimage` - Show character's avatar\n\n" +
+          "> `/charimage` - Show character's avatar\n" +
+          "> `/note <text>` - Set the author's note for the current chat; omit text to read the current note\n" +
+          "> `/persona <name>` - Switch your active persona by name\n" +
+          "> `/impersonate [prompt]` - Have the AI write your next response in character, with an optional guiding prompt\n" +
+          "> `/continue` - Continue the last AI message\n\n" +
           "**Image Generation**\n" +
           "> `/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
           "> `/image cancel` - Abort active image generation\n\n" +
@@ -1619,6 +1716,18 @@ async function handleGetAutocomplete(data) {
   try {
     const context = SillyTavern.getContext();
     const now = Date.now();
+
+    // Sorts a name list alphabetically, ignoring leading emoji and non-letter
+    // characters so that e.g. "🌟 Alice" sorts alongside "Alice" rather than
+    // after all plain-ASCII names.
+    const sortAlpha = (names) =>
+      [...names].sort((a, b) =>
+        a
+          .replace(/^[^\p{L}]+/u, "")
+          .localeCompare(b.replace(/^[^\p{L}]+/u, ""), undefined, {
+            sensitivity: "base",
+          }),
+      );
 
     if (data.list === "characters") {
       if (
@@ -1724,12 +1833,16 @@ async function handleGetAutocomplete(data) {
         "background",
         "cancel",
       ];
+    } else if (data.list === "personas") {
+      // Always fresh — persona list is small and changes rarely.
+      allNames = Object.values(
+        context.powerUserSettings?.personas ?? {},
+      ).filter((n) => n?.trim());
     } else if (data.list === "group_members") {
       if (!context.groupId) {
         // Solo chat - offer the active character's name as the only option.
-        const soloChar = context.characters
-          ?.find((c) => c.id === context.characterId)
-          ?.name?.trim();
+        const soloChar =
+          context.characters?.[context.characterId]?.name?.trim();
         if (soloChar) allNames = [soloChar];
       } else {
         // Read directly from the rendered group members panel and sort
@@ -1851,6 +1964,7 @@ function connect() {
         } else {
           bridgeLocale = null;
         }
+        bridgePlugins = data.plugins || null;
         return;
       }
 

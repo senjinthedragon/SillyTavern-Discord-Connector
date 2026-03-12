@@ -5,6 +5,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-03-12
+
+### Added
+- Added plugin architecture primitives for frontend routing and packet fanout.
+- Added websocket packet-flow integration tests with mocked frontends (`server/websocket-router.test.js`).
+- Added optional per-plugin circuit breaker/backoff support in frontend fanout (`plugins.<name>.circuitBreaker`).
+- Added `scripts/release-checklist.js` and `npm run release-checklist` for pre-release automation.
+- Added `sendGeneratedImage` fanout path so expression images, character images and inline images never accidentally delete an image generation placeholder.
+- Added active plugin status to the `bridge_config` handshake packet so the extension can display which frontends are loaded.
+- Added platform status line to `/status` output showing each known platform as active 🟢, not loaded ⚫, or unhealthy 🔴.
+- Added startup credits banner with version number, author, and support link.
+- Added `/note` command to set or read the author's note for the current chat directly from Discord (or any connected platform).
+- Added `/continue` command to trigger a proper AI continuation of the last message.
+- Added `/impersonate` command to have the AI write your next response in character, with an optional guiding prompt.
+- Added `/persona` command to switch your active SillyTavern persona by name, with live autocomplete populated from your defined personas. Typing an unlisted name creates a temporary persona on the fly.
+- Added `/listpersonas` command to list all personas defined in SillyTavern.
+
+### Changed
+- Refactored bridge routing through a testable router layer (`server/websocket-router.js`).
+- Kept Discord as the built-in free frontend and unbundled Telegram/Signal implementations for separate private/pro distribution.
+- Added support for loading external frontend plugins via `config.externalPlugins`.
+- Strengthened startup validation and reconnect cleanup behavior.
+- Replaced bare `console.log` calls in `websocket.js` and `discord.js` with the timestamped `log()` function for consistent log formatting.
+- Missing plugin files now log a concise "not found" message instead of a full Node.js require stack trace.
+- Image generation placeholder message is now correctly deleted when the generated image arrives, regardless of other images (expressions, avatars, inline) arriving in the meantime.
+- `config.example.js` reorganized into clearly labeled sections (Essential, General, Advanced) to make initial setup easier. Existing `config.js` files from v1.3.1 continue to work without changes.
+
+### Fixed
+- Alphabetical autocomplete sorting for character, group and group member lists was documented as a 1.3.0 feature but the sort function was missing from the released code.
+- Solo chat character lookup in autocomplete used `find()` with an object id that no longer exists in recent SillyTavern versions; fixed to use direct array index.
+- Browser-side image fetch limit raised from 8 MB to 50 MB so uncompressed images from local generators are no longer rejected before the server can compress them.
+
+### Added _(Pro version only)_
+- Telegram frontend plugin: inbound polling via `getUpdates`, outbound text, typing indicator, images, expressions, and streaming via final-text send.
+- Telegram plugin registers bridge slash commands in the Telegram `/` command menu on startup.
+- Signal frontend plugin: inbound message subscription via WebSocket (`signal-cli-rest-api` json-rpc mode), outbound text, images, and expressions.
+- Signal plugin includes helper scripts (`start-signal-bridge.bat` / `.sh`) to spin up the required Docker container.
+- Signal credentials and registration data are stored in `data/signal-data/` in the repo root, mounted as a Docker volume so data survives container restarts and rebuilds.
+
 ## [1.3.1] - 2026-03-06
 
 ### Fixed
@@ -121,7 +160,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-[Unreleased]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.2.4...v1.2.5

@@ -1,55 +1,63 @@
-# v1.3.0: Expressions, Moods, Smarter Autocomplete and a Polished Experience
+# v1.4.0: Plugin Architecture, Multi-Platform Support, and a Polished Core
 
-This release brings characters to life on Discord with expression and mood support, makes slash command autocomplete smarter and more reliable.
+This release introduces a fully extensible plugin system, bringing the bridge architecture up to a new level of flexibility and testability. Discord remains the built-in free frontend, while Telegram and Signal are available as separately licensed pro plugins.
 
-### Reactions, Expressions and Mood (new)
-- Added extension setting `Expression/Reaction Mode` with three modes:
-  - **Off** - no reaction or expression gets displayed
-  - **Discord Status Only** (`status`) - changes the bot's status to reflect the character's current expression
-  - **Discord Status and Expression Images** (`full`) - bot status plus expression image updates posted to Discord
-- The extension now watches SillyTavern's `#expression-image` and sends expression updates to the bridge automatically.
-- Discord activity reflects the latest expression with matching emoji for all known default expressions.
-- Added `/mood <name>` command to fetch and post the current visible expression image on demand; in group chats a character name can be provided.
-- Added lightweight per-character mood memory so `/mood <name>` can return the last seen mood for a group member even when that member is not currently visible.
-- Added `/reaction <mode>` command so expression mode can be changed remotely from Discord without touching SillyTavern.
-- Expression handling supports asynchronous reaction updates (text arrives first, reaction follows) and gracefully handles missing expression blocks when expressions are disabled.
+## Highlights
 
-### Autocomplete sorting and display
-- Character, group and group member autocomplete lists are sorted alphabetically. Sorting ignores leading emoji and decorative characters so names like `🌟 Alice` sort naturally alongside plain names.
-- `/switchchat` autocomplete shows human-readable dates and times (e.g. `Finn - Feb 28, 2026, 15:59:02`) instead of the raw internal filename format, and is sorted newest-first so your most recent chats are always at the top.
+### Plugin Architecture (Free)
+The bridge now routes all outbound packets through a clean plugin system. Each platform registers as a frontend plugin, enabling true multi-platform fanout from a single SillyTavern session. The routing layer is fully unit-tested with mocked frontends.
 
-### `/image` improvements
-- Added per-channel image request queuing so one stuck request does not block other channels.
-- Added request IDs for image placeholder/result/error correlation.
-- Added automatic timeout handling for image generation with a clear retry message.
-- Added `/image cancel` support to cancel the bridge-side image request immediately so users can retry without restarting.
+- `enabledPlugins` in config selects which frontends are active.
+- `externalPlugins` allows loading pro plugin modules from outside the public repo.
+- Optional per-plugin circuit breaker protects the bridge when a frontend becomes unresponsive.
 
-### Localisation
-- Date and time formatting throughout the bridge (log timestamps and chat history autocomplete) now respects your configured `timezone` and `locale`.
-- Added `locale` field to `config.example.js`. Defaults to `"en-US"`.
-- Both `timezone` and `locale` are validated at startup - invalid values produce a clear warning and fall back gracefully rather than crashing at runtime.
+### Image Placeholder Fix (Free)
+Expression images, character avatars, and inline images no longer accidentally delete the "🎨 Generating image…" placeholder. Only an actual `generate_image_result` packet clears it.
 
-### Status
-- Added `/status` slash command to inspect connection and image pipeline health at a glance.
+### Status Improvements (Free)
+`/status` now shows a platform line indicating which frontends are loaded and active. Free version users see Telegram and Signal as ⚫ - a hint that pro plugins are available.
 
-### Stability and hardening
-- Added short-term image request throttling per channel.
-- Added temporary cooldown after repeated image failures to prevent runaway retries.
-- Added runtime image pipeline counters surfaced via `/status`.
-- Added robust JSON parsing guards for WebSocket messages.
-- Added timeout cleanup for stale "Generating image…" placeholders.
-- Added per-channel queue task timeout protection to avoid queue deadlocks.
+### New Immersion Commands
+Four new commands let you control your session more deeply without ever leaving Discord:
 
-### Tests and validation
-- Add a "Release Check" section to `README.md` that instructs maintainers to run `npm run verify-release` before publishing a new version.
-- Add a `verify-release` npm script to `package.json` that runs `cd server && npm test` and then `npm run test-package` to validate server tests and packaging.
-- Added `server` test script: `npm test` runs Node's built-in test runner.
-- Added `server/queue.test.js` tests for queue ordering and queue recovery after timeout.
-- Added `server/activity-format.js` to encapsulate expression normalization and activity string formatting and replaced the inlined logic in `server/discord.js` to call `formatBridgeActivity` instead.
-- Added `server/activity-format.test.js` to cover normalization, known emoji mapping, unknown-expression fallback (`🎭`), and base-activity fallback for empty expressions.
-- Added `server/config-logic.js` to encapsulate config defaults, derived ms fields, validation, and timezone/locale fallback behavior, and updated `server/config-loader.js` to use it while preserving exit-on-error behavior.
-- Added `server/config-logic.test.js` to cover default values, millisecond derivation, validation failure paths, and timezone/locale fallback warnings, and kept existing `server/queue.test.js` unchanged.
-- Keep the existing `test-package` script which performs `npm pack --dry-run` to verify package creation.
+- `/note <text>` — set or read the author's note to guide how the scene develops
+- `/continue` — trigger a proper AI continuation of the last message
+- `/impersonate` — have the AI write your next response in character, with an optional guiding prompt
+- `/persona <name>` — switch your active SillyTavern persona by name, with live autocomplete from your defined personas; typing an unlisted name creates a temporary persona on the fly
+- `/listpersonas` — list all personas defined in SillyTavern
 
-## Notes for maintainers
-- The `bridge_config` handshake packet now includes `locale` alongside `timezone`. The extension validates both using `Intl.DateTimeFormat` on receipt and falls back gracefully if either is absent or invalid.
+### Configuration File Reorganized
+`config.example.js` is now divided into three clearly labeled sections - Essential, General, and Advanced - so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.
+
+### Telegram Plugin (Pro)
+- Full inbound/outbound support via the Telegram Bot API.
+- Slash commands registered in the Telegram `/` menu on startup.
+- Supports text, typing indicators, images, expression updates, and streaming via final-text delivery.
+
+### Signal Plugin (Pro)
+- Full inbound/outbound support via `signal-cli-rest-api` in json-rpc mode.
+- Inbound messages received via WebSocket subscription with automatic reconnect.
+- Supports text, images, and expression updates.
+- Includes Docker helper scripts to spin up the required `signal-cli-rest-api` container.
+- Signal credentials are stored in `data/signal-data/` in the repo root and mounted as a Docker volume, so your registration survives container restarts and rebuilds.
+
+## Configuration Changes
+
+- `enabledPlugins` - array of active frontend names. Defaults to `["discord"]`.
+- `externalPlugins` - array of `{ name, module, config }` objects for pro plugins.
+- `plugins.<name>.circuitBreaker` - optional per-plugin failure protection.
+- `conversationLinks` - optional array linking a single `conversationId` across multiple platform chat IDs for cross-platform fanout.
+
+## Notes for Pro Plugin Users
+
+Pro plugins (Telegram, Signal) are distributed separately and loaded via `externalPlugins` in `config.js`. They are not included in this public repository. See the pro plugin documentation for setup instructions.
+
+Signal requires a running `signal-cli-rest-api` Docker container and a dedicated phone number. Telegram requires a bot token from BotFather.
+
+## QA
+
+- Full server test suite passes (27 tests, 0 failures).
+- Release checklist (`npm run release-checklist`) passes:
+  - server tests,
+  - package dry-run,
+  - release docs presence checks.

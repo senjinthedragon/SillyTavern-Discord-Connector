@@ -41,9 +41,10 @@ const { log } = require("./logger");
 async function sendLong(channel, text) {
   const MAX = 1900;
   let remaining = text;
+  let lastMessage = null;
   while (remaining.length > 0) {
     if (remaining.length <= MAX) {
-      await channel.send(remaining);
+      lastMessage = await channel.send(remaining);
       break;
     }
     let splitAt = remaining.lastIndexOf("\n", MAX);
@@ -52,6 +53,7 @@ async function sendLong(channel, text) {
     await channel.send(remaining.slice(0, splitAt).trimEnd());
     remaining = remaining.slice(splitAt).trimStart();
   }
+  return lastMessage;
 }
 
 /**

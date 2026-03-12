@@ -16,7 +16,7 @@ assignees: ''
 
 ## Have you thought about how it might work?
 
-<!-- Optional. If you have ideas about how this could be implemented, share them here. Don't worry if you don't — that's fine too. -->
+<!-- Optional. If you have ideas about how this could be implemented, share them here. Don't worry if you don't - that's fine too. -->
 
 ## Alternatives you've considered
 

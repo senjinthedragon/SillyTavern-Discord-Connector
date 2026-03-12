@@ -76,7 +76,7 @@ function normalizeExpression(expression) {
 function formatBridgeActivity(activityBase, expression) {
   const normalized = normalizeExpression(expression);
 
-  // Empty expression — show the base activity string instead.
+  // Empty expression - show the base activity string instead.
   if (!normalized) return activityBase;
 
   // Known expression → mapped emoji; unknown → 🎭 as a visible fallback.

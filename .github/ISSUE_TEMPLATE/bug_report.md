@@ -41,4 +41,4 @@ paste errors here
 
 ## Additional context
 
-<!-- Anything else that might be relevant — screenshots, config settings (don't share your bot token!), whether this worked before, etc. -->
+<!-- Anything else that might be relevant - screenshots, config settings (don't share your bot token!), whether this worked before, etc. -->

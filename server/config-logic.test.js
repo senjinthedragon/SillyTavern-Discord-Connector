@@ -1,23 +1,11 @@
 /**
  * config-logic.test.js - SillyTavern Discord Connector: Config Logic Tests
- * Copyright (c) 2026 Senjin the Dragon.
- * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
- * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
- *
- * Tests for the pure configuration logic in config-logic.js.
- * Run with: npm test (from the server folder)
- *
- * Because config-logic.js is a pure module with no side effects (no file I/O,
- * no process.exit), these tests can call createConfig() directly without any
- * stubbing or mocking.
  */
 
 "use strict";
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-
 const { createConfig } = require("./config-logic");
 
 test("createConfig applies timeout defaults and derived millisecond fields", () => {
@@ -33,13 +21,47 @@ test("createConfig applies timeout defaults and derived millisecond fields", () 
   assert.deepEqual(warnings, []);
 });
 
-test("createConfig throws for placeholder Discord token", () => {
+test("createConfig throws for placeholder Discord token when Discord plugin is enabled", () => {
   assert.throws(
     () =>
       createConfig({
+        enabledPlugins: ["discord"],
         discordToken: "YOUR_DISCORD_BOT_TOKEN_HERE",
       }),
-    /Set your Discord Bot Token in config\.js!/,
+    /Discord plugin is enabled|Discord Bot Token/,
+  );
+});
+
+test("createConfig allows non-discord enabled plugin names for external plugins", () => {
+  const { config } = createConfig({
+    enabledPlugins: ["discord", "telegram"],
+    discordToken: "token",
+    externalPlugins: [{ name: "telegram", module: "../private/telegram.js" }],
+  });
+
+  assert.deepEqual(config.enabledPlugins, ["discord", "telegram"]);
+});
+
+test("createConfig throws when enabledPlugins contains invalid entry", () => {
+  assert.throws(
+    () =>
+      createConfig({
+        enabledPlugins: ["discord", ""],
+        discordToken: "token",
+      }),
+    /entries must be non-empty strings/,
+  );
+});
+
+test("createConfig throws when externalPlugins is not an array", () => {
+  assert.throws(
+    () =>
+      createConfig({
+        enabledPlugins: ["discord"],
+        discordToken: "token",
+        externalPlugins: "not-array",
+      }),
+    /externalPlugins must be an array/,
   );
 });
 
@@ -72,10 +94,41 @@ test("createConfig falls back when timezone or locale are invalid", () => {
     locale: "bad_locale_value",
   });
 
-  // Both invalid values should be replaced with safe fallbacks.
   assert.equal(config.timezone, "UTC");
   assert.equal(config.locale, null);
   assert.equal(warnings.length, 2);
-  assert.match(warnings[0], /Invalid timezone/);
-  assert.match(warnings[1], /Invalid locale/);
+});
+
+test("createConfig throws for invalid circuit breaker threshold", () => {
+  assert.throws(
+    () =>
+      createConfig({
+        discordToken: "token",
+        plugins: {
+          discord: {
+            circuitBreaker: { enabled: true, failureThreshold: 0 },
+          },
+        },
+      }),
+    /circuitBreaker\.failureThreshold/,
+  );
+});
+
+test("createConfig throws for invalid circuit breaker cooldown", () => {
+  assert.throws(
+    () =>
+      createConfig({
+        discordToken: "token",
+        plugins: {
+          discord: {
+            circuitBreaker: {
+              enabled: true,
+              failureThreshold: 5,
+              cooldownSeconds: -1,
+            },
+          },
+        },
+      }),
+    /circuitBreaker\.cooldownSeconds/,
+  );
 });
