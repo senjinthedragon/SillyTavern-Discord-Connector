@@ -142,7 +142,8 @@ Use these slash commands in Discord to control the session:
 | **`/mood <n>`** | *Show a character's current mood and expression image. Autocompletes with group members in group chat, or the active character in solo chat* |
 | **`/charimage <n>`** | *Post a character's avatar. Autocompletes with group members in group chat, or the active character in solo chat* |
 | **`/note <text>`** | *Set the author's note for the current chat to guide how the scene develops. Omit text to read the current note* |
-| **`/persona <name>`** | *Switch your active persona by name* |
+| **`/listpersonas`** | *List your available personas* |
+| **`/persona <name>`** | *Switch your active persona by name - supports live autocomplete* |
 | **`/impersonate`** | *Have the AI write your next response in character, with an optional prompt to guide it* |
 | **`/continue`** | *Continue the last AI message* |
 | **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
@@ -176,7 +177,7 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 > If you use `off` or `status` mode for reactions, run `/mood` any time you want to post the current expression image in chat.
 
 > [!NOTE]
-> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists are sorted alphabetically and refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. `/mood` and `/charimage` autocomplete with the members of your active group, or your solo character's name if you're in a solo chat. Chat history shows your most recent chats first and updates immediately after any `/newchat` or switch command issued through the bot.
+> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists are sorted alphabetically and refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. `/mood` and `/charimage` autocomplete with the members of your active group, or your solo character's name if you're in a solo chat. `/persona` autocompletes with the personas you have defined in SillyTavern — you can also type a name that isn't in the list to create a temporary persona on the fly. Chat history shows your most recent chats first and updates immediately after any `/newchat` or switch command issued through the bot.
 >
 > Numbered shortcuts (`/switchchar_3`, `/switchgroup_2`, `/switchchat_1` etc.) are not registered as slash commands because the number of entries varies for everyone. Type them as plain text messages - they work exactly the same way.
 

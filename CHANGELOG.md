@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-03-12
+
 ### Added
 - Added plugin architecture primitives for frontend routing and packet fanout.
 - Added websocket packet-flow integration tests with mocked frontends (`server/websocket-router.test.js`).
@@ -17,7 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `/note` command to set or read the author's note for the current chat directly from Discord (or any connected platform).
 - Added `/continue` command to trigger a proper AI continuation of the last message.
 - Added `/impersonate` command to have the AI write your next response in character, with an optional guiding prompt.
-- Added `/persona` command to switch your active SillyTavern persona by name.
+- Added `/persona` command to switch your active SillyTavern persona by name, with live autocomplete populated from your defined personas. Typing an unlisted name creates a temporary persona on the fly.
+- Added `/listpersonas` command to list all personas defined in SillyTavern.
 
 ### Changed
 - Refactored bridge routing through a testable router layer (`server/websocket-router.js`).
