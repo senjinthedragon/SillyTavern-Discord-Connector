@@ -55,9 +55,9 @@ const { formatBridgeActivity } = require("./activity-format");
 
 let lastActivityText = "";
 
-function setBridgeActivity(expression) {
+function setBridgeActivity(expression, ownerName) {
   if (!client?.user) return;
-  const activityText = formatBridgeActivity(ACTIVITY_BASE, expression);
+  const activityText = formatBridgeActivity(ACTIVITY_BASE, expression, ownerName);
 
   if (activityText === lastActivityText) return;
   lastActivityText = activityText;
@@ -532,9 +532,19 @@ async function sendGeneratedImage(channelId, images, caption) {
   });
 }
 
-async function sendExpression(channelId, expression, image) {
-  if (expression) setBridgeActivity(expression);
-  if (image) await sendImages(channelId, [image], null);
+async function sendExpression(channelId, expression, image, ownerName) {
+  if (expression) setBridgeActivity(expression, ownerName);
+  if (image) {
+    if (ownerName) {
+      const channel = client.channels.cache.get(channelId);
+      if (channel) {
+        enqueue(channelId, async () => {
+          await channel.send(`_${ownerName} feels ${expression}_`);
+        });
+      }
+    }
+    await sendImages(channelId, [image], null);
+  }
 }
 
 // Discord embed colour for recap messages — a muted indigo that reads as

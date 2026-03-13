@@ -69,18 +69,24 @@ function normalizeExpression(expression) {
  * Returns the base activity string when the expression is empty so the bot
  * always shows something meaningful rather than a blank status.
  *
+ * When ownerName is provided it is appended in parentheses after the mood text
+ * so the emoji and mood word stay at the front where they are always visible,
+ * even if the name is long or decorated and gets clipped by Discord.
+ *
  * @param {string} activityBase - The fallback activity text (e.g. "SillyTavern Bridge v1.3.1").
  * @param {any} expression - The raw expression value from SillyTavern.
+ * @param {string|null} ownerName - Optional character name to append.
  * @returns {string}
  */
-function formatBridgeActivity(activityBase, expression) {
+function formatBridgeActivity(activityBase, expression, ownerName) {
   const normalized = normalizeExpression(expression);
 
   // Empty expression - show the base activity string instead.
   if (!normalized) return activityBase;
 
   // Known expression → mapped emoji; unknown → 🎭 as a visible fallback.
-  return `${EXPRESSION_EMOJI_MAP[normalized] || "🎭"} ${normalized}`;
+  const base = `${EXPRESSION_EMOJI_MAP[normalized] || "🎭"} ${normalized}`;
+  return ownerName?.trim() ? `${base} (${ownerName.trim()})` : base;
 }
 
 module.exports = {

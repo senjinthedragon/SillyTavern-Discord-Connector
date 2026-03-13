@@ -173,12 +173,14 @@ async function handleBridgePacket(data, deps) {
 
     case "expression_update": {
       const expression = (data.expression || "").trim().toLowerCase();
-      if (expression) setBridgeActivity(expression);
+      const ownerName = data.ownerName || null;
+      if (expression) setBridgeActivity(expression, ownerName);
       await fanout(
         conversationId,
         "sendExpression",
         expression,
         data.image || null,
+        ownerName,
       );
       break;
     }

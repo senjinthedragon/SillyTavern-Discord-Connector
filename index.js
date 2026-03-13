@@ -475,7 +475,7 @@ async function sendExpressionUpdate(chatIdHint = null) {
     settings.expressionMode === "full",
   );
   if (!snapshot) return;
-  const { expression, image } = snapshot;
+  const { expression, image, ownerName } = snapshot;
 
   const imgEl = document.getElementById("expression-image");
   const src = imgEl.getAttribute("src") || "";
@@ -492,6 +492,7 @@ async function sendExpressionUpdate(chatIdHint = null) {
     JSON.stringify({
       type: "expression_update",
       expression,
+      ownerName: ownerName || null,
       chatId,
       image,
     }),
@@ -1481,6 +1482,7 @@ async function handleExecuteCommand(data) {
             JSON.stringify({
               type: "expression_update",
               expression: snapshot.expression,
+              ownerName: snapshot.ownerName || null,
               chatId: data.chatId,
               image: snapshot.image,
             }),
