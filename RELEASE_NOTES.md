@@ -34,3 +34,6 @@ Added to Discord as a native slash command with an optional integer argument. Ad
 
 - All 27 existing server tests pass.
 - Recap and history tested manually across `switchchar`, `switchgroup`, `switchchat`, and their numbered variants.
+
+## Note on Licensing
+To better support the project's growth and maintain compatibility with SillyTavern's AGPL requirements, we have moved to a modular licensing structure. The core bridge remains open and free under MIT, while the extension is now AGPL. See the [README](README) for details.

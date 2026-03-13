@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Senjin the Dragon.
  * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
  * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
+ * See /server/LICENSE for full license information.
  *
  * Pure-ish packet router used by websocket.js. It centralises per-packet
  * behavior so flow tests can run with mocked frontends and state.

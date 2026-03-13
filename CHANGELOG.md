@@ -23,6 +23,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Added `/listpersonas` to `/sthelp`
 
+### Note on Licensing
+To better support the project's growth and maintain compatibility with SillyTavern's AGPL requirements, we have moved to a modular licensing structure. The core bridge remains open and free under MIT, while the extension is now AGPL. See the [README](README) for details.
+
 ## [1.4.0] - 2026-03-12
 
 ### Added

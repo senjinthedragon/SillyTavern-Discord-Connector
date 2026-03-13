@@ -6,6 +6,8 @@
 
 Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming, image and expression support.
 
+*This is an independent extension for SillyTavern and is not affiliated with the SillyTavern development team*
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/senjinthedragon/SillyTavern-Discord-Connector/main/assets/SillyTavern-Discord-Bridge_1.webp" width="57%" alt="Desktop Discord chat session with images">
   <img src="https://raw.githubusercontent.com/senjinthedragon/SillyTavern-Discord-Connector/main/assets/SillyTavern-Discord-Bridge_2.webp" width="37%" alt="Mobile Discord showing group chat and /charimage autocomplete">
@@ -214,8 +216,11 @@ Want to take your roleplay beyond Discord? **Telegram** and **Signal** plugins a
 
 - **[Contact me to get the pro plugins](https://github.com/senjinthedragon)**
 
-Each plugin comes with its own setup guide. Purchasing also directly supports continued development of the free Discord connector.
+These plugins run as independent modules on your bridge server. Each plugin comes with its own setup guide and is distributed under a proprietary license. Purchasing a pro plugin directly supports the continued development of this project!
 
 ## License
 
-MIT - see [LICENSE](LICENSE) file for full text
+This project is licensed under a split-license model to ensure compatibility with upstream requirements while keeping the core bridge open for everyone:
+
+- SillyTavern Extension (Root): Licensed under GNU AGPLv3 (see [LICENSE](LICENSE)).
+- Bridge Server (/server): Licensed under MIT (see [server/LICENSE](server/LICENSE)).
