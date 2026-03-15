@@ -1,6 +1,6 @@
 {
   "name": "sillytavern-discord-bridge",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Discord bridge server for SillyTavern",
   "author": "Senjin the Dragon <https://github.com/senjinthedragon>",
   "license": "MIT",
