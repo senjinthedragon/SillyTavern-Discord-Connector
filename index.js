@@ -75,25 +75,25 @@ import {
   openCharacterChat,
   Generate,
   setExternalAbortController,
-} from "../../../../script.js";
+} from '../../../../script.js';
 
-import { executeSlashCommandsWithOptions } from "../../../../scripts/slash-commands.js";
+import { executeSlashCommandsWithOptions } from '../../../../scripts/slash-commands.js';
 
 // ---------------------------------------------------------------------------
 // Constants and module-level state
 // ---------------------------------------------------------------------------
 
-const MODULE_NAME = "SillyTavern-Discord-Connector";
+const MODULE_NAME = 'SillyTavern-Discord-Connector';
 
 const DEFAULT_SETTINGS = {
-  bridgeUrl: "ws://127.0.0.1:2333",
+  bridgeUrl: 'ws://127.0.0.1:2333',
   autoConnect: true,
-  expressionMode: "status",
+  expressionMode: 'status',
 };
 
 // String fallback covers older ST versions that don't export this event type.
 const GROUP_WRAPPER_FINISHED =
-  event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
+  event_types.GROUP_WRAPPER_FINISHED ?? 'group_wrapper_finished';
 
 let ws = null;
 let shouldReconnect = true;
@@ -101,7 +101,7 @@ let reconnectTimeout = null;
 let heartbeatInterval = null;
 let expressionObserver = null;
 let expressionDebounceTimer = null;
-let lastExpressionSignature = "";
+let lastExpressionSignature = '';
 let lastActiveChatId = null;
 let bridgeTimezone = null;
 let bridgeLocale = null;
@@ -119,7 +119,7 @@ function getSettings() {
   };
 
   if (
-    !["off", "status", "full"].includes(
+    !['off', 'status', 'full'].includes(
       extensionSettings[MODULE_NAME].expressionMode,
     )
   ) {
@@ -131,7 +131,7 @@ function getSettings() {
 }
 
 function updateStatus(message, color) {
-  const el = document.getElementById("discord_connection_status");
+  const el = document.getElementById('discord_connection_status');
   if (el) {
     el.textContent = `Status: ${message}`;
     el.style.color = color;
@@ -156,18 +156,18 @@ function updateStatus(message, color) {
  */
 function classifyImageSrc(src) {
   if (!src) return null;
-  if (/^data:/i.test(src)) return "local";
-  if (src.startsWith("//")) return "external";
+  if (/^data:/i.test(src)) return 'local';
+  if (src.startsWith('//')) return 'external';
   if (/^https?:\/\//i.test(src)) {
     try {
       return new URL(src).origin === window.location.origin
-        ? "local"
-        : "external";
+        ? 'local'
+        : 'external';
     } catch {
-      return "external";
+      return 'external';
     }
   }
-  return "local";
+  return 'local';
 }
 
 /**
@@ -179,8 +179,8 @@ function classifyImageSrc(src) {
  */
 function resolveLocalUrl(src) {
   if (/^https?:\/\//i.test(src)) return src;
-  if (src.startsWith("//")) return window.location.protocol + src;
-  return window.location.origin + (src.startsWith("/") ? "" : "/") + src;
+  if (src.startsWith('//')) return window.location.protocol + src;
+  return window.location.origin + (src.startsWith('/') ? '' : '/') + src;
 }
 
 /**
@@ -193,9 +193,9 @@ function resolveLocalUrl(src) {
 async function fetchLocalImageAsBase64(src) {
   try {
     if (/^data:([^;]+);base64,/i.test(src)) {
-      const [header, data] = src.split(",", 2);
-      const mimeType = header.replace(/^data:/i, "").replace(/;base64$/i, "");
-      const ext = mimeType.split("/")[1]?.replace("jpeg", "jpg") || "png";
+      const [header, data] = src.split(',', 2);
+      const mimeType = header.replace(/^data:/i, '').replace(/;base64$/i, '');
+      const ext = mimeType.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
       return { data, mimeType, filename: `image.${ext}` };
     }
 
@@ -209,7 +209,7 @@ async function fetchLocalImageAsBase64(src) {
     }
 
     const blob = await response.blob();
-    const mimeType = blob.type || "image/png";
+    const mimeType = blob.type || 'image/png';
 
     const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
     if (blob.size > MAX_IMAGE_BYTES) {
@@ -222,23 +222,23 @@ async function fetchLocalImageAsBase64(src) {
     let filename;
     try {
       const parsed = new URL(url);
-      if (parsed.pathname === "/thumbnail") {
-        const fileParam = parsed.searchParams.get("file");
-        filename = fileParam ? fileParam.split("/").pop() : "avatar.png";
+      if (parsed.pathname === '/thumbnail') {
+        const fileParam = parsed.searchParams.get('file');
+        filename = fileParam ? fileParam.split('/').pop() : 'avatar.png';
       } else {
-        const base = parsed.pathname.split("/").pop();
+        const base = parsed.pathname.split('/').pop();
         filename =
           base && /\.[a-z]{2,5}$/i.test(base)
             ? base
-            : `image.${mimeType.split("/")[1]?.replace("jpeg", "jpg") || "png"}`;
+            : `image.${mimeType.split('/')[1]?.replace('jpeg', 'jpg') || 'png'}`;
       }
     } catch {
-      filename = "image.png";
+      filename = 'image.png';
     }
 
     const data = await new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(",", 2)[1]);
+      reader.onload = () => resolve(reader.result.split(',', 2)[1]);
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
@@ -261,8 +261,8 @@ async function fetchLocalImageAsBase64(src) {
  */
 function extractImageSrcsFromMesText(mesTextEl) {
   if (!mesTextEl) return [];
-  return Array.from(mesTextEl.querySelectorAll("img"))
-    .map((img) => img.getAttribute("src"))
+  return Array.from(mesTextEl.querySelectorAll('img'))
+    .map((img) => img.getAttribute('src'))
     .filter(Boolean);
 }
 
@@ -273,12 +273,12 @@ function extractImageSrcsFromMesText(mesTextEl) {
  * @returns {string}
  */
 function extractTextFromMesText(mesTextEl) {
-  if (!mesTextEl) return "";
+  if (!mesTextEl) return '';
   const clone = mesTextEl.cloneNode(true);
-  for (const p of clone.querySelectorAll("p"))
-    p.insertAdjacentText("afterend", "\n\n");
-  for (const br of clone.querySelectorAll("br")) br.replaceWith("\n");
-  return clone.innerText?.replace(/\n{3,}/g, "\n\n").trim() || "";
+  for (const p of clone.querySelectorAll('p'))
+    p.insertAdjacentText('afterend', '\n\n');
+  for (const br of clone.querySelectorAll('br')) br.replaceWith('\n');
+  return clone.innerText?.replace(/\n{3,}/g, '\n\n').trim() || '';
 }
 
 /**
@@ -293,11 +293,11 @@ async function collectImages(srcs) {
     srcs.map(async (src) => {
       const kind = classifyImageSrc(src);
       if (!kind) return null;
-      if (kind === "local") {
+      if (kind === 'local') {
         const fetched = await fetchLocalImageAsBase64(src);
-        return fetched ? { type: "inline", ...fetched } : null;
+        return fetched ? { type: 'inline', ...fetched } : null;
       }
-      return { type: "url", url: src };
+      return { type: 'url', url: src };
     }),
   );
   return results.filter(Boolean);
@@ -314,7 +314,7 @@ function sendCollectedImages(chatId, images, caption) {
   if (!images?.length || ws?.readyState !== WebSocket.OPEN) return;
   ws.send(
     JSON.stringify({
-      type: "send_images",
+      type: 'send_images',
       chatId,
       images,
       caption: caption || null,
@@ -348,12 +348,12 @@ async function sendCharacterAvatar(chatId, character) {
   const src = `/characters/${encodeURIComponent(character.avatar)}`;
   const fetched = await fetchLocalImageAsBase64(src);
   if (!fetched) {
-    console.warn("[Discord Bridge] Could not fetch character avatar.");
+    console.warn('[Discord Bridge] Could not fetch character avatar.');
     return;
   }
   sendCollectedImages(
     chatId,
-    [{ type: "inline", ...fetched }],
+    [{ type: 'inline', ...fetched }],
     character.name ? `**${character.name}**` : null,
   );
 }
@@ -367,11 +367,11 @@ async function sendCharacterAvatar(chatId, character) {
  * @param {string} chatId
  */
 async function sendLastMessageImages(chatId) {
-  const messages = document.querySelectorAll("#chat .mes");
+  const messages = document.querySelectorAll('#chat .mes');
   if (!messages.length) return;
   const lastMessage = messages[messages.length - 1];
-  if (lastMessage.getAttribute("is_user") === "true") return;
-  await sendImagesFromMesText(chatId, lastMessage.querySelector(".mes_text"));
+  if (lastMessage.getAttribute('is_user') === 'true') return;
+  await sendImagesFromMesText(chatId, lastMessage.querySelector('.mes_text'));
 }
 
 // ---------------------------------------------------------------------------
@@ -383,10 +383,10 @@ async function sendLastMessageImages(chatId) {
 // ---------------------------------------------------------------------------
 
 const EXPRESSION_DEBOUNCE_MS = 250;
-const EXPRESSION_MODE_VALUES = new Set(["off", "status", "full"]);
+const EXPRESSION_MODE_VALUES = new Set(['off', 'status', 'full']);
 
 function normalizeExpressionOwnerName(name) {
-  return String(name || "")
+  return String(name || '')
     .trim()
     .toLowerCase();
 }
@@ -413,34 +413,34 @@ function parseExpressionFromElement(imgEl) {
   if (!imgEl) return null;
 
   const explicit =
-    imgEl.getAttribute("data-expression") || imgEl.getAttribute("title") || "";
+    imgEl.getAttribute('data-expression') || imgEl.getAttribute('title') || '';
   if (explicit.trim()) return explicit.trim().toLowerCase();
 
-  const src = imgEl.getAttribute("src") || "";
-  const base = src.split("?")[0].split("/").pop() || "";
+  const src = imgEl.getAttribute('src') || '';
+  const base = src.split('?')[0].split('/').pop() || '';
   const name = base
-    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/\.[a-z0-9]+$/i, '')
     .trim()
     .toLowerCase();
 
   // ST sometimes points to /img/default-expressions/null.png when no
   // expression is active; treat that as neutral for activity display.
-  if (!name || name === "null") return "neutral";
+  if (!name || name === 'null') return 'neutral';
   return name;
 }
 
 async function buildExpressionImagePayload(imgEl) {
   if (!imgEl) return null;
-  const src = imgEl.getAttribute("src");
+  const src = imgEl.getAttribute('src');
   if (!src) return null;
 
   const kind = classifyImageSrc(src);
   if (!kind) return null;
-  if (kind === "local") {
+  if (kind === 'local') {
     const fetched = await fetchLocalImageAsBase64(src);
-    return fetched ? { type: "inline", ...fetched } : null;
+    return fetched ? { type: 'inline', ...fetched } : null;
   }
-  return { type: "url", url: src };
+  return { type: 'url', url: src };
 }
 
 /**
@@ -451,7 +451,7 @@ async function buildExpressionImagePayload(imgEl) {
  * @returns {Promise<{expression: string, image: object|null, ownerName: string|null}|null>}
  */
 async function getCurrentExpressionSnapshot(includeImage = false) {
-  const imgEl = document.getElementById("expression-image");
+  const imgEl = document.getElementById('expression-image');
   if (!imgEl) return null;
 
   const expression = parseExpressionFromElement(imgEl);
@@ -459,7 +459,7 @@ async function getCurrentExpressionSnapshot(includeImage = false) {
 
   const image = includeImage ? await buildExpressionImagePayload(imgEl) : null;
   const ownerName =
-    imgEl.getAttribute("data-sprite-folder-name")?.trim() || null;
+    imgEl.getAttribute('data-sprite-folder-name')?.trim() || null;
   const snapshot = { expression, image, ownerName };
   cacheExpressionSnapshot(snapshot);
   return snapshot;
@@ -469,28 +469,28 @@ async function sendExpressionUpdate(chatIdHint = null) {
   if (ws?.readyState !== WebSocket.OPEN) return;
 
   const settings = getSettings();
-  if (settings.expressionMode === "off") return;
+  if (settings.expressionMode === 'off') return;
 
   const snapshot = await getCurrentExpressionSnapshot(
-    settings.expressionMode === "full",
+    settings.expressionMode === 'full',
   );
   if (!snapshot) return;
   const { expression, image, ownerName } = snapshot;
 
-  const imgEl = document.getElementById("expression-image");
-  const src = imgEl.getAttribute("src") || "";
+  const imgEl = document.getElementById('expression-image');
+  const src = imgEl.getAttribute('src') || '';
   const signature = `${expression}|${src}`;
   if (signature === lastExpressionSignature) return;
   lastExpressionSignature = signature;
 
   let chatId = null;
-  if (settings.expressionMode === "full") {
+  if (settings.expressionMode === 'full') {
     chatId = chatIdHint || lastActiveChatId || null;
   }
 
   ws.send(
     JSON.stringify({
-      type: "expression_update",
+      type: 'expression_update',
       expression,
       ownerName: ownerName || null,
       chatId,
@@ -503,7 +503,7 @@ function scheduleExpressionUpdate(chatIdHint = null) {
   if (expressionDebounceTimer) clearTimeout(expressionDebounceTimer);
   expressionDebounceTimer = setTimeout(() => {
     sendExpressionUpdate(chatIdHint).catch((err) => {
-      console.warn("[Discord Bridge] Failed to send expression update:", err);
+      console.warn('[Discord Bridge] Failed to send expression update:', err);
     });
   }, EXPRESSION_DEBOUNCE_MS);
 }
@@ -511,7 +511,7 @@ function scheduleExpressionUpdate(chatIdHint = null) {
 function setupExpressionObserver() {
   if (expressionObserver) return;
 
-  const target = document.getElementById("expression-wrapper") || document.body;
+  const target = document.getElementById('expression-wrapper') || document.body;
   if (!target) return;
 
   expressionObserver = new MutationObserver(() => {
@@ -522,7 +522,7 @@ function setupExpressionObserver() {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["src", "data-expression", "title"],
+    attributeFilter: ['src', 'data-expression', 'title'],
   });
 
   // Push initial state when connected and observer starts.
@@ -578,7 +578,7 @@ function invalidateChatCache() {
 // ---------------------------------------------------------------------------
 
 function captureAndSendIntroMessage(chatId) {
-  const chatEl = document.getElementById("chat");
+  const chatEl = document.getElementById('chat');
   if (!chatEl || !chatId || ws?.readyState !== WebSocket.OPEN) return;
 
   const ctx = SillyTavern.getContext();
@@ -591,11 +591,11 @@ function captureAndSendIntroMessage(chatId) {
   const INTRO_SETTLE_MS = 600;
 
   const isIntroMessage = (el) =>
-    el.classList.contains("mes") && el.getAttribute("is_user") !== "true";
+    el.classList.contains('mes') && el.getAttribute('is_user') !== 'true';
 
   const collectNew = () => {
     const fresh = [];
-    for (const el of chatEl.querySelectorAll(".mes")) {
+    for (const el of chatEl.querySelectorAll('.mes')) {
       if (isIntroMessage(el) && !seen.has(el)) {
         seen.add(el);
         fresh.push(el);
@@ -605,11 +605,11 @@ function captureAndSendIntroMessage(chatId) {
   };
 
   const sendOne = async (mesEl) => {
-    const mesText = mesEl.querySelector(".mes_text");
+    const mesText = mesEl.querySelector('.mes_text');
     if (!mesText) return;
     const text = extractTextFromMesText(mesText);
     if (text && ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "intro_message", chatId, text }));
+      ws.send(JSON.stringify({ type: 'intro_message', chatId, text }));
     }
     await sendImagesFromMesText(chatId, mesText);
   };
@@ -646,7 +646,7 @@ function captureAndSendIntroMessage(chatId) {
   hardTimeoutId = setTimeout(() => {
     observer.disconnect();
     clearTimeout(settleTimeoutId);
-    console.warn("[Discord Bridge] Intro message capture timed out");
+    console.warn('[Discord Bridge] Intro message capture timed out');
   }, 10_000);
 
   // Run immediately in case doNewChat populated the DOM synchronously.
@@ -697,7 +697,7 @@ function sendImageError(chatId, requestId, text) {
   if (ws?.readyState !== WebSocket.OPEN) return;
   ws.send(
     JSON.stringify({
-      type: "generate_image_error",
+      type: 'generate_image_error',
       chatId,
       requestId,
       text,
@@ -782,7 +782,7 @@ function enqueueImageGeneration(chatId, fn) {
             .then(fn)
             .catch((err) => {
               console.error(
-                "[Discord Bridge] Image generation queue error:",
+                '[Discord Bridge] Image generation queue error:',
                 err,
               );
             })
@@ -790,7 +790,7 @@ function enqueueImageGeneration(chatId, fn) {
         }),
     )
     .catch((err) => {
-      console.error("[Discord Bridge] Unexpected queue chain error:", err);
+      console.error('[Discord Bridge] Unexpected queue chain error:', err);
     });
 
   imageQueues.set(chatId, next);
@@ -810,24 +810,24 @@ function enqueueImageGeneration(chatId, fn) {
  */
 function generateAndSendImage(chatId, requestId, prompt) {
   return new Promise(async (resolve) => {
-    const chatEl = document.getElementById("chat");
+    const chatEl = document.getElementById('chat');
     if (!chatEl || ws?.readyState !== WebSocket.OPEN) {
       if (ws?.readyState === WebSocket.OPEN) {
         ws.send(
           JSON.stringify({
-            type: "generate_image_error",
+            type: 'generate_image_error',
             chatId,
             requestId,
-            text: "Could not find the SillyTavern chat element.",
+            text: 'Could not find the SillyTavern chat element.',
           }),
         );
       }
-      return resolve({ status: "failed", reason: "chat_element_missing" });
+      return resolve({ status: 'failed', reason: 'chat_element_missing' });
     }
 
     const existingSrcs = new Set(
-      Array.from(chatEl.querySelectorAll("img.mes_img"))
-        .map((img) => img.getAttribute("src"))
+      Array.from(chatEl.querySelectorAll('img.mes_img'))
+        .map((img) => img.getAttribute('src'))
         .filter(Boolean),
     );
 
@@ -848,8 +848,8 @@ function generateAndSendImage(chatId, requestId, prompt) {
 
     const cancelJob = {
       cancel: () => {
-        finish("cancelled", "cancelled_by_user", () => {
-          sendImageError(chatId, requestId, "Image generation cancelled.");
+        finish('cancelled', 'cancelled_by_user', () => {
+          sendImageError(chatId, requestId, 'Image generation cancelled.');
         });
       },
     };
@@ -858,23 +858,23 @@ function generateAndSendImage(chatId, requestId, prompt) {
     const onNewImage = async (src) => {
       const fetched = await fetchLocalImageAsBase64(src);
       if (!fetched) {
-        finish("failed", "image_fetch_failed", () => {
+        finish('failed', 'image_fetch_failed', () => {
           sendImageError(
             chatId,
             requestId,
-            "Image was generated but could not be fetched from SillyTavern.",
+            'Image was generated but could not be fetched from SillyTavern.',
           );
         });
         return;
       }
-      finish("success", null, () => {
+      finish('success', null, () => {
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
-              type: "generate_image_result",
+              type: 'generate_image_result',
               chatId,
               requestId,
-              image: { type: "inline", ...fetched },
+              image: { type: 'inline', ...fetched },
             }),
           );
         }
@@ -882,8 +882,8 @@ function generateAndSendImage(chatId, requestId, prompt) {
     };
 
     observer = new MutationObserver(() => {
-      for (const img of chatEl.querySelectorAll("img.mes_img")) {
-        const src = img.getAttribute("src");
+      for (const img of chatEl.querySelectorAll('img.mes_img')) {
+        const src = img.getAttribute('src');
         if (src && !existingSrcs.has(src)) {
           onNewImage(src);
           return;
@@ -895,18 +895,18 @@ function generateAndSendImage(chatId, requestId, prompt) {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["src"],
+      attributeFilter: ['src'],
     });
 
     hardTimeoutId = setTimeout(() => {
-      finish("timed_out", "timeout", () => {
+      finish('timed_out', 'timeout', () => {
         console.warn(
           `[Discord Bridge] Image generation timed out after ${IMAGE_GENERATION_TIMEOUT_MS / 1000}s.`,
         );
         sendImageError(
           chatId,
           requestId,
-          "Image generation timed out. Please try again.",
+          'Image generation timed out. Please try again.',
         );
       });
     }, IMAGE_GENERATION_TIMEOUT_MS);
@@ -914,12 +914,12 @@ function generateAndSendImage(chatId, requestId, prompt) {
     try {
       await executeSlashCommandsWithOptions(`/sd ${prompt}`);
     } catch (err) {
-      finish("failed", "sd_command_failed", () => {
-        console.error("[Discord Bridge] /sd command failed:", err);
+      finish('failed', 'sd_command_failed', () => {
+        console.error('[Discord Bridge] /sd command failed:', err);
         sendImageError(
           chatId,
           requestId,
-          `Image generation failed: ${err.message || "Unknown error"}`,
+          `Image generation failed: ${err.message || 'Unknown error'}`,
         );
       });
     }
@@ -943,7 +943,7 @@ async function handleUserMessage(data) {
 
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(
-      JSON.stringify({ type: "typing_action", chatId: messageState.chatId }),
+      JSON.stringify({ type: 'typing_action', chatId: messageState.chatId }),
     );
   }
 
@@ -957,7 +957,7 @@ async function handleUserMessage(data) {
     messageState.isStreaming = true;
     ws.send(
       JSON.stringify({
-        type: "stream_chunk",
+        type: 'stream_chunk',
         chatId: messageState.chatId,
         streamId: currentStreamId,
         characterName: currentCharacterName,
@@ -1001,14 +1001,14 @@ async function handleUserMessage(data) {
         }
       } catch (err) {
         console.warn(
-          "[Discord Bridge] Could not read final text from chat array:",
+          '[Discord Bridge] Could not read final text from chat array:',
           err,
         );
       }
 
       ws.send(
         JSON.stringify({
-          type: "stream_end",
+          type: 'stream_end',
           chatId: messageState.chatId,
           streamId: currentStreamId,
           characterName: isGroup ? currentCharacterName : null,
@@ -1034,13 +1034,13 @@ async function handleUserMessage(data) {
       const msg = chat[i];
       if (msg.is_user) break;
       if (msg.mes?.trim())
-        aiMessages.unshift({ name: msg.name || "", text: msg.mes.trim() });
+        aiMessages.unshift({ name: msg.name || '', text: msg.mes.trim() });
     }
 
     if (aiMessages.length > 0) {
       ws.send(
         JSON.stringify({
-          type: "ai_reply",
+          type: 'ai_reply',
           chatId: messageState.chatId,
           messages: aiMessages,
         }),
@@ -1048,9 +1048,9 @@ async function handleUserMessage(data) {
     } else {
       ws.send(
         JSON.stringify({
-          type: "error_message",
+          type: 'error_message',
           chatId: messageState.chatId,
-          text: "Something went wrong and no response was found. Try again?",
+          text: 'Something went wrong and no response was found. Try again?',
         }),
       );
     }
@@ -1113,16 +1113,16 @@ async function handleUserMessage(data) {
   try {
     const abortController = new AbortController();
     setExternalAbortController(abortController);
-    await Generate("normal", { signal: abortController.signal });
+    await Generate('normal', { signal: abortController.signal });
   } catch (error) {
-    console.error("[Discord Bridge] Generation error:", error);
+    console.error('[Discord Bridge] Generation error:', error);
     await deleteLastMessage();
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(
         JSON.stringify({
-          type: "error_message",
+          type: 'error_message',
           chatId: messageState.chatId,
-          text: `Generation failed. Your message was retracted - try again.\n\nError: ${error.message || "Unknown"}`,
+          text: `Generation failed. Your message was retracted - try again.\n\nError: ${error.message || 'Unknown'}`,
         }),
       );
     }
@@ -1160,7 +1160,7 @@ function buildLastExchange(chat) {
     const msg = chat[i];
     if (msg.mes?.trim())
       aiMessages.unshift({
-        name: msg.name || "",
+        name: msg.name || '',
         text: msg.mes.trim(),
         isUser: false,
       });
@@ -1173,7 +1173,7 @@ function buildLastExchange(chat) {
   const userMsg = chat[i];
   if (!userMsg.mes?.trim()) return null;
 
-  const userLabel = userMsg.name?.trim() || "You";
+  const userLabel = userMsg.name?.trim() || 'You';
 
   // Cap AI messages to avoid flooding on very large groups.
   const cappedAi = aiMessages.slice(-RECAP_MAX_AI_MESSAGES);
@@ -1186,8 +1186,8 @@ function buildLastExchange(chat) {
 
   if (truncated) {
     entries.push({
-      name: "",
-      text: `_${aiMessages.length - RECAP_MAX_AI_MESSAGES} earlier message(s) not shown — use /history to see more._`,
+      name: '',
+      text: `_${aiMessages.length - RECAP_MAX_AI_MESSAGES} earlier message(s) not shown - use /history to see more._`,
       isUser: false,
     });
   }
@@ -1218,7 +1218,11 @@ function buildHistory(chat, n) {
     while (i >= 0 && !chat[i].is_user) {
       const msg = chat[i];
       if (msg.mes?.trim())
-        aiMessages.unshift({ name: msg.name || "", text: msg.mes.trim(), isUser: false });
+        aiMessages.unshift({
+          name: msg.name || '',
+          text: msg.mes.trim(),
+          isUser: false,
+        });
       i--;
     }
 
@@ -1230,7 +1234,7 @@ function buildHistory(chat, n) {
 
     if (!userMsg.mes?.trim()) continue;
 
-    const userLabel = userMsg.name?.trim() || "You";
+    const userLabel = userMsg.name?.trim() || 'You';
     exchanges.unshift([
       { name: userLabel, text: userMsg.mes.trim(), isUser: true },
       ...aiMessages,
@@ -1259,7 +1263,7 @@ function scheduleRecap(chatId) {
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(
         JSON.stringify({
-          type: "recap_message",
+          type: 'recap_message',
           chatId,
           entries: result.entries,
         }),
@@ -1275,40 +1279,40 @@ function scheduleRecap(chatId) {
 async function handleExecuteCommand(data) {
   lastActiveChatId = data.chatId || lastActiveChatId;
   if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "typing_action", chatId: data.chatId }));
+    ws.send(JSON.stringify({ type: 'typing_action', chatId: data.chatId }));
   }
 
-  let replyText = "Command execution failed, try again later.";
+  let replyText = 'Command execution failed, try again later.';
   const context = SillyTavern.getContext();
 
   try {
     switch (data.command) {
-      case "newchat":
+      case 'newchat':
         await doNewChat({ deleteCurrentChat: false });
         invalidateChatCache();
         captureAndSendIntroMessage(data.chatId);
-        replyText = "New chat started.";
+        replyText = 'New chat started.';
         break;
 
-      case "listchars": {
+      case 'listchars': {
         const characters = context.characters.filter((c) => c.name?.trim());
         replyText =
           characters.length === 0
-            ? "No available characters found."
-            : "Available characters:\n\n" +
+            ? 'No available characters found.'
+            : 'Available characters:\n\n' +
               characters
                 .map((c, i) => `${i + 1}. /switchchar_${i + 1} - ${c.name}`)
-                .join("\n") +
-              "\n\nUse /switchchar_number or /switchchar character_name to switch.";
+                .join('\n') +
+              '\n\nUse /switchchar_number or /switchchar character_name to switch.';
         break;
       }
 
-      case "switchchar": {
+      case 'switchchar': {
         if (!data.args?.length) {
-          replyText = "Usage: /switchchar <n> or /switchchar_number";
+          replyText = 'Usage: /switchchar <n> or /switchchar_number';
           break;
         }
-        const targetName = data.args.join(" ");
+        const targetName = data.args.join(' ');
         const target = context.characters.find((c) => c.name === targetName);
         if (target) {
           scheduleRecap(data.chatId);
@@ -1321,25 +1325,25 @@ async function handleExecuteCommand(data) {
         break;
       }
 
-      case "listgroups": {
+      case 'listgroups': {
         const allGroups = context.groups || [];
         replyText =
           allGroups.length === 0
-            ? "No groups found."
-            : "Available groups:\n\n" +
+            ? 'No groups found.'
+            : 'Available groups:\n\n' +
               allGroups
                 .map((g, i) => `${i + 1}. /switchgroup_${i + 1} - ${g.name}`)
-                .join("\n") +
-              "\n\nUse /switchgroup_number or /switchgroup group_name to switch.";
+                .join('\n') +
+              '\n\nUse /switchgroup_number or /switchgroup group_name to switch.';
         break;
       }
 
-      case "switchgroup": {
+      case 'switchgroup': {
         if (!data.args?.length) {
-          replyText = "Usage: /switchgroup <n> or /switchgroup_number";
+          replyText = 'Usage: /switchgroup <n> or /switchgroup_number';
           break;
         }
-        const targetName = data.args.join(" ");
+        const targetName = data.args.join(' ');
         const target = (context.groups || []).find(
           (g) => g.name === targetName,
         );
@@ -1354,32 +1358,32 @@ async function handleExecuteCommand(data) {
         break;
       }
 
-      case "listchats": {
+      case 'listchats': {
         if (context.characterId === undefined) {
-          replyText = "Please select a character first.";
+          replyText = 'Please select a character first.';
           break;
         }
         const chatFiles = await getPastCharacterChats(context.characterId);
         replyText =
           chatFiles.length === 0
-            ? "No chat history for current character."
-            : "Chat history:\n\n" +
+            ? 'No chat history for current character.'
+            : 'Chat history:\n\n' +
               chatFiles
                 .map(
                   (c, i) =>
-                    `${i + 1}. /switchchat_${i + 1} - ${c.file_name.replace(".jsonl", "")}`,
+                    `${i + 1}. /switchchat_${i + 1} - ${c.file_name.replace('.jsonl', '')}`,
                 )
-                .join("\n") +
-              "\n\nUse /switchchat_number or /switchchat chat_name to switch.";
+                .join('\n') +
+              '\n\nUse /switchchat_number or /switchchat chat_name to switch.';
         break;
       }
 
-      case "switchchat": {
+      case 'switchchat': {
         if (!data.args?.length) {
-          replyText = "Usage: /switchchat <n>";
+          replyText = 'Usage: /switchchat <n>';
           break;
         }
-        const targetChatFile = data.args.join(" ");
+        const targetChatFile = data.args.join(' ');
         try {
           scheduleRecap(data.chatId);
           await openCharacterChat(targetChatFile);
@@ -1390,13 +1394,13 @@ async function handleExecuteCommand(data) {
         break;
       }
 
-      case "charimage": {
+      case 'charimage': {
         // In solo chat, no argument needed - active character's avatar is sent.
         // In group chat, an argument selects which member to show; if omitted,
         // lists the group members instead.
         const ctx = SillyTavern.getContext();
         const isGroup = !!ctx.groupId;
-        const targetName = data.args?.join(" ").trim() || null;
+        const targetName = data.args?.join(' ').trim() || null;
 
         if (targetName) {
           const target = ctx.characters.find(
@@ -1419,16 +1423,16 @@ async function handleExecuteCommand(data) {
             )
             .filter(Boolean);
           replyText = memberNames.length
-            ? "Group members:\n\n" +
-              memberNames.map((n) => `\u2022 ${n}`).join("\n") +
+            ? 'Group members:\n\n' +
+              memberNames.map((n) => `\u2022 ${n}`).join('\n') +
               "\n\nUse /charimage <n> to see a member's avatar."
-            : "No members found in the current group.";
+            : 'No members found in the current group.';
         } else {
           if (
             ctx.characterId === undefined ||
             !ctx.characters?.[ctx.characterId]
           ) {
-            replyText = "No character is currently selected.";
+            replyText = 'No character is currently selected.';
             break;
           }
           sendCharacterAvatar(data.chatId, ctx.characters[ctx.characterId]); // async, not awaited
@@ -1437,8 +1441,8 @@ async function handleExecuteCommand(data) {
         break;
       }
 
-      case "mood": {
-        const requestedName = data.args?.join(" ").trim() || null;
+      case 'mood': {
+        const requestedName = data.args?.join(' ').trim() || null;
         let snapshot = await getCurrentExpressionSnapshot(true);
         let usedCachedSnapshot = false;
         if (!snapshot) {
@@ -1446,20 +1450,20 @@ async function handleExecuteCommand(data) {
             const cached = getCachedExpressionSnapshot(requestedName);
             if (!cached) {
               replyText =
-                "No active expression is available right now, and no stored mood exists for that character yet.";
+                'No active expression is available right now, and no stored mood exists for that character yet.';
               break;
             }
             snapshot = cached;
             usedCachedSnapshot = true;
           } else {
             replyText =
-              "No active expression is available right now. Make sure expressions are enabled in SillyTavern.";
+              'No active expression is available right now. Make sure expressions are enabled in SillyTavern.';
             break;
           }
         }
 
         if (requestedName) {
-          const owner = snapshot.ownerName || "(unknown)";
+          const owner = snapshot.ownerName || '(unknown)';
           if (
             !snapshot.ownerName ||
             snapshot.ownerName.toLowerCase() !== requestedName.toLowerCase()
@@ -1480,7 +1484,7 @@ async function handleExecuteCommand(data) {
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
-              type: "expression_update",
+              type: 'expression_update',
               expression: snapshot.expression,
               ownerName: snapshot.ownerName || null,
               chatId: data.chatId,
@@ -1491,63 +1495,63 @@ async function handleExecuteCommand(data) {
 
         const ownerPrefix = snapshot.ownerName
           ? `**${snapshot.ownerName}**: `
-          : "";
-        const cachedNote = usedCachedSnapshot ? " (last known mood)" : "";
+          : '';
+        const cachedNote = usedCachedSnapshot ? ' (last known mood)' : '';
         replyText = snapshot.image
           ? `Current mood: ${ownerPrefix}**${snapshot.expression}**${cachedNote} (image sent).`
           : `Current mood: ${ownerPrefix}**${snapshot.expression}**${cachedNote} (no expression image available).`;
         break;
       }
 
-      case "reaction": {
+      case 'reaction': {
         if (!data.args?.length) {
-          replyText = "Usage: /reaction <mode>\nModes: off, status, full";
+          replyText = 'Usage: /reaction <mode>\nModes: off, status, full';
           break;
         }
 
-        const mode = String(data.args[0] || "")
+        const mode = String(data.args[0] || '')
           .trim()
           .toLowerCase();
         if (!EXPRESSION_MODE_VALUES.has(mode)) {
-          replyText = "Invalid mode. Use one of: off, status, full.";
+          replyText = 'Invalid mode. Use one of: off, status, full.';
           break;
         }
 
         getSettings().expressionMode = mode;
         saveSettingsDebounced();
-        lastExpressionSignature = "";
+        lastExpressionSignature = '';
         scheduleExpressionUpdate(data.chatId);
 
         const modeLabel =
-          mode === "off"
-            ? "Off"
-            : mode === "status"
-              ? "Discord status only"
-              : "Discord status + expression images";
+          mode === 'off'
+            ? 'Off'
+            : mode === 'status'
+              ? 'Discord status only'
+              : 'Discord status + expression images';
         replyText = `Reaction mode set to: **${modeLabel}**.`;
         break;
       }
 
-      case "image": {
+      case 'image': {
         if (!data.args?.length) {
           replyText =
-            "Usage: /image <prompt> or /image <keyword>\nKeywords: you, face, me, scene, last, raw_last, background\nUse /image cancel to stop an active generation.";
+            'Usage: /image <prompt> or /image <keyword>\nKeywords: you, face, me, scene, last, raw_last, background\nUse /image cancel to stop an active generation.';
           break;
         }
 
-        const prompt = data.args.join(" ").trim();
+        const prompt = data.args.join(' ').trim();
         const lowerPrompt = prompt.toLowerCase();
 
-        if (lowerPrompt === "cancel") {
+        if (lowerPrompt === 'cancel') {
           const activeJob = activeImageJobs.get(data.chatId);
           if (!activeJob) {
-            replyText = "No active image generation to cancel.";
+            replyText = 'No active image generation to cancel.';
             break;
           }
 
           activeJob.cancel();
           imageMetrics.canceled += 1;
-          replyText = "Cancelled active image generation.";
+          replyText = 'Cancelled active image generation.';
           break;
         }
 
@@ -1565,7 +1569,7 @@ async function handleExecuteCommand(data) {
         if (requestHistory.length >= IMAGE_RATE_LIMIT_MAX_REQUESTS) {
           imageMetrics.rateLimited += 1;
           replyText =
-            "Too many image requests in a short time. Please wait a minute and try again.";
+            'Too many image requests in a short time. Please wait a minute and try again.';
           break;
         }
 
@@ -1578,10 +1582,10 @@ async function handleExecuteCommand(data) {
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
-              type: "image_placeholder",
+              type: 'image_placeholder',
               chatId: data.chatId,
               requestId,
-              text: "🎨 Generating image… (timeout: 3 minutes; use /image cancel to abort)",
+              text: '🎨 Generating image… (timeout: 3 minutes; use /image cancel to abort)',
             }),
           );
         }
@@ -1601,81 +1605,81 @@ async function handleExecuteCommand(data) {
           );
           imageMetrics.inFlight = Math.max(0, imageMetrics.inFlight - 1);
 
-          if (result?.status === "success") {
+          if (result?.status === 'success') {
             imageMetrics.succeeded += 1;
             markImageSuccess(data.chatId);
-          } else if (result?.status === "timed_out") {
+          } else if (result?.status === 'timed_out') {
             imageMetrics.timedOut += 1;
-            markImageFailure(data.chatId, "Image generation timed out");
-          } else if (result?.status === "cancelled") {
+            markImageFailure(data.chatId, 'Image generation timed out');
+          } else if (result?.status === 'cancelled') {
             // /image cancel increments canceled immediately for user feedback.
           } else {
             imageMetrics.failed += 1;
             markImageFailure(
               data.chatId,
-              result?.reason || "Image generation failed unexpectedly",
+              result?.reason || 'Image generation failed unexpectedly',
             );
           }
         });
         return;
       }
 
-      case "continue": {
+      case 'continue': {
         const { chat: chatBefore } = SillyTavern.getContext();
         const lastMsgBefore = [...chatBefore]
           .reverse()
           .find((m) => !m.is_user && m.mes?.trim());
-        const textBefore = lastMsgBefore?.mes?.trim() ?? "";
+        const textBefore = lastMsgBefore?.mes?.trim() ?? '';
 
-        await executeSlashCommandsWithOptions("/continue await=true");
+        await executeSlashCommandsWithOptions('/continue await=true');
 
         const { chat: chatAfter } = SillyTavern.getContext();
         const lastMsgAfter = [...chatAfter]
           .reverse()
           .find((m) => !m.is_user && m.mes?.trim());
-        const textAfter = lastMsgAfter?.mes?.trim() ?? "";
+        const textAfter = lastMsgAfter?.mes?.trim() ?? '';
 
         const newText = textAfter.startsWith(textBefore)
           ? textAfter.slice(textBefore.length).trim()
           : textAfter;
 
-        replyText = newText || "Continuation returned nothing.";
+        replyText = newText || 'Continuation returned nothing.';
         break;
       }
 
-      case "impersonate": {
-        const prompt = data.args?.[0] ?? "";
+      case 'impersonate': {
+        const prompt = data.args?.[0] ?? '';
         await executeSlashCommandsWithOptions(
           prompt
             ? `/impersonate await=true ${prompt}`
-            : "/impersonate await=true",
+            : '/impersonate await=true',
         );
-        const impersonatedText = String($("#send_textarea").val()).trim();
+        const impersonatedText = String($('#send_textarea').val()).trim();
         if (impersonatedText) {
-          $("#send_textarea").val("").trigger("input");
+          $('#send_textarea').val('').trigger('input');
           replyText = `💭 *Suggested response* _(feel free to copy, edit and send as your own)_:\n${impersonatedText}`;
         } else {
-          replyText = "Impersonation returned nothing.";
+          replyText = 'Impersonation returned nothing.';
         }
         break;
       }
 
-      case "listpersonas": {
+      case 'listpersonas': {
         const personas = Object.values(
           SillyTavern.getContext().powerUserSettings?.personas ?? {},
         ).filter((n) => n?.trim());
         replyText =
           personas.length > 0
-            ? "Available personas:\n\n" +
-              personas.map((n, i) => `${i + 1}. ${n}`).join("\n")
-            : "No personas found.";
+            ? 'Available personas:\n\n' +
+              personas.map((n, i) => `${i + 1}. ${n}`).join('\n')
+            : 'No personas found.';
         break;
       }
 
-      case "persona": {
-        const personaName = data.args?.[0] ?? "";
+      case 'persona': {
+        const personaName = data.args?.[0] ?? '';
         if (!personaName) {
-          replyText = "Please provide a persona name. Example: `/persona Aria`";
+          replyText = 'Please provide a persona name. Example: `/persona Aria`';
           break;
         }
         await executeSlashCommandsWithOptions(`/persona-set ${personaName}`);
@@ -1683,14 +1687,14 @@ async function handleExecuteCommand(data) {
         break;
       }
 
-      case "note": {
-        const noteText = data.args?.[0] ?? "";
+      case 'note': {
+        const noteText = data.args?.[0] ?? '';
         if (noteText) {
           await executeSlashCommandsWithOptions(`/note ${noteText}`);
           replyText = `Author's note set to: _${noteText}_`;
         } else {
           const current =
-            SillyTavern.getContext().chatMetadata?.note_prompt ?? "";
+            SillyTavern.getContext().chatMetadata?.note_prompt ?? '';
           replyText = current
             ? `Current author's note: _${current}_`
             : "No author's note is currently set.";
@@ -1698,18 +1702,18 @@ async function handleExecuteCommand(data) {
         break;
       }
 
-      case "status": {
+      case 'status': {
         const breakerState = getBreakerState(data.chatId);
         const activeCharacter =
           context.characterId !== undefined
-            ? context.characters?.[context.characterId]?.name || "(unknown)"
-            : "(none)";
+            ? context.characters?.[context.characterId]?.name || '(unknown)'
+            : '(none)';
         const activeGroup = context.groupId
           ? (context.groups || []).find((g) => g.id === context.groupId)
-              ?.name || "(unknown)"
-          : "(none)";
+              ?.name || '(unknown)'
+          : '(none)';
 
-        let lastErrorText = "";
+        let lastErrorText = '';
         if (imageMetrics.lastError) {
           const errorTime = new Date(imageMetrics.lastErrorAt);
           const minutesAgo = Math.floor(
@@ -1717,7 +1721,7 @@ async function handleExecuteCommand(data) {
           );
           const timeString =
             minutesAgo < 1
-              ? "Just now"
+              ? 'Just now'
               : minutesAgo < 60
                 ? `${minutesAgo}m ago`
                 : minutesAgo < 1440
@@ -1727,35 +1731,35 @@ async function handleExecuteCommand(data) {
         }
 
         const PLATFORM_LABELS = {
-          discord: "Discord",
-          telegram: "Telegram",
-          signal: "Signal",
+          discord: 'Discord',
+          telegram: 'Telegram',
+          signal: 'Signal',
         };
         const PLATFORM_ICONS = {
-          active: "🟢",
-          not_loaded: "⚫",
-          inactive: "🔴",
+          active: '🟢',
+          not_loaded: '⚫',
+          inactive: '🔴',
         };
         const platformLine = bridgePlugins
           ? Object.entries(bridgePlugins)
               .map(
                 ([p, s]) =>
-                  `${PLATFORM_LABELS[p] || p} ${PLATFORM_ICONS[s] || "⚫"}`,
+                  `${PLATFORM_LABELS[p] || p} ${PLATFORM_ICONS[s] || '⚫'}`,
               )
-              .join(" | ")
-          : "Unknown";
+              .join(' | ')
+          : 'Unknown';
 
         replyText =
-          "## 🐲 __Bridge Status:__\n" +
-          `**Connection:** ${ws?.readyState === WebSocket.OPEN ? "🟢 Online" : "🔴 Offline"}\n` +
+          '## 🐲 __Bridge Status:__\n' +
+          `**Connection:** ${ws?.readyState === WebSocket.OPEN ? '🟢 Online' : '🔴 Offline'}\n` +
           `**Plugins:** ${platformLine}\n` +
-          `**Active:** ${activeGroup !== "(none)" ? `👥 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `👤 ${activeCharacter}` : "_Nothing loaded_"}\n` +
+          `**Active:** ${activeGroup !== '(none)' ? `👥 Group: ${activeGroup}` : activeCharacter !== '(none)' ? `👤 ${activeCharacter}` : '_Nothing loaded_'}\n` +
           `**Mood snapshots cached:** ${expressionCache.size}\n\n` +
-          "**🖼️ Image Generation**\n" +
-          `> **Status:** ${!breakerState ? "✅ Ready" : `⏸️ Paused - cooling down (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s left, will resume automatically)`}\n` +
-          `> **Queue:** ${imageQueues.has(data.chatId) ? "⏳ Pending images" : "✅ Empty"}\n` +
-          `> **Currently generating:** ${activeImageJobs.has(data.chatId) ? "⚙️ Yes" : "-"}\n\n` +
-          "**📊 Image Stats** _(since last restart)_\n" +
+          '**🖼️ Image Generation**\n' +
+          `> **Status:** ${!breakerState ? '✅ Ready' : `⏸️ Paused - cooling down (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s left, will resume automatically)`}\n` +
+          `> **Queue:** ${imageQueues.has(data.chatId) ? '⏳ Pending images' : '✅ Empty'}\n` +
+          `> **Currently generating:** ${activeImageJobs.has(data.chatId) ? '⚙️ Yes' : '-'}\n\n` +
+          '**📊 Image Stats** _(since last restart)_\n' +
           `> ✅ Succeeded: **${imageMetrics.succeeded}** / ✨ Total requested: **${imageMetrics.totalRequests}**\n` +
           `> ❌ Failed: **${imageMetrics.failed}** | ⏱️ Timed out: **${imageMetrics.timedOut}** | 🚫 Rate limited: **${imageMetrics.rateLimited}**\n` +
           `> 🛑 Canceled: **${imageMetrics.canceled}** | ⚡ Concurrent now: **${imageMetrics.inFlight}** (peak: **${imageMetrics.maxConcurrentInFlight}**)\n` +
@@ -1764,52 +1768,56 @@ async function handleExecuteCommand(data) {
         break;
       }
 
-      case "sthelp":
+      case 'sthelp':
         replyText =
-          "## 🐲 __Bridge Commands:__\n" +
-          "**System & Status**\n" +
-          "> `/sthelp` - Show this menu\n" +
-          "> `/status` - Check bridge and image pipeline health\n" +
-          "> `/reaction <mode>` - Set mode (`off`, `status`, `full`)\n\n" +
-          "**Management**\n" +
-          "> `/listchars` | `/listgroups` - List available characters/groups\n" +
-          "> `/switchchar` | `/switchgroup` - Switch character/group\n" +
-          "> `/newchat` - Start a new chat with the active character or group\n" +
-          "> `/listchats` | `/switchchat` - List and switch to previous chat\n" +
-          "> `/history [n]` - Show last n exchanges (default: 5, omit n for all)\n" +
-          "> *💡 Tip: You can also use `_#` (e.g., `/switchchar_3`) to select by index.*\n\n" +
-          "**Immersion & Mood**\n" +
-          "> `/mood` - Show character expression\n" +
+          '## 🐲 __Bridge Commands:__\n' +
+          '**System & Status**\n' +
+          '> `/sthelp` - Show this menu\n' +
+          '> `/status` - Check bridge and image pipeline health\n' +
+          '> `/reaction <mode>` - Set mode (`off`, `status`, `full`)\n\n' +
+          '**Management**\n' +
+          '> `/listchars` | `/listgroups` - List available characters/groups\n' +
+          '> `/switchchar` | `/switchgroup` - Switch character/group\n' +
+          '> `/newchat` - Start a new chat with the active character or group\n' +
+          '> `/listchats` | `/switchchat` - List and switch to previous chat\n' +
+          '> `/history [n]` - Show last n exchanges (default: 5, omit n for all)\n' +
+          '> *💡 Tip: You can also use `_#` (e.g., `/switchchar_3`) to select by index.*\n\n' +
+          '**Immersion & Mood**\n' +
+          '> `/mood` - Show character expression\n' +
           "> `/charimage` - Show character's avatar\n" +
           "> `/note <text>` - Set the author's note for the current chat; omit text to read the current note\n" +
-          "> `/persona <name>` - Switch your active persona by name\n" +
-          "> `/listpersonas` - List your available personas\n" +
-          "> `/impersonate [prompt]` - Have the AI write your next response in character, with an optional guiding prompt\n" +
-          "> `/continue` - Continue the last AI message\n\n" +
-          "**Image Generation**\n" +
-          "> `/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
-          "> `/image cancel` - Abort active image generation\n\n" +
-          "~~                                                                                                                                          ~~\n" +
-          "*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n" +
-          "*Please support my work:* <https://github.com/sponsors/senjinthedragon>";
+          '> `/persona <name>` - Switch your active persona by name\n' +
+          '> `/listpersonas` - List your available personas\n' +
+          '> `/impersonate [prompt]` - Have the AI write your next response in character, with an optional guiding prompt\n' +
+          '> `/continue` - Continue the last AI message\n\n' +
+          '**Image Generation**\n' +
+          '> `/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n' +
+          '> `/image cancel` - Abort active image generation\n\n' +
+          '~~                                                                                                                                          ~~\n' +
+          '*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n' +
+          '*Please support my work:* <https://github.com/sponsors/senjinthedragon>';
         break;
 
-      case "history": {
+      case 'history': {
         const { chat } = SillyTavern.getContext();
-        const n = data.args?.length ? Math.max(0, parseInt(data.args[0]) || 0) : 5;
+        const n = data.args?.length
+          ? Math.max(0, parseInt(data.args[0]) || 0)
+          : 5;
         const entries = buildHistory(chat, n);
         if (!entries) {
-          replyText = "No chat history found.";
+          replyText = 'No chat history found.';
           break;
         }
         if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({
-            type: "recap_message",
-            chatId: data.chatId,
-            entries,
-          }));
+          ws.send(
+            JSON.stringify({
+              type: 'recap_message',
+              chatId: data.chatId,
+              entries,
+            }),
+          );
         }
-        replyText = `Showing last ${n > 0 ? n : "all"} exchange(s).`;
+        replyText = `Showing last ${n > 0 ? n : 'all'} exchange(s).`;
         break;
       }
 
@@ -1833,19 +1841,19 @@ async function handleExecuteCommand(data) {
         const chatMatch = data.command.match(/^switchchat_(\d+)$/);
         if (chatMatch) {
           if (context.characterId === undefined) {
-            replyText = "Please select a character first.";
+            replyText = 'Please select a character first.';
             break;
           }
           const index = parseInt(chatMatch[1]) - 1;
           const chatFiles = await getPastCharacterChats(context.characterId);
           if (index >= 0 && index < chatFiles.length) {
-            const chatName = chatFiles[index].file_name.replace(".jsonl", "");
+            const chatName = chatFiles[index].file_name.replace('.jsonl', '');
             try {
               scheduleRecap(data.chatId);
               await openCharacterChat(chatName);
               replyText = `Loaded chat: ${chatName}`;
             } catch {
-              replyText = "Failed to load chat.";
+              replyText = 'Failed to load chat.';
             }
           } else {
             replyText = `Invalid number: ${index + 1}. Use /listchats to see options.`;
@@ -1872,14 +1880,14 @@ async function handleExecuteCommand(data) {
       }
     }
   } catch (error) {
-    console.error("[Discord Bridge] Command error:", error);
-    replyText = `Error executing command: ${error.message || "Unknown error"}`;
+    console.error('[Discord Bridge] Command error:', error);
+    replyText = `Error executing command: ${error.message || 'Unknown error'}`;
   }
 
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(
       JSON.stringify({
-        type: "ai_reply",
+        type: 'ai_reply',
         chatId: data.chatId,
         text: replyText,
       }),
@@ -1906,13 +1914,13 @@ async function handleGetAutocomplete(data) {
     const sortAlpha = (names) =>
       [...names].sort((a, b) =>
         a
-          .replace(/^[^\p{L}]+/u, "")
-          .localeCompare(b.replace(/^[^\p{L}]+/u, ""), undefined, {
-            sensitivity: "base",
+          .replace(/^[^\p{L}]+/u, '')
+          .localeCompare(b.replace(/^[^\p{L}]+/u, ''), undefined, {
+            sensitivity: 'base',
           }),
       );
 
-    if (data.list === "characters") {
+    if (data.list === 'characters') {
       if (
         autocompleteCache.characters &&
         now - autocompleteCache.characters.cachedAt < AUTOCOMPLETE_CACHE_TTL_MS
@@ -1924,7 +1932,7 @@ async function handleGetAutocomplete(data) {
           .filter((n) => n?.trim());
         autocompleteCache.characters = { names: allNames, cachedAt: now };
       }
-    } else if (data.list === "groups") {
+    } else if (data.list === 'groups') {
       if (
         autocompleteCache.groups &&
         now - autocompleteCache.groups.cachedAt < AUTOCOMPLETE_CACHE_TTL_MS
@@ -1936,7 +1944,7 @@ async function handleGetAutocomplete(data) {
           .filter((n) => n?.trim());
         autocompleteCache.groups = { names: allNames, cachedAt: now };
       }
-    } else if (data.list === "chats") {
+    } else if (data.list === 'chats') {
       // Only meaningful when a character is selected; empty list otherwise.
       // Sorted newest-first using the raw filename (which is lexicographically
       // ordered by timestamp), then reformatted for display using the timezone
@@ -1961,12 +1969,12 @@ async function handleGetAutocomplete(data) {
           const fmt = (() => {
             const tz = bridgeTimezone;
             const opts = {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
               hour12: false,
               ...(tz ? { timeZone: tz } : {}),
             };
@@ -1984,7 +1992,7 @@ async function handleGetAutocomplete(data) {
           // shown in Discord's dropdown; value is the raw filename that ST
           // uses to actually load the chat.
           allNames = chatFiles
-            .map((c) => c.file_name.replace(".jsonl", ""))
+            .map((c) => c.file_name.replace('.jsonl', ''))
             .filter((n) => n?.trim())
             // Sort newest-first by raw filename - the timestamp suffix is
             // lexicographically ordered so no date parsing is needed here.
@@ -1996,7 +2004,7 @@ async function handleGetAutocomplete(data) {
               // keeping the raw filename as the value ST receives on selection.
               const prefix = raw.replace(
                 / - \d{4}-\d{2}-\d{2}@\d{2}h\d{2}m\d{2}s\d+ms$/,
-                "",
+                '',
               );
               return { name: `${prefix} - ${fmt.format(date)}`, value: raw };
             });
@@ -2004,24 +2012,24 @@ async function handleGetAutocomplete(data) {
           chatCache[context.characterId] = { names: allNames };
         }
       }
-    } else if (data.list === "image_prompts") {
+    } else if (data.list === 'image_prompts') {
       // Static keyword list - no caching needed.
       allNames = [
-        "you",
-        "face",
-        "me",
-        "scene",
-        "last",
-        "raw_last",
-        "background",
-        "cancel",
+        'you',
+        'face',
+        'me',
+        'scene',
+        'last',
+        'raw_last',
+        'background',
+        'cancel',
       ];
-    } else if (data.list === "personas") {
+    } else if (data.list === 'personas') {
       // Always fresh - persona list is small and changes rarely.
       allNames = Object.values(
         context.powerUserSettings?.personas ?? {},
       ).filter((n) => n?.trim());
-    } else if (data.list === "group_members") {
+    } else if (data.list === 'group_members') {
       if (!context.groupId) {
         // Solo chat - offer the active character's name as the only option.
         const soloChar =
@@ -2031,7 +2039,7 @@ async function handleGetAutocomplete(data) {
         // Read directly from the rendered group members panel and sort
         // alphabetically, consistent with the other name lists.
         const memberEls = document.querySelectorAll(
-          "#rm_group_members .group_member .ch_name",
+          '#rm_group_members .group_member .ch_name',
         );
         allNames = sortAlpha(
           Array.from(memberEls)
@@ -2042,28 +2050,28 @@ async function handleGetAutocomplete(data) {
     }
   } catch (err) {
     // Fall through with empty choices rather than leaving Discord's dropdown on a spinner.
-    console.error("[Discord Bridge] Autocomplete error:", err);
+    console.error('[Discord Bridge] Autocomplete error:', err);
   }
 
-  const query = (data.query || "").toLowerCase();
+  const query = (data.query || '').toLowerCase();
   // allNames entries are either plain strings (all lists except chats) or
   // {name, value} objects (chats, where the display label differs from the
   // raw filename that SillyTavern needs to load the chat). Normalise here so
   // websocket.js always receives a consistent {name, value} array.
   const choices = allNames
     .filter((entry) => {
-      const label = typeof entry === "string" ? entry : entry.name;
+      const label = typeof entry === 'string' ? entry : entry.name;
       return label.toLowerCase().includes(query);
     })
     .slice(0, 25)
     .map((entry) =>
-      typeof entry === "string" ? { name: entry, value: entry } : entry,
+      typeof entry === 'string' ? { name: entry, value: entry } : entry,
     );
 
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(
       JSON.stringify({
-        type: "autocomplete_response",
+        type: 'autocomplete_response',
         requestId: data.requestId,
         choices,
       }),
@@ -2086,7 +2094,7 @@ function connect() {
 
   const settings = getSettings();
   if (!settings.bridgeUrl) {
-    updateStatus("URL not set!", "red");
+    updateStatus('URL not set!', 'red');
     return;
   }
 
@@ -2095,19 +2103,19 @@ function connect() {
     reconnectTimeout = null;
   }
 
-  updateStatus("Connecting...", "orange");
+  updateStatus('Connecting...', 'orange');
   ws = new WebSocket(settings.bridgeUrl);
 
   ws.onopen = () => {
-    updateStatus("Connected", "green");
-    console.log("[Discord Bridge] Connected to bridge server");
-    lastExpressionSignature = "";
+    updateStatus('Connected', 'green');
+    console.log('[Discord Bridge] Connected to bridge server');
+    lastExpressionSignature = '';
     setupExpressionObserver();
     scheduleExpressionUpdate(lastActiveChatId);
     if (heartbeatInterval) clearInterval(heartbeatInterval);
     heartbeatInterval = setInterval(() => {
       if (ws?.readyState === WebSocket.OPEN)
-        ws.send(JSON.stringify({ type: "heartbeat" }));
+        ws.send(JSON.stringify({ type: 'heartbeat' }));
     }, 30000);
   };
 
@@ -2116,9 +2124,9 @@ function connect() {
     try {
       data = JSON.parse(event.data);
 
-      if (data.type === "heartbeat") return;
+      if (data.type === 'heartbeat') return;
 
-      if (data.type === "bridge_config") {
+      if (data.type === 'bridge_config') {
         // Validate timezone and locale before storing - invalid values would
         // cause Intl.DateTimeFormat to throw at autocomplete time.
         if (data.timezone) {
@@ -2151,34 +2159,34 @@ function connect() {
         return;
       }
 
-      if (data.type === "user_message") {
+      if (data.type === 'user_message') {
         await handleUserMessage(data);
         return;
       }
 
-      if (data.type === "system_command") {
-        if (data.command === "reload_ui_only")
+      if (data.type === 'system_command') {
+        if (data.command === 'reload_ui_only')
           setTimeout(() => window.location.reload(), 500);
         return;
       }
 
-      if (data.type === "get_autocomplete") {
+      if (data.type === 'get_autocomplete') {
         await handleGetAutocomplete(data);
         return;
       }
 
-      if (data.type === "execute_command") {
+      if (data.type === 'execute_command') {
         await handleExecuteCommand(data);
         return;
       }
     } catch (error) {
-      console.error("[Discord Bridge] Message handling error:", error);
+      console.error('[Discord Bridge] Message handling error:', error);
       if (data?.chatId && ws?.readyState === WebSocket.OPEN) {
         ws.send(
           JSON.stringify({
-            type: "error_message",
+            type: 'error_message',
             chatId: data.chatId,
-            text: "Internal error processing request.",
+            text: 'Internal error processing request.',
           }),
         );
       }
@@ -2186,7 +2194,7 @@ function connect() {
   };
 
   ws.onclose = () => {
-    updateStatus("Disconnected", "red");
+    updateStatus('Disconnected', 'red');
     ws = null;
 
     if (heartbeatInterval) {
@@ -2196,7 +2204,7 @@ function connect() {
 
     const settings = getSettings();
     if (settings.autoConnect && shouldReconnect) {
-      updateStatus("Reconnecting...", "orange");
+      updateStatus('Reconnecting...', 'orange');
       if (!reconnectTimeout) {
         reconnectTimeout = setTimeout(() => {
           reconnectTimeout = null;
@@ -2207,8 +2215,8 @@ function connect() {
   };
 
   ws.onerror = (error) => {
-    console.error("[Discord Bridge] WebSocket error:", error);
-    updateStatus("Connection error", "red");
+    console.error('[Discord Bridge] WebSocket error:', error);
+    updateStatus('Connection error', 'red');
   };
 }
 
@@ -2219,7 +2227,7 @@ function disconnect() {
     clearTimeout(reconnectTimeout);
     reconnectTimeout = null;
   }
-  updateStatus("Disconnected", "red");
+  updateStatus('Disconnected', 'red');
 }
 
 // ---------------------------------------------------------------------------
@@ -2231,35 +2239,35 @@ jQuery(async () => {
     const settingsHtml = await $.get(
       `/scripts/extensions/third-party/${MODULE_NAME}/settings.html`,
     );
-    $("#extensions_settings").append(settingsHtml);
+    $('#extensions_settings').append(settingsHtml);
 
     const settings = getSettings();
-    $("#discord_bridge_url").val(settings.bridgeUrl);
-    $("#discord_auto_connect").prop("checked", settings.autoConnect);
-    $("#discord_expression_mode").val(settings.expressionMode);
+    $('#discord_bridge_url').val(settings.bridgeUrl);
+    $('#discord_auto_connect').prop('checked', settings.autoConnect);
+    $('#discord_expression_mode').val(settings.expressionMode);
 
-    $("#discord_bridge_url").on("input", () => {
-      getSettings().bridgeUrl = $("#discord_bridge_url").val();
+    $('#discord_bridge_url').on('input', () => {
+      getSettings().bridgeUrl = $('#discord_bridge_url').val();
       saveSettingsDebounced();
     });
 
-    $("#discord_auto_connect").on("change", () => {
-      getSettings().autoConnect = $("#discord_auto_connect").prop("checked");
+    $('#discord_auto_connect').on('change', () => {
+      getSettings().autoConnect = $('#discord_auto_connect').prop('checked');
       saveSettingsDebounced();
     });
 
-    $("#discord_expression_mode").on("change", () => {
-      getSettings().expressionMode = $("#discord_expression_mode").val();
-      lastExpressionSignature = "";
+    $('#discord_expression_mode').on('change', () => {
+      getSettings().expressionMode = $('#discord_expression_mode').val();
+      lastExpressionSignature = '';
       saveSettingsDebounced();
       scheduleExpressionUpdate(lastActiveChatId);
     });
 
-    $("#discord_connect_button").on("click", connect);
-    $("#discord_disconnect_button").on("click", disconnect);
+    $('#discord_connect_button').on('click', connect);
+    $('#discord_disconnect_button').on('click', disconnect);
 
     if (settings.autoConnect) connect();
   } catch (error) {
-    console.error("[Discord Bridge] Failed to load settings UI:", error);
+    console.error('[Discord Bridge] Failed to load settings UI:', error);
   }
 });

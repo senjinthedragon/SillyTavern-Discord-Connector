@@ -21,6 +21,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `/history` to `/sthelp` output.
 - Added `EmbedBuilder` to `discord.js` imports and `splitLongText` from `text-chunking.js`.
 
+### Changed
+
+- Expression and mood updates now include the character's name in all contexts. The Discord activity string changes from `😯 surprise` to `😯 surprise (Finn)`, with the name appended in parentheses so the emoji and mood word stay visible at the front even if the name is long or decorated. In full mode, a `_Finn feels surprise_` line is posted to the channel immediately before the expression image so it is always clear which character the mood belongs to. On Telegram and Signal the mood message changes from `Mood: surprise` to `Finn feels surprise`. Falls back to the existing nameless format when no owner name is available.
+- `ownerName` is now included in `expression_update` packets sent by `index.js` (both the automatic update path and the `/mood` command path).
+- `websocket-router.js` extracts `ownerName` from the packet and passes it to `setBridgeActivity` and all frontend plugins via `fanout`.
+- `formatBridgeActivity` in `activity-format.js` accepts an optional `ownerName` parameter and appends it in parentheses when present.
+- `setBridgeActivity` and `sendExpression` in `server/discord.js` updated to accept and use `ownerName`.
+- `sendExpression` updated in `server/plugins/discord.js` wrapper, `plugins/telegram.js`, and `plugins/signal.js`.
+
 ### Fixed
 
 - Added `/listpersonas` to `/sthelp`

@@ -1,6 +1,6 @@
-# v1.5.0: Chat Recap and History
+# v1.5.0: Chat Recap, History, and Expression Attribution
 
-This release adds two closely related features that solve the "where were we?" problem when switching between characters, groups, or older chats.
+This release adds two closely related features that solve the "where were we?" problem when switching between characters, groups, or older chats - and cleans up a long-standing ambiguity in how mood and expression updates are attributed in group sessions.
 
 ## Highlights
 
@@ -17,6 +17,14 @@ For group chats the full last round is shown - the user message plus every AI re
 New command that posts the last `n` exchanges from the current chat, oldest first, using the same embed/plain-text rendering as the recap. Defaults to 5 exchanges if no argument is given. No upper cap - if a user asks for more exchanges than the chat contains, everything available is shown. Long messages are split at word boundaries so nothing overflows Discord's or Telegram's message size limits.
 
 Added to Discord as a native slash command with an optional integer argument. Added to Telegram's registered command list. Listed in `/sthelp`.
+
+### Character Names on Mood and Expression Updates
+
+In both status and full expression mode it was previously unclear which character a mood update belonged to, particularly in group chats where each character emotes independently and the updates can arrive between or after messages from different characters.
+
+The Discord activity string now reads `😯 surprise (Finn)` instead of just `😯 surprise`. The name is appended in parentheses so the emoji and mood word stay at the front and remain visible even when names are long or decorated with special characters - if the name gets clipped by Discord's character limit, the important part is already visible.
+
+In full mode, a `_Finn feels surprise_` line is posted to the channel immediately before the expression image, rendered in italics so it reads as stage direction rather than dialogue. On Telegram and Signal the mood message changes from `Mood: surprise` to `Finn feels surprise`. All three fall back gracefully to the existing nameless format if no owner name is available.
 
 ## Fixes
 
@@ -36,6 +44,11 @@ Added to Discord as a native slash command with an optional integer argument. Ad
 - `sendRecap` added to `server/plugins/discord.js` wrapper, `plugins/telegram.js`, and `plugins/signal.js` for consistent cross-platform delivery.
 - Discord `/history` command uses option type `INTEGER` (type 4) rather than STRING, so Discord validates the input client-side. The interaction arg filter in `discord.js` was broadened from `type === 3` only to `type === 3 || type === 4` to pass integer option values through to SillyTavern.
 - User display name in recap entries is read directly from `msg.name` on `is_user` chat entries, which already contains the active persona name. No separate persona lookup required.
+- `ownerName` added to `expression_update` packets in both the automatic update path (`sendExpressionUpdate`) and the `/mood` command path in `index.js`.
+- `websocket-router.js` extracts `data.ownerName` and passes it to `setBridgeActivity` and as a fourth arg to `fanout` for `sendExpression`.
+- `formatBridgeActivity` in `activity-format.js` accepts an optional third `ownerName` parameter and appends `(name)` to the activity string when present.
+- `setBridgeActivity` and `sendExpression` in `server/discord.js` updated to accept `ownerName`. When posting in full mode with a name present, a `channel.send` call is enqueued before the image via the per-channel queue to guarantee ordering.
+- `sendExpression` signature updated in `server/plugins/discord.js` wrapper, `plugins/telegram.js`, and `plugins/signal.js`.
 
 ## QA
 
