@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.5.0] - Upcoming
 
 ### Added
+
 - Added automatic chat recap on character, group, and chat switches. After a successful `/switchchar`, `/switchgroup`, `/switchchat`, or their numbered variants, the bridge waits for SillyTavern's `chatLoaded` event and then posts the last complete exchange from the newly loaded chat as a `recap_message` packet. On Discord this renders as styled embeds; on Telegram and Signal as plain text. Both use the persona name from `msg.name` on user entries - no separate persona lookup required.
 - Added `buildLastExchange(chat)` helper to `index.js` that walks `context.chat` backwards to collect the last user message and all trailing AI replies. AI messages are soft-capped at 10 per recap for large groups, with a note pointing to `/history` if any were omitted.
 - Added `scheduleRecap(chatId)` to `index.js` that registers a one-shot `chatLoaded` listener immediately before triggering a switch, scoping the listener tightly to the load just caused.
@@ -21,14 +22,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added `EmbedBuilder` to `discord.js` imports and `splitLongText` from `text-chunking.js`.
 
 ### Fixed
+
 - Added `/listpersonas` to `/sthelp`
 
+### Security
+
+- Added undici as an explicit direct dependency at ^6.24.0 to resolve Dependabot alerts.
+
 ### Note on Licensing
+
 To better support the project's growth and maintain compatibility with SillyTavern's AGPL requirements, we have moved to a modular licensing structure. The core bridge remains open and free under MIT, while the extension is now AGPL. See the [README](README.md#license) for details.
 
 ## [1.4.0] - 2026-03-12
 
 ### Added
+
 - Added plugin architecture primitives for frontend routing and packet fanout.
 - Added websocket packet-flow integration tests with mocked frontends (`server/websocket-router.test.js`).
 - Added optional per-plugin circuit breaker/backoff support in frontend fanout (`plugins.<name>.circuitBreaker`).
@@ -44,6 +52,7 @@ To better support the project's growth and maintain compatibility with SillyTave
 - Added `/listpersonas` command to list all personas defined in SillyTavern.
 
 ### Changed
+
 - Refactored bridge routing through a testable router layer (`server/websocket-router.js`).
 - Kept Discord as the built-in free frontend and unbundled Telegram/Signal implementations for separate private/pro distribution.
 - Added support for loading external frontend plugins via `config.externalPlugins`.
@@ -54,11 +63,13 @@ To better support the project's growth and maintain compatibility with SillyTave
 - `config.example.js` reorganized into clearly labeled sections (Essential, General, Advanced) to make initial setup easier. Existing `config.js` files from v1.3.1 continue to work without changes.
 
 ### Fixed
+
 - Alphabetical autocomplete sorting for character, group and group member lists was documented as a 1.3.0 feature but the sort function was missing from the released code.
 - Solo chat character lookup in autocomplete used `find()` with an object id that no longer exists in recent SillyTavern versions; fixed to use direct array index.
 - Browser-side image fetch limit raised from 8 MB to 50 MB so uncompressed images from local generators are no longer rejected before the server can compress them.
 
 ### Added _(Pro version only)_
+
 - Telegram frontend plugin: inbound polling via `getUpdates`, outbound text, typing indicator, images, expressions, and streaming via final-text send.
 - Telegram plugin registers bridge slash commands in the Telegram `/` command menu on startup.
 - Signal frontend plugin: inbound message subscription via WebSocket (`signal-cli-rest-api` json-rpc mode), outbound text, images, and expressions.
@@ -68,11 +79,13 @@ To better support the project's growth and maintain compatibility with SillyTave
 ## [1.3.1] - 2026-03-06
 
 ### Fixed
+
 - Reverted an unnecessary `npm audit fix --force` that had downgraded dependencies and broken the bridge.
 
 ## [1.3.0] - 2026-03-06
 
 ### Added
+
 - Expression and mood support: the bot's Discord status now reflects the active character's current expression, with matching emoji for all known default expressions.
 - `/mood <n>` command to post the current visible expression image on demand; remembers the last seen mood per character in group chats.
 - `/reaction <mode>` command to change expression display mode remotely from Discord (`off`, `status`, `full`).
@@ -85,6 +98,7 @@ To better support the project's growth and maintain compatibility with SillyTave
 - `locale` config field for controlling date and time formatting in logs and chat history. Defaults to `"en-US"`.
 
 ### Changed
+
 - All name-based autocomplete lists (characters, groups, group members) are now sorted alphabetically, with leading emoji and decorative characters ignored for sort order.
 - `/switchchat` autocomplete now shows human-readable dates and times sorted newest-first, instead of raw filenames.
 - `queueTaskTimeoutMs` renamed to `queueTaskTimeoutSeconds` - now accepts plain seconds (e.g. `30`).
@@ -93,43 +107,51 @@ To better support the project's growth and maintain compatibility with SillyTave
 - `timezone` and `locale` are now validated at startup with a clear warning and graceful fallback if either is invalid.
 
 ### Fixed
+
 - `/mood` and `/charimage` autocomplete was silently not firing due to stale Discord slash command registration.
 - Solo chat character lookup in autocomplete was using array indexing instead of `find()`, always returning undefined.
 
 ## [1.2.5] - 2026-03-03
 
 ### Fixed
+
 - Fixed npm publishing workflow.
 
 ## [1.2.4] - 2026-03-03
 
 ### Fixed
+
 - Fixed npm publishing workflow.
 
 ## [1.2.3] - 2026-03-02
 
 ### Added
+
 - Added keywords to `package.json` to improve discoverability on npm and GitHub.
 - Fully implemented GitHub Actions for automated publishing to npm and GitHub Packages.
 - Integrated `version-everything` to keep the extension manifest and server package version in sync.
 
 ### Fixed
+
 - Minor typos in README and documentation.
 - Repository structure cleaned up for local development.
 
 ## [1.2.1] - 2026-03-02
 
 ### Changed
+
 - Reduced published package size from ~16 MB to ~28 KB by properly excluding `node_modules`, local config files, and development assets.
 - Corrected package scope and registry configuration for GitHub Packages.
 - Switched README images to absolute URLs so they render correctly outside of GitHub.
 
 ### Added
+
 - Automated publishing via GitHub Actions on future releases.
 
 ## [1.2.0] - 2026-03-01
 
 ### Added
+
 - `/image <prompt>` command for AI image generation with a live placeholder while generating.
 - `/image` keyword shortcuts: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`.
 - `/charimage` command to post a character's avatar to Discord.
@@ -138,24 +160,29 @@ To better support the project's growth and maintain compatibility with SillyTave
 - Images exceeding Discord's 8 MB upload limit are automatically scaled down before sending.
 
 ### Changed
+
 - Server code restructured from a single large file into focused modules: `server.js`, `client.js`, `discord.js`, `websocket.js`, `messaging.js`, `streaming.js`, `queue.js`, `logger.js`.
 
 ### Fixed
+
 - Manual disconnect now works correctly when auto-reconnect is enabled - previously a deliberate disconnect could still trigger a reconnect.
 - Streaming no longer breaks on responses exceeding 2000 characters - live updates now truncate with an ellipsis and the full text is posted correctly once generation finishes.
 
 ## [1.1.3] - 2026-02-26
 
 ### Added
+
 - All bridge commands now register as native Discord slash commands and appear in the `/` menu automatically.
 - Live autocomplete for `/switchchar`, `/switchgroup` and `/switchchat` - shows filtered results from your SillyTavern installation as you type.
 
 ### Changed
+
 - The `applications.commands` OAuth2 scope is now required. Existing users can grant it by generating a new invite URL and opening it in a browser - no need to kick and re-invite the bot.
 
 ## [1.1.2] - 2026-02-26
 
 ### Fixed
+
 - Fixed a compatibility issue where the bot would log in but not respond to messages on newer versions of Discord.js.
 - Fixed a syntax error that caused crashes on Node.js v22 and higher.
 - Windows `start-bridge.bat` launcher now automatically runs `npm install` if dependencies are missing.
@@ -163,6 +190,7 @@ To better support the project's growth and maintain compatibility with SillyTave
 ## [1.1.1] - 2026-02-25
 
 ### Fixed
+
 - Fixed syntax errors introduced at the end of the 1.1.0 release that prevented the extension from loading.
 - Re-synced bridge server and extension logic to match intended 1.1.0 behavior.
 
@@ -173,6 +201,7 @@ To better support the project's growth and maintain compatibility with SillyTave
 ## [1.0.0] - 2026-02-25
 
 ### Added
+
 - Initial release.
 - Real-time AI response streaming from SillyTavern to Discord.
 - Slash commands: `/switchchar`, `/switchgroup`, `/newchat`, `/listchars`, `/listgroups`, `/listchats`, `/switchchat`.
