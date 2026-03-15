@@ -6,6 +6,8 @@
 
 Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming, image and expression support.
 
+*This is an independent extension for SillyTavern and is not affiliated with the SillyTavern development team*
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/senjinthedragon/SillyTavern-Discord-Connector/main/assets/SillyTavern-Discord-Bridge_1.webp" width="57%" alt="Desktop Discord chat session with images">
   <img src="https://raw.githubusercontent.com/senjinthedragon/SillyTavern-Discord-Connector/main/assets/SillyTavern-Discord-Bridge_2.webp" width="37%" alt="Mobile Discord showing group chat and /charimage autocomplete">
@@ -24,7 +26,7 @@ If this extension adds value to your roleplay experience, please consider:
 
 - [SillyTavern](https://github.com/SillyTavern/SillyTavern) (latest recommended)
 - [Node.js](https://nodejs.org/) v18 or higher
-- A Discord bot token with the **Message Content** privileged intent enabled (see step 2)
+- A Discord bot token with the **Message Content** [privileged intent](#2-create-your-discord-bot) enabled
 - A Discord server with a channel where you want to send messages. You can set this up yourself, for free, with Discord. It's at the bottom of your server list, **Add a Server** (the little icon with a + sign)
 - (optional) If you want to use the `/image` command to ai generate images, the `Image Generation` extension that comes with SillyTavern needs to be set up correctly and be working.
 - (optional) The same goes for expressions, your `Character Expressions` extension needs to be set up correctly and be working if you want those to be sent to Discord.
@@ -104,7 +106,7 @@ You can change the other lines in the `config.js` as well, but the ones listed a
 I have included a `start-bridge.bat` file in the server folder. You can run this file to start the bridge server.
 
 **Linux/Mac**:\
-Open your terminal and `cd` into the server folder listed in the previous step.
+Open your terminal and `cd` into the server folder listed in [the previous step](#3-configure-the-sillytavern-bridge-server).
 
 ```shell
 npm install // Updates dependencies and installs the bridge server.
@@ -139,6 +141,7 @@ Use these slash commands in Discord to control the session:
 | **`/listchats`** | *List saved chats for the current character with shortcut numbers* |
 | **`/switchchat <name>`** | *Load a saved chat by name - supports live autocomplete* |
 | **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
+| **`/history <n>`** | *Show the last n exchanges from the current chat, assumes 5 when not specified* |
 | **`/mood <n>`** | *Show a character's current mood and expression image. Autocompletes with group members in group chat, or the active character in solo chat* |
 | **`/charimage <n>`** | *Post a character's avatar. Autocompletes with group members in group chat, or the active character in solo chat* |
 | **`/note <text>`** | *Set the author's note for the current chat to guide how the scene develops. Omit text to read the current note* |
@@ -177,7 +180,7 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 > If you use `off` or `status` mode for reactions, run `/mood` any time you want to post the current expression image in chat.
 
 > [!NOTE]
-> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists are sorted alphabetically and refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. `/mood` and `/charimage` autocomplete with the members of your active group, or your solo character's name if you're in a solo chat. `/persona` autocompletes with the personas you have defined in SillyTavern — you can also type a name that isn't in the list to create a temporary persona on the fly. Chat history shows your most recent chats first and updates immediately after any `/newchat` or switch command issued through the bot.
+> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists are sorted alphabetically and refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. `/mood` and `/charimage` autocomplete with the members of your active group, or your solo character's name if you're in a solo chat. `/persona` autocompletes with the personas you have defined in SillyTavern - you can also type a name that isn't in the list to create a temporary persona on the fly. Chat history shows your most recent chats first and updates immediately after any `/newchat` or switch command issued through the bot.
 >
 > Numbered shortcuts (`/switchchar_3`, `/switchgroup_2`, `/switchchat_1` etc.) are not registered as slash commands because the number of entries varies for everyone. Type them as plain text messages - they work exactly the same way.
 
@@ -195,16 +198,16 @@ Images that SillyTavern adds to a reply - whether generated automatically after 
 Check that the bridge server is running and the extension shows "Connected" in green.
 
 **Message Content Intent error:**\
-This intent must be explicitly enabled in the Discord Developer Portal under your bot's settings - it is not on by default. (See step 2)
+This intent must be explicitly enabled in the Discord Developer Portal under [your bot's settings](#2-create-your-discord-bot) - it is not on by default.
 
 **Port conflict:**\
-If port 2333 is in use, change `wssPort` in `config.js` and update the bridge URL in the extension settings to match.
+If port 2333 is in use, change `wssPort` in `config.js` and update the bridge URL in the [extension settings](#3-configure-the-sillytavern-bridge-server) to match.
 
 **Autocomplete shows "Loading options failed":**\
 This can happen if Discord has cached an old version of your slash commands. Simply restart your Discord app to force it to fetch the latest command definitions from the bot.
 
 **Slash commands don't appear in Discord:**\
-The `applications.commands` scope must be included when generating the bot's invite URL (see step 2).\
+The [`applications.commands`](#2-create-your-discord-bot) scope must be included when generating the bot's invite URL.\
 If you invited the bot already, generate a new invite URL with the scope added and open it in a browser - you do not need to kick and re-invite the bot, visiting the new URL is enough to grant the missing scope. Slash commands can also take up to an hour to appear in Discord after the bridge first starts.
 
 ## Pro Plugins
@@ -213,8 +216,11 @@ Want to take your roleplay beyond Discord? **Telegram** and **Signal** plugins a
 
 - **[Contact me to get the pro plugins](https://github.com/senjinthedragon)**
 
-Each plugin comes with its own setup guide. Purchasing also directly supports continued development of the free Discord connector.
+These plugins run as independent modules on your bridge server. Each plugin comes with its own setup guide and is distributed under a proprietary license. Purchasing a pro plugin directly supports the continued development of this project!
 
 ## License
 
-MIT - see [LICENSE](LICENSE) file for full text
+This project is licensed under a split-license model to ensure compatibility with upstream requirements while keeping the core bridge open for everyone:
+
+- SillyTavern Extension (Root): Licensed under GNU AGPLv3 (see [LICENSE](LICENSE)).
+- Bridge Server (/server): Licensed under MIT (see [server/LICENSE](server/LICENSE)).

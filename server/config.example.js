@@ -1,6 +1,19 @@
-// config.example.js
-// Copy or rename this file to config.js and fill in your settings.
-// You only need to change the top section to get started.
+/**
+ * config.example.js - SillyTavern Discord Connector: Configuration Template
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See /server/LICENSE for full license information.
+ *
+ * This is a template for the bridge configuration. To get started:
+ * 1. Copy or rename this file to 'config.js' in the same directory.
+ * 2. Fill in your Discord Bot Token and user/channel restrictions.
+ * 3. Adjust advanced settings only if your environment requires it.
+ *
+ * Note: Essential settings (Discord token, access control) are at the top,
+ * followed by general environment preferences and advanced logic for 
+ * circuit breakers and pro-plugin routing.
+ */
 
 module.exports = {
   // =========================================================================
@@ -68,14 +81,14 @@ module.exports = {
   externalPlugins: [
     // {
     //   name: "telegram",
-    //   module: "plugins/telegram.js",
+    //   module: "external-plugins/telegram-pro/telegram.js",
     //   config: {
     //     botToken: "YOUR_TELEGRAM_BOT_TOKEN",
     //   },
     // },
     // {
     //   name: "signal",
-    //   module: "plugins/signal.js",
+    //   module: "external-plugins/signal-pro/signal.js",
     //   config: {
     //     baseUrl: "http://127.0.0.1:8080",
     //     account: "+31123456789",

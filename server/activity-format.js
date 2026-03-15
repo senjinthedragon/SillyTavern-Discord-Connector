@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Senjin the Dragon.
  * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
  * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
+ * See /server/LICENSE for full license information.
  *
  * Encapsulates expression normalisation and Discord activity string formatting.
  * Extracted from discord.js so the logic can be tested in isolation and reused
@@ -69,18 +69,24 @@ function normalizeExpression(expression) {
  * Returns the base activity string when the expression is empty so the bot
  * always shows something meaningful rather than a blank status.
  *
+ * When ownerName is provided it is appended in parentheses after the mood text
+ * so the emoji and mood word stay at the front where they are always visible,
+ * even if the name is long or decorated and gets clipped by Discord.
+ *
  * @param {string} activityBase - The fallback activity text (e.g. "SillyTavern Bridge v1.3.1").
  * @param {any} expression - The raw expression value from SillyTavern.
+ * @param {string|null} ownerName - Optional character name to append.
  * @returns {string}
  */
-function formatBridgeActivity(activityBase, expression) {
+function formatBridgeActivity(activityBase, expression, ownerName) {
   const normalized = normalizeExpression(expression);
 
   // Empty expression - show the base activity string instead.
   if (!normalized) return activityBase;
 
   // Known expression → mapped emoji; unknown → 🎭 as a visible fallback.
-  return `${EXPRESSION_EMOJI_MAP[normalized] || "🎭"} ${normalized}`;
+  const base = `${EXPRESSION_EMOJI_MAP[normalized] || "🎭"} ${normalized}`;
+  return ownerName?.trim() ? `${base} (${ownerName.trim()})` : base;
 }
 
 module.exports = {

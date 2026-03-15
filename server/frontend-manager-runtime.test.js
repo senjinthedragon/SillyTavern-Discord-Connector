@@ -1,3 +1,30 @@
+/**
+ * frontend-manager-runtime.test.js - SillyTavern Discord Connector: Manager Tests
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See /server/LICENSE for full license information.
+ *
+ * Integration and unit tests for the multi-frontend routing logic.
+ * This suite verifies the core "fanout" mechanism that allows a single
+ * SillyTavern message to be broadcast across multiple chat platforms.
+ *
+ * Key technical areas tested:
+ * - Dependency Injection via Cache Mocking: Uses a custom loadFrontendManager
+ * helper to inject mock configurations and loggers into the Node.js 
+ * require cache, ensuring isolated testing without side effects.
+ * - Error Isolation (Fanout): Confirms that a failure in one frontend (e.g., 
+ * a crashing Telegram bot) does not prevent message delivery to other 
+ * healthy frontends (e.g., Discord or Signal).
+ * - Complex ID Parsing: Verifies that the route parser correctly handles 
+ * platform-specific chat IDs that contain internal delimiters (like colons 
+ * in Signal IDs) without mangling them.
+ * - Circuit Breaker Integration: Validates that the manager respects 
+ * per-platform failure thresholds, effectively "silencing" a broken 
+ * connection to prevent repeated execution of known-failing code.
+ * Run with: npm test (from the server folder)
+ */
+
 "use strict";
 
 const test = require("node:test");

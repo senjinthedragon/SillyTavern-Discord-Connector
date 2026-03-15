@@ -1,5 +1,27 @@
 /**
  * config-logic.test.js - SillyTavern Discord Connector: Config Logic Tests
+ * Copyright (c) 2026 Senjin the Dragon.
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ * Licensed under the MIT License.
+ * See /server/LICENSE for full license information.
+ *
+ * Automated test suite for the configuration validation engine.
+ * Utilizes the native node:test runner and node:assert/strict to verify 
+ * that config-logic.js correctly handles user input and edge cases.
+ *
+ * Test coverage includes:
+ * - Default Assignment: Verifies that omitted optional fields receive their 
+ * proper default values and millisecond derived fields are calculated.
+ * - Credential Safety: Ensures the bridge refuses to boot if the default 
+ * placeholder Discord token is still present.
+ * - Type Integrity: Validates that list-based settings (enabledPlugins, 
+ * externalPlugins) are actual arrays of non-empty strings.
+ * - Bounds Checking: Confirms that timeout and circuit breaker values are 
+ * strictly positive numbers to prevent infinite hangs or instant failures.
+ * - Resilience: Checks the "soft-fail" logic for internationalization 
+ * settings, ensuring invalid timezones or locales produce actionable 
+ * warnings rather than fatal crashes.
+ * Run with: npm test (from the server folder)
  */
 
 "use strict";

@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Senjin the Dragon.
  * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
  * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
+ * See /server/LICENSE for full license information.
  *
  * Pure-ish packet router used by websocket.js. It centralises per-packet
  * behavior so flow tests can run with mocked frontends and state.
@@ -158,6 +158,10 @@ async function handleBridgePacket(data, deps) {
         await fanout(conversationId, "sendText", data.text.trim());
       break;
 
+    case "recap_message":
+      await fanout(conversationId, "sendRecap", data.entries || []);
+      break;
+
     case "send_images":
       await fanout(
         conversationId,
@@ -169,12 +173,14 @@ async function handleBridgePacket(data, deps) {
 
     case "expression_update": {
       const expression = (data.expression || "").trim().toLowerCase();
-      if (expression) setBridgeActivity(expression);
+      const ownerName = data.ownerName || null;
+      if (expression) setBridgeActivity(expression, ownerName);
       await fanout(
         conversationId,
         "sendExpression",
         expression,
         data.image || null,
+        ownerName,
       );
       break;
     }

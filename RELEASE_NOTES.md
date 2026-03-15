@@ -1,63 +1,60 @@
-# v1.4.0: Plugin Architecture, Multi-Platform Support, and a Polished Core
+# v1.5.0: Chat Recap, History, and Expression Attribution
 
-This release introduces a fully extensible plugin system, bringing the bridge architecture up to a new level of flexibility and testability. Discord remains the built-in free frontend, while Telegram and Signal are available as separately licensed pro plugins.
+This release adds two closely related features that solve the "where were we?" problem when switching between characters, groups, or older chats - and cleans up a long-standing ambiguity in how mood and expression updates are attributed in group sessions.
 
 ## Highlights
 
-### Plugin Architecture (Free)
-The bridge now routes all outbound packets through a clean plugin system. Each platform registers as a frontend plugin, enabling true multi-platform fanout from a single SillyTavern session. The routing layer is fully unit-tested with mocked frontends.
+### Automatic Recap on Switch
 
-- `enabledPlugins` in config selects which frontends are active.
-- `externalPlugins` allows loading pro plugin modules from outside the public repo.
-- Optional per-plugin circuit breaker protects the bridge when a frontend becomes unresponsive.
+Whenever `/switchchar`, `/switchgroup`, `/switchchat`, or their numbered variants succeed, the bridge now automatically posts the last complete exchange from the newly loaded chat - the last user message and all AI replies that followed it. This gives you immediate context without replaying the entire conversation.
 
-### Image Placeholder Fix (Free)
-Expression images, character avatars, and inline images no longer accidentally delete the "🎨 Generating image…" placeholder. Only an actual `generate_image_result` packet clears it.
+On Discord the recap renders as a series of styled embeds with a `📜 Last exchange` header, visually distinct from live AI replies. On Telegram and Signal it arrives as plain text with the same header. The recap is sent asynchronously after `chatLoaded` fires, so the "Switched to X" confirmation always arrives first and the recap follows once SillyTavern has fully loaded the new chat.
 
-### Status Improvements (Free)
-`/status` now shows a platform line indicating which frontends are loaded and active. Free version users see Telegram and Signal as ⚫ - a hint that pro plugins are available.
+For group chats the full last round is shown - the user message plus every AI reply that followed - since partial context would make it impossible to understand what happened. A soft cap of 10 AI messages per recap prevents flooding in very large groups, with a note pointing to `/history` if any were omitted.
 
-### New Immersion Commands
-Four new commands let you control your session more deeply without ever leaving Discord:
+### `/history [n]` Command
 
-- `/note <text>` — set or read the author's note to guide how the scene develops
-- `/continue` — trigger a proper AI continuation of the last message
-- `/impersonate` — have the AI write your next response in character, with an optional guiding prompt
-- `/persona <name>` — switch your active SillyTavern persona by name, with live autocomplete from your defined personas; typing an unlisted name creates a temporary persona on the fly
-- `/listpersonas` — list all personas defined in SillyTavern
+New command that posts the last `n` exchanges from the current chat, oldest first, using the same embed/plain-text rendering as the recap. Defaults to 5 exchanges if no argument is given. No upper cap - if a user asks for more exchanges than the chat contains, everything available is shown. Long messages are split at word boundaries so nothing overflows Discord's or Telegram's message size limits.
 
-### Configuration File Reorganized
-`config.example.js` is now divided into three clearly labeled sections - Essential, General, and Advanced - so new users only need to fill in the top section to get started. Existing `config.js` files from v1.3.1 work without any changes.
+Added to Discord as a native slash command with an optional integer argument. Added to Telegram's registered command list. Listed in `/sthelp`.
 
-### Telegram Plugin (Pro)
-- Full inbound/outbound support via the Telegram Bot API.
-- Slash commands registered in the Telegram `/` menu on startup.
-- Supports text, typing indicators, images, expression updates, and streaming via final-text delivery.
+### Character Names on Mood and Expression Updates
 
-### Signal Plugin (Pro)
-- Full inbound/outbound support via `signal-cli-rest-api` in json-rpc mode.
-- Inbound messages received via WebSocket subscription with automatic reconnect.
-- Supports text, images, and expression updates.
-- Includes Docker helper scripts to spin up the required `signal-cli-rest-api` container.
-- Signal credentials are stored in `data/signal-data/` in the repo root and mounted as a Docker volume, so your registration survives container restarts and rebuilds.
+In both status and full expression mode it was previously unclear which character a mood update belonged to, particularly in group chats where each character emotes independently and the updates can arrive between or after messages from different characters.
 
-## Configuration Changes
+The Discord activity string now reads `😯 surprise (Finn)` instead of just `😯 surprise`. The name is appended in parentheses so the emoji and mood word stay at the front and remain visible even when names are long or decorated with special characters - if the name gets clipped by Discord's character limit, the important part is already visible.
 
-- `enabledPlugins` - array of active frontend names. Defaults to `["discord"]`.
-- `externalPlugins` - array of `{ name, module, config }` objects for pro plugins.
-- `plugins.<name>.circuitBreaker` - optional per-plugin failure protection.
-- `conversationLinks` - optional array linking a single `conversationId` across multiple platform chat IDs for cross-platform fanout.
+In full mode, a `_Finn feels surprise_` line is posted to the channel immediately before the expression image, rendered in italics so it reads as stage direction rather than dialogue. On Telegram and Signal the mood message changes from `Mood: surprise` to `Finn feels surprise`. All three fall back gracefully to the existing nameless format if no owner name is available.
 
-## Notes for Pro Plugin Users
+## Fixes
 
-Pro plugins (Telegram, Signal) are distributed separately and loaded via `externalPlugins` in `config.js`. They are not included in this public repository. See the pro plugin documentation for setup instructions.
+- Added `/listpersonas` to `/sthelp`. The functionality was there but we forgot to mention it in there.
 
-Signal requires a running `signal-cli-rest-api` Docker container and a dedicated phone number. Telegram requires a bot token from BotFather.
+## Security
+
+- Added undici as an explicit direct dependency at ^6.24.0 to resolve Dependabot alerts.
+
+## Implementation Notes
+
+- New `buildLastExchange(chat)` helper in `index.js` walks `context.chat` backwards to extract the last user message and all trailing AI replies, with the group AI message cap applied here.
+- New `buildHistory(chat, n)` helper collects the last `n` complete exchanges oldest-first. `n = 0` returns everything.
+- New `scheduleRecap(chatId)` registers a one-shot `chatLoaded` listener immediately before triggering a switch, scoping it tightly to the load we just caused. Reads `context.chat` once the event fires and sends a `recap_message` packet.
+- New `recap_message` packet type handled in `websocket-router.js`, fanned out to `sendRecap` on each registered frontend plugin.
+- `sendRecap(channelId, entries)` added to `server/discord.js`: iterates entries, splits each with `splitLongText` at 4000 chars, wraps every chunk in an `EmbedBuilder` embed with `setColor(0x5865f2)`. First embed gets the `📜 Last exchange` title.
+- `sendRecap` added to `server/plugins/discord.js` wrapper, `plugins/telegram.js`, and `plugins/signal.js` for consistent cross-platform delivery.
+- Discord `/history` command uses option type `INTEGER` (type 4) rather than STRING, so Discord validates the input client-side. The interaction arg filter in `discord.js` was broadened from `type === 3` only to `type === 3 || type === 4` to pass integer option values through to SillyTavern.
+- User display name in recap entries is read directly from `msg.name` on `is_user` chat entries, which already contains the active persona name. No separate persona lookup required.
+- `ownerName` added to `expression_update` packets in both the automatic update path (`sendExpressionUpdate`) and the `/mood` command path in `index.js`.
+- `websocket-router.js` extracts `data.ownerName` and passes it to `setBridgeActivity` and as a fourth arg to `fanout` for `sendExpression`.
+- `formatBridgeActivity` in `activity-format.js` accepts an optional third `ownerName` parameter and appends `(name)` to the activity string when present.
+- `setBridgeActivity` and `sendExpression` in `server/discord.js` updated to accept `ownerName`. When posting in full mode with a name present, a `channel.send` call is enqueued before the image via the per-channel queue to guarantee ordering.
+- `sendExpression` signature updated in `server/plugins/discord.js` wrapper, `plugins/telegram.js`, and `plugins/signal.js`.
 
 ## QA
 
-- Full server test suite passes (27 tests, 0 failures).
-- Release checklist (`npm run release-checklist`) passes:
-  - server tests,
-  - package dry-run,
-  - release docs presence checks.
+- All 27 existing server tests pass.
+- Recap and history tested manually across `switchchar`, `switchgroup`, `switchchat`, and their numbered variants.
+
+## Note on Licensing
+
+To better support the project's growth and maintain compatibility with SillyTavern's AGPL requirements, we have moved to a modular licensing structure. The core bridge remains open and free under MIT, while the extension is now AGPL. See the [README](README.md#license) for details.

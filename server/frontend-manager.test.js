@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Senjin the Dragon.
  * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
  * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
+ * See /server/LICENSE for full license information.
  *
  * Tests for plugin-first config validation in config-logic.js, covering
  * external plugin registration and Discord token requirements.

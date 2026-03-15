@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Senjin the Dragon.
  * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
  * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
+ * See /server/LICENSE for full license information.
  *
  * Thin wrapper around console that suppresses debug-level output in production.
  * Set debug: true in config.js to enable verbose logging.

@@ -1,1 +1,14 @@
-/* All style elements for your extension go here */
+/**
+ * style.css - SillyTavern Discord Connector: Extension Stylesheet
+ * Copyright (C) 2026 Senjin the Dragon
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Styles for the settings panel, status indicators, and custom 
+ * SillyTavern UI injections. This file ensures the connector's 
+ * interface matches the native SillyTavern theme and layout.
+ */

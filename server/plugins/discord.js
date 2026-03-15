@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Senjin the Dragon.
  * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
  * Licensed under the MIT License.
- * See LICENSE file in the project root for full license information.
+ * See /server/LICENSE for full license information.
  *
  * Wraps the existing Discord transport module behind the same interface used
  * by other frontend plugins. This keeps plugin-loader.js consistent: all
@@ -38,8 +38,8 @@ function createDiscordPlugin() {
       await discord.sendGeneratedImage(chatId, images, caption);
     },
 
-    async sendExpression(chatId, expression, image) {
-      await discord.sendExpression(chatId, expression, image);
+    async sendExpression(chatId, expression, image, ownerName) {
+      await discord.sendExpression(chatId, expression, image, ownerName);
     },
 
     async streamChunk(chatId, payload) {
@@ -48,6 +48,10 @@ function createDiscordPlugin() {
 
     async streamEnd(chatId, payload) {
       return discord.streamEnd(chatId, payload);
+    },
+
+    async sendRecap(chatId, entries) {
+      await discord.sendRecap(chatId, entries);
     },
   };
 }
