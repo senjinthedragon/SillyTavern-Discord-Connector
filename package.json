@@ -27,7 +27,7 @@
     "scripts/release-checklist.js"
   ],
   "scripts": {
-    "version": "cd server && npm install && cd .. && version-everything manifest.json server/package.json && git add manifest.json server/package.json package-lock.json server/package-lock.json",
+    "version": "node -e \"if(require('child_process').execSync('git branch --show-current').toString().trim()!=='main'){process.stderr.write('Version bumps must be done on main.\\n');process.exit(1)}\" && cd server && npm install && cd .. && version-everything manifest.json server/package.json && git add manifest.json server/package.json package-lock.json server/package-lock.json",
     "bump": "npm version patch && git push origin HEAD --tags",
     "bump-minor": "npm version minor && git push origin HEAD --tags",
     "bump-major": "npm version major && git push origin HEAD --tags",
