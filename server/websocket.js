@@ -117,7 +117,10 @@ log("log", `[Bridge] WebSocket server listening on port ${wssPort}`);
 
 wss.on("connection", (ws) => {
   if (sillyTavernClient && sillyTavernClient.readyState === WebSocket.OPEN) {
-    log("warn", "[Bridge] New SillyTavern connection received while one is already active - closing previous.");
+    log(
+      "warn",
+      "[Bridge] New SillyTavern connection received while one is already active - closing previous.",
+    );
     sillyTavernClient.close(1008, "Replaced by new connection");
   }
   sillyTavernClient = ws;

@@ -51,18 +51,18 @@ const imageRateHistory = new Map();
 const imageCircuitState = new Map();
 // All counters reset to zero on extension reload (i.e. page load).
 const imageMetrics = {
-  totalRequests: 0,        // requests that passed rate + breaker checks
+  totalRequests: 0, // requests that passed rate + breaker checks
   succeeded: 0,
   timedOut: 0,
   failed: 0,
   canceled: 0,
-  rateLimited: 0,          // rejected by the per-channel rate window
-  breakerRejected: 0,      // rejected while circuit breaker was open
-  breakerTrips: 0,         // times the breaker opened due to consecutive failures
-  inFlight: 0,             // currently executing (inside enqueueImageGeneration)
+  rateLimited: 0, // rejected by the per-channel rate window
+  breakerRejected: 0, // rejected while circuit breaker was open
+  breakerTrips: 0, // times the breaker opened due to consecutive failures
+  inFlight: 0, // currently executing (inside enqueueImageGeneration)
   maxConcurrentInFlight: 0,
-  lastError: null,         // string description of the most recent failure
-  lastErrorAt: null,       // timestamp (ms) of lastError
+  lastError: null, // string description of the most recent failure
+  lastErrorAt: null, // timestamp (ms) of lastError
 };
 
 // ---------------------------------------------------------------------------

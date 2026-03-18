@@ -262,10 +262,7 @@ export async function handleUserMessage(data) {
   eventSource.on(event_types.STREAM_TOKEN_RECEIVED, streamCallback);
 
   const sendStreamEnd = () => {
-    if (
-      messageState.isStreaming &&
-      currentStreamId
-    ) {
+    if (messageState.isStreaming && currentStreamId) {
       const isGroup = !!SillyTavern.getContext().groupId;
 
       // Read chat[i].mes rather than relying on the server's pendingText (last
@@ -494,7 +491,9 @@ export async function handleExecuteCommand(data) {
         );
         if (target) {
           scheduleRecap(data.chatId);
-          await executeSlashCommandsWithOptions(`/go ${sanitizeSlashArg(target.name)}`);
+          await executeSlashCommandsWithOptions(
+            `/go ${sanitizeSlashArg(target.name)}`,
+          );
           invalidateChatCache();
           replyText = `Switched to group "${targetName}".`;
         } else {
@@ -1003,7 +1002,9 @@ export async function handleExecuteCommand(data) {
           const groups = context.groups || [];
           if (index >= 0 && index < groups.length) {
             scheduleRecap(data.chatId);
-            await executeSlashCommandsWithOptions(`/go ${sanitizeSlashArg(groups[index].name)}`);
+            await executeSlashCommandsWithOptions(
+              `/go ${sanitizeSlashArg(groups[index].name)}`,
+            );
             invalidateChatCache();
             replyText = `Switched to group "${groups[index].name}".`;
           } else {
@@ -1111,7 +1112,10 @@ export async function handleGetAutocomplete(data) {
               ...(tz ? { timeZone: tz } : {}),
             };
             try {
-              return new Intl.DateTimeFormat(sharedState.bridgeLocale || undefined, opts);
+              return new Intl.DateTimeFormat(
+                sharedState.bridgeLocale || undefined,
+                opts,
+              );
             } catch {
               return new Intl.DateTimeFormat(undefined, {
                 ...opts,
@@ -1200,5 +1204,9 @@ export async function handleGetAutocomplete(data) {
       typeof entry === "string" ? { name: entry, value: entry } : entry,
     );
 
-  safeSend({ type: "autocomplete_response", requestId: data.requestId, choices });
+  safeSend({
+    type: "autocomplete_response",
+    requestId: data.requestId,
+    choices,
+  });
 }
