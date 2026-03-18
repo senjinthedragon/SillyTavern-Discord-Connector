@@ -121,18 +121,22 @@ function parseRoute(route) {
 }
 
 function getRoutes(conversationId) {
-  const linked = routesByConversation.get(conversationId);
-  if (linked?.size) return Array.from(linked);
-
-  const routes = [];
+  // Merge dynamic routes (platforms that have sent at least one message this
+  // session) with static config routes. Previously an early-return here meant
+  // config routes were shadowed once any platform registered dynamically,
+  // breaking cross-platform fanout for platforms that hadn't spoken yet.
+  const dynamic = routesByConversation.get(conversationId);
+  const configRoutes = [];
   const links = config.conversationLinks || [];
   for (const link of links) {
     if (String(link.conversationId) !== String(conversationId)) continue;
-    if (link.discordChannelId) routes.push(`discord:${link.discordChannelId}`);
-    if (link.telegramChatId) routes.push(`telegram:${link.telegramChatId}`);
-    if (link.signalChatId) routes.push(`signal:${link.signalChatId}`);
+    if (link.discordChannelId)
+      configRoutes.push(`discord:${link.discordChannelId}`);
+    if (link.telegramChatId)
+      configRoutes.push(`telegram:${link.telegramChatId}`);
+    if (link.signalChatId) configRoutes.push(`signal:${link.signalChatId}`);
   }
-  return routes;
+  return Array.from(new Set([...(dynamic || []), ...configRoutes]));
 }
 
 async function fanout(conversationId, fnName, ...args) {

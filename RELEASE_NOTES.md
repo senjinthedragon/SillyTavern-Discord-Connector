@@ -86,6 +86,21 @@ SillyTavern's slash command runner supports pipe chaining (`|`), meaning a craft
 
 The `sanitizePersonaName` helper has been renamed `sanitizeSlashArg` and is now applied to every point where user-supplied or externally-sourced text is interpolated into a slash command string. `/switchgroup` group names (from ST's own data, not user input) are also sanitized as an extra precaution.
 
+### Cross-platform sync now works correctly
+
+Two bugs were preventing the multi-platform sync from behaving as intended when `conversationLinks` is configured.
+
+**What was broken:**
+
+`getRoutes` had an early-return that checked for dynamically-registered routes first (platforms that had already sent a message this session). Once any platform sent a message, only that platform's route was returned, silently dropping AI replies, mood updates, and recap messages for every other platform in the conversation. A Discord user typing first would mean Telegram received nothing until the Telegram user also typed.
+
+Additionally, user messages were only forwarded to SillyTavern - they were never echoed to the other platforms in the conversation, so a message sent on Discord was invisible on Telegram and Signal until the AI replied.
+
+**What was fixed:**
+
+- Dynamic routes and static config routes are now merged on every `getRoutes` lookup. All configured platforms receive fanout for every AI reply, mood update, and recap, regardless of whether they have sent a message this session.
+- User messages are now cross-relayed to all other platforms in the same conversation immediately when they arrive. Each relay is prefixed with `[platform]` so the origin is clear: `[discord] Hello there`. This keeps every connected client in sync in real time.
+
 ### Other fixes
 
 - Rapid successive `/switchchar`, `/switchgroup`, or `/switchchat` commands no longer send duplicate recap messages. Each call to `scheduleRecap` now cancels any previously pending listener before registering a new one.

@@ -90,6 +90,24 @@ const pluginLoader = createPluginLoader({
       platform,
       ...(mappedPersona ? { mappedPersona } : {}),
     });
+
+    // Cross-relay the user's message to all other platforms in the same
+    // conversation so every connected client stays in sync.
+    const originKey = `${platform}:${chatId}`;
+    const relayText = `[${platform}] ${text}`;
+    for (const route of getRoutes(conversationId)) {
+      if (route === originKey) continue;
+      const { platform: targetPlatform, nativeChatId: targetChatId } =
+        parseRoute(route);
+      const frontend = getFrontend(targetPlatform);
+      if (!frontend?.sendText) continue;
+      frontend.sendText(targetChatId, relayText).catch((err) => {
+        log(
+          "warn",
+          `[Bridge] Cross-relay to ${route} failed: ${err.message}`,
+        );
+      });
+    }
   },
   onCommand(platform, chatId, command, args, userId = "") {
     const conversationId = resolveConversationId(platform, chatId);
