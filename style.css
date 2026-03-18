@@ -8,15 +8,16 @@
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * All colors are derived from currentColor or low-opacity neutrals so the
- * panel looks correct regardless of which SillyTavern theme is active.
- * Hardcoded colors are used only for semantic status indicators (green/red).
+ * Colors are either currentColor, low-opacity neutrals, or the universal
+ * dark-on-light tooltip convention - so the panel adapts to any ST theme.
+ * The only hardcoded colors are semantic: green/red for connection status
+ * (set by index.js) and the tooltip background (dark bg + light text is
+ * the convention regardless of page theme).
  */
 
 /* ---------------------------------------------------------------------------
  * Section titles
- * Small all-caps label that groups related settings. A faint border underneath
- * provides separation without introducing a specific color.
+ * Small all-caps label that groups related settings visually.
  * --------------------------------------------------------------------------- */
 .dc-section-title {
   margin: 14px 0 6px;
@@ -29,17 +30,14 @@
   padding-bottom: 4px;
 }
 
-/* Remove the top margin on the very first section title so it sits flush with
- * the top of the drawer content. */
 .inline-drawer-content .dc-section-title:first-child {
   margin-top: 4px;
 }
 
 /* ---------------------------------------------------------------------------
  * Connection status badge
- * Shown between the buttons and the auto-connect checkbox. The JS in index.js
- * sets element.style.color directly for green/red/orange; the badge just
- * provides a subtle container and consistent typography.
+ * The JS in index.js sets element.style.color directly for green/red/orange;
+ * the badge provides a subtle container and consistent typography around it.
  * --------------------------------------------------------------------------- */
 .dc-status {
   margin: 6px 0;
@@ -52,21 +50,80 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Helper text
- * Used under selects and checkboxes. Replaces the previous inline
- * style="opacity: 0.8" approach for consistency.
- * --------------------------------------------------------------------------- */
-.dc-hint {
-  display: block;
-  font-size: 0.8em;
-  line-height: 1.45;
-  opacity: 0.6;
-}
-
-/* ---------------------------------------------------------------------------
  * Block spacing
- * A small consistent gap between each setting row.
  * --------------------------------------------------------------------------- */
 .discord-connector_block {
   margin-bottom: 6px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Info icon and tooltip
+ *
+ * Usage: <span class="dc-info" data-tooltip="Your explanation here.">ⓘ</span>
+ *
+ * The tooltip is positioned above the icon by default. It uses a dark
+ * background with light text - the universal tooltip convention that works
+ * in both light and dark themes without needing to know the active theme's
+ * color values.
+ * --------------------------------------------------------------------------- */
+.dc-info {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  font-style: normal;
+  font-size: 0.85em;
+  margin-left: 3px;
+  opacity: 0.45;
+  vertical-align: middle;
+  transition: opacity 0.1s ease;
+  /* Ensure the tooltip isn't clipped by overflow:hidden ancestors */
+  z-index: 0;
+}
+
+.dc-info:hover {
+  opacity: 0.9;
+}
+
+/* Tooltip bubble */
+.dc-info::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 240px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  background: rgba(18, 18, 18, 0.93);
+  color: #e8e8e8;
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 9999;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+/* Caret arrow pointing down toward the icon */
+.dc-info::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(18, 18, 18, 0.93);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 9999;
+}
+
+.dc-info:hover::after,
+.dc-info:hover::before {
+  opacity: 1;
 }
