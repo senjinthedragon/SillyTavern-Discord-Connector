@@ -2370,6 +2370,66 @@ jQuery(async () => {
     $("#discord_connect_button").on("click", connect);
     $("#discord_disconnect_button").on("click", disconnect);
 
+    // -----------------------------------------------------------------------
+    // Global tooltip for .dc-info elements
+    //
+    // Uses position:fixed so it escapes ST's overflow:hidden extensions panel.
+    // Handles mouse, keyboard (focus/blur), and touch (tap to toggle).
+    // -----------------------------------------------------------------------
+    const $tip = $('<div id="dc-tooltip"></div>').appendTo("body");
+    let tipTarget = null;
+
+    function showTip(el) {
+      const text = el.getAttribute("data-tooltip");
+      if (!text) return;
+      tipTarget = el;
+      $tip.text(text);
+
+      // Position above the icon, centered horizontally, clamped to viewport
+      const r = el.getBoundingClientRect();
+      const tipW = 240; // max-width from CSS
+      let left = r.left + r.width / 2 - tipW / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+
+      $tip.css({ left: left + "px", top: "", bottom: "" });
+
+      // Measure actual rendered height after setting text/position
+      $tip.addClass("dc-tooltip-visible");
+      const tipH = $tip.outerHeight();
+      $tip.removeClass("dc-tooltip-visible");
+
+      // Prefer above; fall back to below if it would clip the top
+      if (r.top - tipH - 10 >= 8) {
+        $tip.css({ top: r.top - tipH - 10 + "px" });
+      } else {
+        $tip.css({ top: r.bottom + 8 + "px" });
+      }
+
+      $tip.addClass("dc-tooltip-visible");
+    }
+
+    function hideTip() {
+      tipTarget = null;
+      $tip.removeClass("dc-tooltip-visible");
+    }
+
+    // Mouse
+    $(document).on("mouseenter", ".dc-info", function () { showTip(this); });
+    $(document).on("mouseleave", ".dc-info", hideTip);
+
+    // Keyboard (tabindex="0" on each .dc-info)
+    $(document).on("focus", ".dc-info", function () { showTip(this); });
+    $(document).on("blur", ".dc-info", hideTip);
+
+    // Touch - tap to toggle, tap anywhere else to hide
+    $(document).on("touchstart", ".dc-info", function (e) {
+      e.preventDefault();
+      if (tipTarget === this) { hideTip(); } else { showTip(this); }
+    });
+    $(document).on("touchstart", function (e) {
+      if (tipTarget && !$(e.target).closest(".dc-info").length) hideTip();
+    });
+
     if (settings.autoConnect) connect();
   } catch (error) {
     console.error("[Discord Bridge] Failed to load settings UI:", error);

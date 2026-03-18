@@ -59,15 +59,14 @@
 /* ---------------------------------------------------------------------------
  * Info icon and tooltip
  *
- * Usage: <span class="dc-info" data-tooltip="Your explanation here.">ⓘ</span>
+ * Usage: <span class="dc-info" tabindex="0" data-tooltip="Your explanation here.">ⓘ</span>
  *
- * The tooltip is positioned above the icon by default. It uses a dark
- * background with light text - the universal tooltip convention that works
- * in both light and dark themes without needing to know the active theme's
- * color values.
+ * The tooltip itself is a single #dc-tooltip div injected into <body> by
+ * index.js and positioned with position:fixed via getBoundingClientRect().
+ * This escapes any overflow:hidden ancestor (like ST's extensions panel)
+ * and works consistently across all viewport sizes including tablets.
  * --------------------------------------------------------------------------- */
 .dc-info {
-  position: relative;
   display: inline-block;
   cursor: help;
   font-style: normal;
@@ -76,22 +75,18 @@
   opacity: 0.45;
   vertical-align: middle;
   transition: opacity 0.1s ease;
-  /* Ensure the tooltip isn't clipped by overflow:hidden ancestors */
-  z-index: 0;
 }
 
-.dc-info:hover {
+.dc-info:hover,
+.dc-info:focus {
   opacity: 0.9;
+  outline: none;
 }
 
-/* Tooltip bubble */
-.dc-info::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: max-content;
+/* Global tooltip div - created once by index.js, reused for all .dc-info elements */
+#dc-tooltip {
+  position: fixed;
+  z-index: 99999;
   max-width: 240px;
   padding: 7px 10px;
   border-radius: 5px;
@@ -102,28 +97,11 @@
   line-height: 1.45;
   white-space: normal;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  z-index: 9999;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
-}
-
-/* Caret arrow pointing down toward the icon */
-.dc-info::before {
-  content: "";
-  position: absolute;
-  bottom: calc(100% + 2px);
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: rgba(18, 18, 18, 0.93);
-  pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
-  z-index: 9999;
 }
 
-.dc-info:hover::after,
-.dc-info:hover::before {
+#dc-tooltip.dc-tooltip-visible {
   opacity: 1;
 }
