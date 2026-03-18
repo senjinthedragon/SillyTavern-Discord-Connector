@@ -99,7 +99,20 @@ Additionally, user messages were only forwarded to SillyTavern - they were never
 **What was fixed:**
 
 - Dynamic routes and static config routes are now merged on every `getRoutes` lookup. All configured platforms receive fanout for every AI reply, mood update, and recap, regardless of whether they have sent a message this session.
-- User messages are now cross-relayed to all other platforms in the same conversation immediately when they arrive. Each relay is prefixed with `[platform]` so the origin is clear: `[discord] Hello there`. This keeps every connected client in sync in real time.
+- User messages are now cross-relayed to all other platforms in the same conversation immediately when they arrive, labelled with the sender's persona name - for example `Senjin: Hello there`. This keeps every connected client in sync in real time. The label is resolved from the `/mypersona` mapping if set, otherwise from the active ST persona sent by the extension on connect, otherwise `[platform]` as a last resort.
+- Discord messages are now included in the cross-relay. Previously Discord sent messages directly to SillyTavern without echoing them to Telegram or Signal.
+
+### Signal UUID compatibility
+
+Newer versions of `signal-cli-rest-api` identify senders by UUID rather than phone number in the `source` field of the WebSocket envelope. This caused `conversationLinks` lookups to silently fail - the UUID never matched the phone number in `signalChatId`, so Signal messages were routed in isolation regardless of how the config was set up.
+
+The Signal plugin now reads `sourceNumber` (the E.164 phone number) first and only falls back to `source` if `sourceNumber` is absent. If you previously worked around this by putting a UUID in `signalChatId`, switch it back to the phone number - the plugin will now match it correctly.
+
+If a platform message still doesn't match any `conversationLinks` entry, the server now logs a warning pointing to the mismatch so it is easy to spot.
+
+### /status shows persona name
+
+The `/status` command now shows your active persona's display name (e.g. `🎭 Senjin`) instead of its internal ID key.
 
 ### Other fixes
 
