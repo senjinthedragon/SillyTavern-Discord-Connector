@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Telegram plugin passes `msg.from?.id` as `userId` in both `onUserMessage` and `onCommand` calls. In direct messages this is the Telegram user's numeric ID; in group contexts it distinguishes individual senders from the group chat ID.
 - Signal plugin passes `source` (the sender's phone number) as `userId` in both callback calls. For Signal this is the same value as `chatId` since Signal conversations are identified by phone number, but having it explicit in the packet keeps the persona-map contract consistent with the other platforms.
 - Added `/mypersona` to Telegram's registered bot command list so it appears in Telegram's `/` command menu.
+- Added `persona-map.test.js` with 11 tests covering the two-source merge logic, runtime-over-config priority, file persistence, ENOENT resilience, and empty-key cleanup. `websocket-router.test.js` extended with 3 tests for the `save_user_persona` packet path. `websocket-router.js` refactored to receive `setPersonaForUser` via deps injection (consistent with the rest of the file) so it can be properly mocked in tests.
 
 ### Fixed
 
