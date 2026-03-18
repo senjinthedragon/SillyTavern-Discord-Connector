@@ -1064,7 +1064,7 @@ async function handleUserMessage(data) {
   // Also forwards any images embedded in the last AI message (post-generation
   // art, etc.). Not awaited so text reaches Discord first.
   const collectAndSendReplies = () => {
-    if (!messageState.chatId || ws?.readyState !== WebSocket.OPEN) return;
+    if (!messageState.chatId) return;
     const { chat } = SillyTavern.getContext();
     if (!chat || chat.length < 2) return;
 
@@ -1077,21 +1077,17 @@ async function handleUserMessage(data) {
     }
 
     if (aiMessages.length > 0) {
-      ws.send(
-        JSON.stringify({
-          type: "ai_reply",
-          chatId: messageState.chatId,
-          messages: aiMessages,
-        }),
-      );
+      safeSend({
+        type: "ai_reply",
+        chatId: messageState.chatId,
+        messages: aiMessages,
+      });
     } else {
-      ws.send(
-        JSON.stringify({
-          type: "error_message",
-          chatId: messageState.chatId,
-          text: "Something went wrong and no response was found. Try again?",
-        }),
-      );
+      safeSend({
+        type: "error_message",
+        chatId: messageState.chatId,
+        text: "Something went wrong and no response was found. Try again?",
+      });
     }
 
     sendLastMessageImages(messageState.chatId);
@@ -1130,7 +1126,7 @@ async function handleUserMessage(data) {
     sendStreamEnd();
     if (!SillyTavern.getContext().groupId) {
       removeAllListeners();
-      setTimeout(collectAndSendReplies, 100);
+      collectAndSendReplies();
     }
   };
   eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded);
@@ -1138,7 +1134,7 @@ async function handleUserMessage(data) {
   // Fires once after all group members have finished generating.
   const onGroupFinished = () => {
     removeAllListeners();
-    setTimeout(collectAndSendReplies, 100);
+    collectAndSendReplies();
   };
   eventSource.on(GROUP_WRAPPER_FINISHED, onGroupFinished);
 

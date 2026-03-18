@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added a note to the Pro Plugins section of `README.md` explaining that Telegram and Signal plugins have no built-in user allow-list, and are intended for personal or small-group use rather than publicly accessible bots.
 - `expressionCache` is now cleared on every character, group, or chat switch, and on `/newchat`. Previously the cache grew without bound across the session and could serve stale mood snapshots from characters no longer active. Since each new chat starts fresh and the AI regenerates moods on load anyway, there is no value in keeping entries across switches.
 - `generateAndSendImage` refactored from `new Promise(async (resolve) => {...})` to a plain `async` function using the deferred promise pattern. The Promise executor is now synchronous; `await executeSlashCommandsWithOptions(...)` runs in the async function body where errors cannot be silently swallowed by the executor.
+- `collectAndSendReplies` no longer uses a 100ms `setTimeout` to wait for the chat array to settle after generation ends. Reading the SillyTavern source confirmed that by the time `GENERATION_ENDED` (solo) or `GROUP_WRAPPER_FINISHED` (group) fires, ST has already written all messages to `context.chat` - the delay was never needed. The function is now called directly, eliminating the theoretical race. The redundant `ws?.readyState !== WebSocket.OPEN` guard in the early-return was also removed since all sends go through `safeSend`.
 
 ### Fixed
 

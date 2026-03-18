@@ -44,6 +44,10 @@ The timeout case is handled differently by design: if an image arrives after the
 
 The mood snapshot cache (`expressionCache`) is now cleared whenever you switch character, group, or chat, and on `/newchat`. Previously it accumulated entries indefinitely and could serve a stale mood from a character active in a past session. Since every new chat starts fresh and the AI regenerates moods on load anyway, keeping old entries across switches has no benefit.
 
+### `collectAndSendReplies` timing fix
+
+`collectAndSendReplies` used a 100ms `setTimeout` after `GENERATION_ENDED` / `GROUP_WRAPPER_FINISHED` to wait for SillyTavern's chat array to settle before reading it. Checking the ST source confirmed this was unnecessary: by the time either event fires, ST has already fully written all messages to `context.chat` (during `onFinishStreaming`, which is awaited before the stop button is hidden). The timeout has been removed and the function is now called directly - no race, no arbitrary delay.
+
 ### `generateAndSendImage` async refactor
 
 `generateAndSendImage` was using the `new Promise(async (resolve) => {...})` anti-pattern, where an unhandled error inside the async executor can silently swallow the rejection and leave the promise permanently pending. It has been refactored to a plain `async` function - the observer, timeout, and cancel job are set up synchronously, the `/sd` command is awaited in the function body, and the promise is returned at the end. Behaviour is identical; errors are now properly propagable.
