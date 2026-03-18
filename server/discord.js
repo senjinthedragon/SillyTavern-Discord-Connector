@@ -276,9 +276,46 @@ const autocompleteDebouncers = {};
 const pendingAutocompletes = {};
 
 // Tracks the Discord message sent as an image placeholder ("🎨 Generating image…")
-// keyed by channelId. Deleted by sendImages when the real image arrives, or
-// edited to an error message if generation fails.
+// keyed by channelId. Each entry is { msg, timerId } - msg is the Discord Message
+// object and timerId is the handle for the live countdown timer. Cleared by
+// sendGeneratedImage when the real image arrives.
 const placeholderMessages = {};
+
+// Edits the placeholder message on a self-rescheduling timer to show how much
+// generation time remains. Updates every 60 seconds while more than one minute
+// remains, then every 10 seconds during the final minute.
+function startPlaceholderCountdown(channelId, msg, timeoutMs) {
+  const endTime = Date.now() + timeoutMs;
+
+  function formatRemaining(ms) {
+    if (ms <= 60_000) {
+      return `${Math.ceil(ms / 1_000)} seconds remaining`;
+    }
+    const minutes = Math.ceil(ms / 60_000);
+    return `${minutes} minute${minutes !== 1 ? 's' : ''} remaining`;
+  }
+
+  function scheduleNext() {
+    const remaining = endTime - Date.now();
+    if (remaining <= 0) return null;
+    const delay = remaining > 60_000 ? 60_000 : 10_000;
+    return setTimeout(async () => {
+      if (!placeholderMessages[channelId]) return;
+      const rem = endTime - Date.now();
+      if (rem <= 0) return;
+      try {
+        await msg.edit(`🎨 Generating image… (${formatRemaining(rem)}; use /image cancel to abort)`);
+      } catch {
+        // Message was deleted or inaccessible - stop the countdown.
+        return;
+      }
+      if (!placeholderMessages[channelId]) return;
+      placeholderMessages[channelId].timerId = scheduleNext();
+    }, delay);
+  }
+
+  return scheduleNext();
+}
 
 // Maps each autocomplete-enabled command to the list type the extension queries.
 // charimage uses "group_members" (active group only, not the full library).
@@ -498,11 +535,16 @@ async function sendText(channelId, text) {
   if (!channel) return;
   enqueue(channelId, async () => {
     const msg = await sendLong(channel, text);
-    // Save the message reference so sendImages can delete it when the real
-    // image arrives. Keyed by channelId - only one placeholder per channel
+    // Save the message reference so sendGeneratedImage can delete it when the
+    // real image arrives. Keyed by channelId - only one placeholder per channel
     // at a time since image generation is serialised per channel.
     if (text.includes('🎨 Generating image')) {
-      placeholderMessages[channelId] = msg;
+      const timerId = startPlaceholderCountdown(channelId, msg, config.imagePlaceholderTimeoutMs);
+      placeholderMessages[channelId] = { msg, timerId };
+    } else if (placeholderMessages[channelId]) {
+      // A non-placeholder text (e.g. an error message) arrived while a countdown
+      // is running - stop the timer so it no longer edits the stale placeholder.
+      clearTimeout(placeholderMessages[channelId].timerId);
     }
   });
 }
@@ -527,7 +569,8 @@ async function sendGeneratedImage(channelId, images, caption) {
   if (!channel) return;
   enqueue(channelId, async () => {
     if (placeholderMessages[channelId]) {
-      await placeholderMessages[channelId].delete().catch((err) => {
+      clearTimeout(placeholderMessages[channelId].timerId);
+      await placeholderMessages[channelId].msg.delete().catch((err) => {
         log('warn', `[Images] Could not delete placeholder: ${err.message}`);
       });
       delete placeholderMessages[channelId];
