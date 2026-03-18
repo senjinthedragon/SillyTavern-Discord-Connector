@@ -222,6 +222,8 @@ Want to take your roleplay beyond Discord? **Telegram** and **Signal** plugins a
 
 These plugins run as independent modules on your bridge server. Each plugin comes with its own setup guide and is distributed under a proprietary license. Purchasing a pro plugin directly supports the continued development of this project!
 
+> **Note:** Unlike the Discord plugin, the Telegram and Signal plugins do not have a built-in user allow-list. They are designed for personal or small-group use where you control who has the phone number or bot link. If you expose them publicly, anyone who can reach your bot can send messages to your SillyTavern instance.
+
 ## License
 
 This project is licensed under a split-license model to ensure compatibility with upstream requirements while keeping the core bridge open for everyone:

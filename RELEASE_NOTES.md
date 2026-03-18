@@ -38,6 +38,16 @@ Previously, `/image cancel` removed the placeholder and stopped the countdown, b
 
 The timeout case is handled differently by design: if an image arrives after the bridge gave up waiting, it is still posted but with a brief note - "_(Image arrived after timeout)_" - so the user gets their image and the manager has a clear hint that `imagePlaceholderTimeoutSeconds` in `config.js` may need to be raised.
 
+## Changes
+
+### `safeSend()` helper in the extension
+
+All the repeated `if (ws?.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({...})); }` blocks throughout `index.js` have been collapsed into a single `safeSend(payload)` helper. Same behaviour, ~15 fewer copies of the boilerplate.
+
+### Telegram and Signal allow-list note in README
+
+The Pro Plugins section of the README now calls out that Telegram and Signal plugins have no built-in user allow-list. This is intentional - they are designed for personal use where you control who has access. The note is there so anyone setting up a more open deployment knows to account for this.
+
 ## Fixes
 
 ### Slash command injection hardening

@@ -26,6 +26,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `/image cancel` now truly prevents a late-arriving image from being posted. When the user cancels, the request ID is added to a `cancelledImageRequests` set on the bridge; if the image arrives after the fact, `generate_image_result` silently discards it. Likewise, images that arrive after a timeout are sent with a short note - "_(Image arrived after timeout - consider increasing `imagePlaceholderTimeoutSeconds` in config.js.)_" - so users still receive the image but the manager has a clear signal that the timeout is too short. Both sets self-expire after 30 minutes in the unlikely event the image never arrives. A `reason` field (`"cancelled"` | `"timed_out"` | `"failed"`) was added to `generate_image_error` packets so the bridge can distinguish between the three outcomes.
 
+### Changed
+
+- All `ws?.readyState === WebSocket.OPEN` + `ws.send(JSON.stringify(...))` guard-and-send call sites in `index.js` have been replaced with a `safeSend(payload)` helper. This removes roughly 15 copies of the same boilerplate and means the readyState check is enforced in one place.
+- Added a note to the Pro Plugins section of `README.md` explaining that Telegram and Signal plugins have no built-in user allow-list, and are intended for personal or small-group use rather than publicly accessible bots.
+
 ### Fixed
 
 - `sanitizePersonaName` has been renamed to `sanitizeSlashArg` and applied consistently to all user-supplied arguments before they are interpolated into slash command strings passed to `executeSlashCommandsWithOptions`. The original fix only covered persona names; `/note`, `/impersonate`, and `/sd` prompts were left unsanitized and vulnerable to the same pipe-chaining injection (`hello | /newchat`). `/switchgroup` group names (sourced from ST's own data rather than user input) are also now sanitized as defence in depth. The fix applies to every call site where user-controlled or externally-sourced text reaches the slash command runner.

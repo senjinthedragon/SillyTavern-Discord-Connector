@@ -97,6 +97,11 @@ const GROUP_WRAPPER_FINISHED =
   event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
 
 let ws = null;
+
+function safeSend(payload) {
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+}
+
 let shouldReconnect = true;
 let reconnectTimeout = null;
 let heartbeatInterval = null;
@@ -609,9 +614,7 @@ function captureAndSendIntroMessage(chatId) {
     const mesText = mesEl.querySelector(".mes_text");
     if (!mesText) return;
     const text = extractTextFromMesText(mesText);
-    if (text && ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "intro_message", chatId, text }));
-    }
+    if (text) safeSend({ type: "intro_message", chatId, text });
     await sendImagesFromMesText(chatId, mesText);
   };
 
@@ -813,16 +816,12 @@ function generateAndSendImage(chatId, requestId, prompt) {
   return new Promise(async (resolve) => {
     const chatEl = document.getElementById("chat");
     if (!chatEl || ws?.readyState !== WebSocket.OPEN) {
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({
-            type: "generate_image_error",
-            chatId,
-            requestId,
-            text: "Could not find the SillyTavern chat element.",
-          }),
-        );
-      }
+      safeSend({
+        type: "generate_image_error",
+        chatId,
+        requestId,
+        text: "Could not find the SillyTavern chat element.",
+      });
       return resolve({ status: "failed", reason: "chat_element_missing" });
     }
 
@@ -874,16 +873,12 @@ function generateAndSendImage(chatId, requestId, prompt) {
         return;
       }
       finish("success", null, () => {
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "generate_image_result",
-              chatId,
-              requestId,
-              image: { type: "inline", ...fetched },
-            }),
-          );
-        }
+        safeSend({
+          type: "generate_image_result",
+          chatId,
+          requestId,
+          image: { type: "inline", ...fetched },
+        });
       });
     };
 
@@ -987,11 +982,7 @@ async function handleUserMessage(data) {
 
   const messageState = { chatId: data.chatId, isStreaming: false };
 
-  if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(
-      JSON.stringify({ type: "typing_action", chatId: messageState.chatId }),
-    );
-  }
+  safeSend({ type: "typing_action", chatId: messageState.chatId });
 
   await sendMessageAsUser(data.text);
 
@@ -1052,15 +1043,13 @@ async function handleUserMessage(data) {
         );
       }
 
-      ws.send(
-        JSON.stringify({
-          type: "stream_end",
-          chatId: messageState.chatId,
-          streamId: currentStreamId,
-          characterName: isGroup ? currentCharacterName : null,
-          finalText,
-        }),
-      );
+      safeSend({
+        type: "stream_end",
+        chatId: messageState.chatId,
+        streamId: currentStreamId,
+        characterName: isGroup ? currentCharacterName : null,
+        finalText,
+      });
     }
     messageState.isStreaming = false;
     currentStreamId = null;
@@ -1163,15 +1152,11 @@ async function handleUserMessage(data) {
   } catch (error) {
     console.error("[Discord Bridge] Generation error:", error);
     await deleteLastMessage();
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: "error_message",
-          chatId: messageState.chatId,
-          text: `Generation failed. Your message was retracted - try again.\n\nError: ${error.message || "Unknown"}`,
-        }),
-      );
-    }
+    safeSend({
+      type: "error_message",
+      chatId: messageState.chatId,
+      text: `Generation failed. Your message was retracted - try again.\n\nError: ${error.message || "Unknown"}`,
+    });
     removeAllListeners();
     sendStreamEnd();
   }
@@ -1315,15 +1300,7 @@ function scheduleRecap(chatId) {
     const { chat } = SillyTavern.getContext();
     const result = buildLastExchange(chat);
     if (!result) return;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: "recap_message",
-          chatId,
-          entries: result.entries,
-        }),
-      );
-    }
+    safeSend({ type: "recap_message", chatId, entries: result.entries });
   };
   eventSource.once(event_types.CHAT_LOADED, _pendingRecapListener);
 }
@@ -1334,9 +1311,7 @@ function scheduleRecap(chatId) {
  */
 async function handleExecuteCommand(data) {
   lastActiveChatId = data.chatId || lastActiveChatId;
-  if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "typing_action", chatId: data.chatId }));
-  }
+  safeSend({ type: "typing_action", chatId: data.chatId });
 
   let replyText = "Command execution failed, try again later.";
   const context = SillyTavern.getContext();
@@ -1537,17 +1512,13 @@ async function handleExecuteCommand(data) {
           }
         }
 
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "expression_update",
-              expression: snapshot.expression,
-              ownerName: snapshot.ownerName || null,
-              chatId: data.chatId,
-              image: snapshot.image,
-            }),
-          );
-        }
+        safeSend({
+          type: "expression_update",
+          expression: snapshot.expression,
+          ownerName: snapshot.ownerName || null,
+          chatId: data.chatId,
+          image: snapshot.image,
+        });
 
         const ownerPrefix = snapshot.ownerName
           ? `**${snapshot.ownerName}**: `
@@ -1635,16 +1606,12 @@ async function handleExecuteCommand(data) {
         const requestId = makeImageRequestId();
         imageMetrics.totalRequests += 1;
 
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "image_placeholder",
-              chatId: data.chatId,
-              requestId,
-              text: `🎨 Generating image… (timeout: ${imageGenerationTimeoutMs / 60_000} minutes; use /image cancel to abort)`,
-            }),
-          );
-        }
+        safeSend({
+          type: "image_placeholder",
+          chatId: data.chatId,
+          requestId,
+          text: `🎨 Generating image… (timeout: ${imageGenerationTimeoutMs / 60_000} minutes; use /image cancel to abort)`,
+        });
 
         // Queue and return early - generate_image_result/error sends its own packets.
         enqueueImageGeneration(data.chatId, async () => {
@@ -1758,33 +1725,25 @@ async function handleExecuteCommand(data) {
           break;
         }
         if (personaArg.toLowerCase() === "clear") {
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(
-              JSON.stringify({
-                type: "save_user_persona",
-                chatId: data.chatId,
-                platform: data.platform || "discord",
-                userId: data.userId || "",
-                personaName: null,
-              }),
-            );
-          }
+          safeSend({
+            type: "save_user_persona",
+            chatId: data.chatId,
+            platform: data.platform || "discord",
+            userId: data.userId || "",
+            personaName: null,
+          });
           replyText =
             "Your persona preference has been cleared. Messages will use whatever persona is currently active.";
           break;
         }
         await executeSlashCommandsWithOptions(`/persona-set ${personaArg}`);
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "save_user_persona",
-              chatId: data.chatId,
-              platform: data.platform || "discord",
-              userId: data.userId || "",
-              personaName: personaArg,
-            }),
-          );
-        }
+        safeSend({
+          type: "save_user_persona",
+          chatId: data.chatId,
+          platform: data.platform || "discord",
+          userId: data.userId || "",
+          personaName: personaArg,
+        });
         replyText = `Persona _${personaArg}_ saved. It will be set automatically each time you send a message.`;
         break;
       }
@@ -1915,15 +1874,7 @@ async function handleExecuteCommand(data) {
           replyText = "No chat history found.";
           break;
         }
-        if (ws?.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "recap_message",
-              chatId: data.chatId,
-              entries,
-            }),
-          );
-        }
+        safeSend({ type: "recap_message", chatId: data.chatId, entries });
         replyText = `Showing last ${n > 0 ? n : "all"} exchange(s).`;
         break;
       }
@@ -1991,15 +1942,7 @@ async function handleExecuteCommand(data) {
     replyText = `Error executing command: ${error.message || "Unknown error"}`;
   }
 
-  if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(
-      JSON.stringify({
-        type: "ai_reply",
-        chatId: data.chatId,
-        text: replyText,
-      }),
-    );
-  }
+  safeSend({ type: "ai_reply", chatId: data.chatId, text: replyText });
 }
 
 /**
@@ -2175,15 +2118,7 @@ async function handleGetAutocomplete(data) {
       typeof entry === "string" ? { name: entry, value: entry } : entry,
     );
 
-  if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(
-      JSON.stringify({
-        type: "autocomplete_response",
-        requestId: data.requestId,
-        choices,
-      }),
-    );
-  }
+  safeSend({ type: "autocomplete_response", requestId: data.requestId, choices });
 }
 
 // ---------------------------------------------------------------------------
@@ -2221,8 +2156,7 @@ function connect() {
     scheduleExpressionUpdate(lastActiveChatId);
     if (heartbeatInterval) clearInterval(heartbeatInterval);
     heartbeatInterval = setInterval(() => {
-      if (ws?.readyState === WebSocket.OPEN)
-        ws.send(JSON.stringify({ type: "heartbeat" }));
+      safeSend({ type: "heartbeat" });
     }, 30000);
   };
 
@@ -2294,14 +2228,12 @@ function connect() {
       }
     } catch (error) {
       console.error("[Discord Bridge] Message handling error:", error);
-      if (data?.chatId && ws?.readyState === WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({
-            type: "error_message",
-            chatId: data.chatId,
-            text: "Internal error processing request.",
-          }),
-        );
+      if (data?.chatId) {
+        safeSend({
+          type: "error_message",
+          chatId: data.chatId,
+          text: "Internal error processing request.",
+        });
       }
     }
   };
