@@ -37,6 +37,8 @@ const {
   setPersonaForUser,
   setDefaultPersonaName,
   getDefaultPersonaName,
+  setCrossRelayEnabled,
+  isCrossRelayEnabled,
 } = require("./persona-map");
 
 const version = require("./package.json").version;
@@ -95,6 +97,7 @@ const pluginLoader = createPluginLoader({
 
     // Cross-relay the user's message to all other platforms in the same
     // conversation so every connected client stays in sync.
+    if (!isCrossRelayEnabled()) return;
     const originKey = `${platform}:${chatId}`;
     const senderLabel =
       mappedPersona || getDefaultPersonaName() || `[${platform}]`;
@@ -195,6 +198,7 @@ wss.on("connection", (ws) => {
       getPendingAutocompletes,
       setPersonaForUser,
       setCurrentPersonaName: setDefaultPersonaName,
+      setCrossRelayEnabled,
       log,
     });
   });
@@ -202,6 +206,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     sillyTavernClient = null;
     setDefaultPersonaName(null);
+    setCrossRelayEnabled(true);
     setBridgeActivity(null);
 
     for (const key of Object.keys(streamSessions)) {

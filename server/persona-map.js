@@ -135,6 +135,10 @@ const defaultStore = createPersonaMapStore();
 // cross-relay sender label when no per-user mapping is configured.
 let _defaultPersonaName = null;
 
+// Whether the extension has cross-platform relay enabled. Defaults to true so
+// relay works before the first client_info packet arrives.
+let _crossPlatformRelay = true;
+
 module.exports = {
   load: () => defaultStore.load(),
   getPersonaForUser: (p, u) => defaultStore.getPersonaForUser(p, u),
@@ -143,5 +147,9 @@ module.exports = {
     _defaultPersonaName = name || null;
   },
   getDefaultPersonaName: () => _defaultPersonaName,
+  setCrossRelayEnabled: (val) => {
+    _crossPlatformRelay = val !== false;
+  },
+  isCrossRelayEnabled: () => _crossPlatformRelay,
   createPersonaMapStore,
 };

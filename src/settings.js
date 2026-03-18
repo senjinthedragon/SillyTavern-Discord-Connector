@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = {
   autoConnect: true,
   expressionMode: "status",
   allowUserPersonaSave: true,
+  crossPlatformRelay: true,
 };
 
 export function getSettings() {

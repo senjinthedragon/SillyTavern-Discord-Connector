@@ -46,6 +46,8 @@ async function handleBridgePacket(data, deps) {
 
   if (data.type === "client_info") {
     if (data.personaName) deps.setCurrentPersonaName(String(data.personaName));
+    if (data.crossPlatformRelay !== undefined)
+      deps.setCrossRelayEnabled(data.crossPlatformRelay);
     return;
   }
 

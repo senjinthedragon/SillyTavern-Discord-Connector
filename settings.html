@@ -80,6 +80,20 @@
         </label>
       </div>
 
+      <!-- Multi-platform - only shown when at least one pro platform is active -->
+      <div id="discord_multi_platform_section" style="display:none">
+      <p class="dc-section-title">Multi-platform</p>
+      <div class="discord-connector_block flex-container">
+        <label class="checkbox_label" for="discord_cross_platform_relay">
+          <input type="checkbox" id="discord_cross_platform_relay" />
+          <span>
+            Relay messages to all connected clients
+            <span class="dc-info" tabindex="0" data-tooltip="When on, a message typed on one platform (Discord, Telegram, Signal) is immediately echoed to all other connected platforms so every client stays in sync. When off, messages only reach the platform where they were typed.">ⓘ</span>
+          </span>
+        </label>
+      </div>
+      </div>
+
       <hr class="sysHR" />
     </div>
   </div>

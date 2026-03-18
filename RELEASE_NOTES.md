@@ -141,6 +141,15 @@ Persona mapping now works on all three platforms. The `onUserMessage` and `onCom
 
 Owner-configured persona maps now use separate keys per platform in `config.js`: `discordPersonaMap`, `telegramPersonaMap`, and `signalPersonaMap`. All three are documented with examples in `config.example.js`.
 
+### Cross-platform relay toggle
+
+A new "Relay messages to all connected clients" toggle appears in the extension settings panel when at least one pro platform is active. Free users never see it.
+
+- **On** (default) - a message typed on Discord, Telegram, or Signal is immediately forwarded to all other connected platforms in the same conversation, so every client stays in sync.
+- **Off** - messages only go to the platform where they were typed. AI replies, mood updates, and recaps still reach all platforms; only user message relay is suppressed.
+
+The setting takes effect immediately on toggle - no server restart required.
+
 ---
 
 ## Thanks

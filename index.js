@@ -163,6 +163,10 @@ function connect() {
           sharedState.bridgeLocale = null;
         }
         sharedState.bridgePlugins = data.plugins || null;
+        const hasProPlugin = Object.values(data.plugins || {}).some(
+          (s) => s === "active",
+        );
+        $("#discord_multi_platform_section").toggle(hasProPlugin);
         if (
           typeof data.imagePlaceholderTimeoutMs === "number" &&
           data.imagePlaceholderTimeoutMs > 0
@@ -176,7 +180,11 @@ function connect() {
         const pSettings = SillyTavern.getContext().powerUserSettings;
         const personaId = pSettings?.default_persona || pSettings?.persona;
         const personaName = personaId ? pSettings?.personas?.[personaId] : null;
-        if (personaName) safeSend({ type: "client_info", personaName });
+        safeSend({
+          type: "client_info",
+          ...(personaName ? { personaName } : {}),
+          crossPlatformRelay: getSettings().crossPlatformRelay,
+        });
         return;
       }
 
@@ -215,6 +223,7 @@ function connect() {
   socket.onclose = () => {
     updateStatus("Disconnected", "red");
     setWs(null);
+    $("#discord_multi_platform_section").hide();
 
     if (heartbeatInterval) {
       clearInterval(heartbeatInterval);
@@ -269,6 +278,10 @@ jQuery(async () => {
       "checked",
       settings.allowUserPersonaSave,
     );
+    $("#discord_cross_platform_relay").prop(
+      "checked",
+      settings.crossPlatformRelay,
+    );
 
     $("#discord_bridge_url").on("input", () => {
       getSettings().bridgeUrl = $("#discord_bridge_url").val();
@@ -292,6 +305,17 @@ jQuery(async () => {
         "#discord_allow_user_persona_save",
       ).prop("checked");
       SillyTavern.getContext().saveSettingsDebounced();
+    });
+
+    $("#discord_cross_platform_relay").on("change", () => {
+      getSettings().crossPlatformRelay = $(
+        "#discord_cross_platform_relay",
+      ).prop("checked");
+      SillyTavern.getContext().saveSettingsDebounced();
+      safeSend({
+        type: "client_info",
+        crossPlatformRelay: getSettings().crossPlatformRelay,
+      });
     });
 
     $("#discord_connect_button").on("click", connect);

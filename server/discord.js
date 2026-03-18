@@ -50,7 +50,11 @@ const {
   parseRoute,
 } = require("./frontend-manager");
 const { streamSessions, scheduleEdit } = require("./streaming");
-const { getPersonaForUser, getDefaultPersonaName } = require("./persona-map");
+const {
+  getPersonaForUser,
+  getDefaultPersonaName,
+  isCrossRelayEnabled,
+} = require("./persona-map");
 const version = require("./package.json").version;
 
 const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes(
@@ -560,6 +564,7 @@ if (DISCORD_PLUGIN_ENABLED) {
       );
 
       // Cross-relay to other platforms in the same conversation.
+      if (!isCrossRelayEnabled()) return;
       const senderLabel =
         mappedPersona || getDefaultPersonaName() || `[discord]`;
       const relayText = `${senderLabel}: ${content}`;
