@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - All `ws?.readyState === WebSocket.OPEN` + `ws.send(JSON.stringify(...))` guard-and-send call sites in `index.js` have been replaced with a `safeSend(payload)` helper. This removes roughly 15 copies of the same boilerplate and means the readyState check is enforced in one place.
 - Added a note to the Pro Plugins section of `README.md` explaining that Telegram and Signal plugins have no built-in user allow-list, and are intended for personal or small-group use rather than publicly accessible bots.
+- `expressionCache` is now cleared on every character, group, or chat switch, and on `/newchat`. Previously the cache grew without bound across the session and could serve stale mood snapshots from characters no longer active. Since each new chat starts fresh and the AI regenerates moods on load anyway, there is no value in keeping entries across switches.
 
 ### Fixed
 

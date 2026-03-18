@@ -1292,6 +1292,7 @@ function buildHistory(chat, n) {
  */
 let _pendingRecapListener = null;
 function scheduleRecap(chatId) {
+  expressionCache.clear();
   if (_pendingRecapListener) {
     eventSource.removeListener(event_types.CHAT_LOADED, _pendingRecapListener);
   }
@@ -1320,6 +1321,7 @@ async function handleExecuteCommand(data) {
     switch (data.command) {
       case "newchat":
         await doNewChat({ deleteCurrentChat: false });
+        expressionCache.clear();
         invalidateChatCache();
         captureAndSendIntroMessage(data.chatId);
         replyText = "New chat started.";

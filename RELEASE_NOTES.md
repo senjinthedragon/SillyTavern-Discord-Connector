@@ -40,6 +40,10 @@ The timeout case is handled differently by design: if an image arrives after the
 
 ## Changes
 
+### Expression cache cleared on switch
+
+The mood snapshot cache (`expressionCache`) is now cleared whenever you switch character, group, or chat, and on `/newchat`. Previously it accumulated entries indefinitely and could serve a stale mood from a character active in a past session. Since every new chat starts fresh and the AI regenerates moods on load anyway, keeping old entries across switches has no benefit.
+
 ### `safeSend()` helper in the extension
 
 All the repeated `if (ws?.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({...})); }` blocks throughout `index.js` have been collapsed into a single `safeSend(payload)` helper. Same behaviour, ~15 fewer copies of the boilerplate.
