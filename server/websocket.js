@@ -31,6 +31,7 @@ const {
   getAutocompleteDebouncers,
 } = require("./discord");
 const { handleBridgePacket } = require("./websocket-router");
+const { getPersonaForUser } = require("./persona-map");
 
 const version = require("./package.json").version;
 const width = 70;
@@ -69,12 +70,20 @@ function sendToSillyTavern(payload) {
 }
 
 const pluginLoader = createPluginLoader({
-  onUserMessage(platform, chatId, text) {
+  onUserMessage(platform, chatId, text, userId = "") {
     const conversationId = resolveConversationId(platform, chatId);
     addRoute(conversationId, platform, chatId);
-    sendToSillyTavern({ type: "user_message", text, chatId: conversationId });
+    const mappedPersona = getPersonaForUser(platform, userId);
+    sendToSillyTavern({
+      type: "user_message",
+      text,
+      chatId: conversationId,
+      userId,
+      platform,
+      ...(mappedPersona ? { mappedPersona } : {}),
+    });
   },
-  onCommand(platform, chatId, command, args) {
+  onCommand(platform, chatId, command, args, userId = "") {
     const conversationId = resolveConversationId(platform, chatId);
     addRoute(conversationId, platform, chatId);
     sendToSillyTavern({
@@ -82,6 +91,8 @@ const pluginLoader = createPluginLoader({
       command,
       args,
       chatId: conversationId,
+      userId,
+      platform,
     });
   },
 });

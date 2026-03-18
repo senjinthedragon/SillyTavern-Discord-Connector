@@ -8,7 +8,8 @@
  * Manages the mapping from platform user IDs to SillyTavern persona names.
  * Two sources are merged at runtime:
  *
- *   1. config.discordPersonaMap - static owner-configured map in config.js.
+ *   1. config.<platform>PersonaMap - static owner-configured maps in config.js
+ *      (e.g. discordPersonaMap, telegramPersonaMap, signalPersonaMap).
  *      Useful for assigning personas that users cannot change themselves.
  *   2. server/persona-map.json  - runtime file updated by /mypersona commands.
  *      User-saved preferences take priority over the owner config.
@@ -48,7 +49,10 @@ function load() {
     }
   }
 
-  const configCount = Object.keys(config.discordPersonaMap || {}).length;
+  const configCount = ["discord", "telegram", "signal"].reduce(
+    (n, p) => n + Object.keys(config[p + "PersonaMap"] || {}).length,
+    0,
+  );
   const total = fileCount + configCount;
   log(
     "log",
@@ -78,11 +82,7 @@ function getPersonaForUser(platform, userId) {
     return platformMap[userId] || null;
   }
 
-  if (platform === "discord") {
-    return config.discordPersonaMap?.[userId] ?? null;
-  }
-
-  return null;
+  return config[platform + "PersonaMap"]?.[userId] ?? null;
 }
 
 /**
