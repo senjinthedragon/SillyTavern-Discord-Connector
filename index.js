@@ -2414,17 +2414,25 @@ jQuery(async () => {
     }
 
     // Mouse
-    $(document).on("mouseenter", ".dc-info", function () { showTip(this); });
+    $(document).on("mouseenter", ".dc-info", function () {
+      showTip(this);
+    });
     $(document).on("mouseleave", ".dc-info", hideTip);
 
     // Keyboard (tabindex="0" on each .dc-info)
-    $(document).on("focus", ".dc-info", function () { showTip(this); });
+    $(document).on("focus", ".dc-info", function () {
+      showTip(this);
+    });
     $(document).on("blur", ".dc-info", hideTip);
 
     // Touch - tap to toggle, tap anywhere else to hide
     $(document).on("touchstart", ".dc-info", function (e) {
       e.preventDefault();
-      if (tipTarget === this) { hideTip(); } else { showTip(this); }
+      if (tipTarget === this) {
+        hideTip();
+      } else {
+        showTip(this);
+      }
     });
     $(document).on("touchstart", function (e) {
       if (tipTarget && !$(e.target).closest(".dc-info").length) hideTip();

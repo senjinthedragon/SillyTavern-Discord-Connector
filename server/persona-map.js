@@ -30,7 +30,8 @@ const DEFAULT_MAP_FILE = path.join(__dirname, "persona-map.json");
 
 function createPersonaMapStore(options = {}) {
   const filePath = options.filePath || DEFAULT_MAP_FILE;
-  const getConfig = options.getConfig || (() => require("./config-loader").config);
+  const getConfig =
+    options.getConfig || (() => require("./config-loader").config);
   const getLog = options.getLog || (() => require("./logger").log);
 
   let runtimeMap = {};

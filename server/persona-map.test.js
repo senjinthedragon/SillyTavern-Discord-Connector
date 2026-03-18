@@ -20,7 +20,10 @@ const fs = require("fs");
 const { createPersonaMapStore } = require("./persona-map");
 
 function tmpFile() {
-  return path.join(os.tmpdir(), `persona-map-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+  return path.join(
+    os.tmpdir(),
+    `persona-map-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+  );
 }
 
 function makeStore(configData = {}) {
@@ -50,10 +53,18 @@ test("setPersonaForUser and getPersonaForUser round-trip", () => {
 
 test("setPersonaForUser persists across load", () => {
   const fp = tmpFile();
-  const store = createPersonaMapStore({ filePath: fp, getConfig: () => ({}), getLog: () => () => {} });
+  const store = createPersonaMapStore({
+    filePath: fp,
+    getConfig: () => ({}),
+    getLog: () => () => {},
+  });
   store.setPersonaForUser("discord", "user1", "Alice");
 
-  const store2 = createPersonaMapStore({ filePath: fp, getConfig: () => ({}), getLog: () => () => {} });
+  const store2 = createPersonaMapStore({
+    filePath: fp,
+    getConfig: () => ({}),
+    getLog: () => () => {},
+  });
   store2.load();
   assert.equal(store2.getPersonaForUser("discord", "user1"), "Alice");
 
@@ -73,7 +84,7 @@ test("runtime entry takes priority over config map entry", () => {
 
 test("config map lookup is platform-generic", () => {
   const store = makeStore({
-    telegramPersonaMap: { "123": "TelegramAlice" },
+    telegramPersonaMap: { 123: "TelegramAlice" },
     signalPersonaMap: { "+31612345678": "SignalBob" },
   });
   assert.equal(store.getPersonaForUser("telegram", "123"), "TelegramAlice");
@@ -90,7 +101,11 @@ test("setPersonaForUser null removes entry", () => {
 
 test("setPersonaForUser null cleans up empty platform key", () => {
   const fp = tmpFile();
-  const store = createPersonaMapStore({ filePath: fp, getConfig: () => ({}), getLog: () => () => {} });
+  const store = createPersonaMapStore({
+    filePath: fp,
+    getConfig: () => ({}),
+    getLog: () => () => {},
+  });
   store.setPersonaForUser("discord", "user1", "Alice");
   store.setPersonaForUser("discord", "user1", null);
 
