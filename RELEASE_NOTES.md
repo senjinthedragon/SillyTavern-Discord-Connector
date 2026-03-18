@@ -52,6 +52,24 @@ The mood snapshot cache (`expressionCache`) is now cleared whenever you switch c
 
 `generateAndSendImage` was using the `new Promise(async (resolve) => {...})` anti-pattern, where an unhandled error inside the async executor can silently swallow the rejection and leave the promise permanently pending. It has been refactored to a plain `async` function - the observer, timeout, and cancel job are set up synchronously, the `/sd` command is awaited in the function body, and the promise is returned at the end. Behaviour is identical; errors are now properly propagable.
 
+### `index.js` split into focused modules
+
+The 2400-line `index.js` has been broken up into nine focused ES modules under `src/`:
+
+| Module | Responsibility |
+|---|---|
+| `ws.js` | WebSocket instance, `safeSend`, `getWs`/`setWs` |
+| `settings.js` | Extension name, defaults, `getSettings`, `updateStatus` |
+| `utils.js` | `sanitizeSlashArg` |
+| `state.js` | Shared mutable state (`lastActiveChatId`, timezone, locale, plugins) |
+| `image-relay.js` | Image classification, fetching, and forwarding to bridge |
+| `expression-relay.js` | Expression cache, observer, snapshot helpers |
+| `image-generation.js` | Circuit breaker, per-channel queue, `/sd` execution, metrics |
+| `recap.js` | `buildLastExchange`, `buildHistory`, `scheduleRecap` |
+| `commands.js` | All WebSocket message handlers and autocomplete |
+
+`index.js` is now a thin orchestrator (~180 lines) responsible only for the WebSocket lifecycle and the settings UI. Behaviour is unchanged.
+
 ### `safeSend()` helper in the extension
 
 All the repeated `if (ws?.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({...})); }` blocks throughout `index.js` have been collapsed into a single `safeSend(payload)` helper. Same behaviour, ~15 fewer copies of the boilerplate.
