@@ -31,7 +31,7 @@ const {
   getAutocompleteDebouncers,
 } = require("./discord");
 const { handleBridgePacket } = require("./websocket-router");
-const { load: loadPersonaMap, getPersonaForUser } = require("./persona-map");
+const { load: loadPersonaMap, getPersonaForUser, setPersonaForUser } = require("./persona-map");
 
 const version = require("./package.json").version;
 const width = 70;
@@ -159,6 +159,7 @@ wss.on("connection", (ws) => {
       pendingImageMessages,
       setBridgeActivity,
       getPendingAutocompletes,
+      setPersonaForUser,
       log,
     });
   });

@@ -163,8 +163,7 @@ async function handleBridgePacket(data, deps) {
       break;
 
     case "save_user_persona": {
-      const { setPersonaForUser } = require("./persona-map");
-      setPersonaForUser(
+      deps.setPersonaForUser(
         data.platform || "discord",
         data.userId || "",
         data.personaName ?? null,

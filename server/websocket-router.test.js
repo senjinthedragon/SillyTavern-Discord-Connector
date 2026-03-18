@@ -16,10 +16,11 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { handleBridgePacket } = require("./websocket-router");
 
-function createDeps() {
+function createDeps(overrides = {}) {
   const sentByWs = [];
   const calls = [];
   const routes = ["discord:chan1", "telegram:chat2"];
+  const personaSaves = [];
   const frontends = {
     discord: {
       async sendText(chatId, text) {
@@ -64,9 +65,14 @@ function createDeps() {
     pendingImageMessages: {},
     setBridgeActivity: () => {},
     getPendingAutocompletes: () => ({}),
+    setPersonaForUser: (platform, userId, personaName) => {
+      personaSaves.push({ platform, userId, personaName });
+    },
     log: () => {},
     __calls: calls,
     __wsSent: sentByWs,
+    __personaSaves: personaSaves,
+    ...overrides,
   };
 }
 
@@ -114,6 +120,59 @@ test("handleBridgePacket ai_reply is skipped once after stream_end", async () =>
 
   assert.equal(deps.__calls.filter((c) => c[1] === "sendText").length, 0);
   assert.equal(deps.streamHandled.has("conv1"), false);
+});
+
+test("handleBridgePacket save_user_persona calls setPersonaForUser via deps", async () => {
+  const deps = createDeps();
+  await handleBridgePacket(
+    {
+      type: "save_user_persona",
+      chatId: "conv1",
+      platform: "discord",
+      userId: "user123",
+      personaName: "Alice",
+    },
+    deps,
+  );
+
+  assert.equal(deps.__personaSaves.length, 1);
+  assert.deepEqual(deps.__personaSaves[0], {
+    platform: "discord",
+    userId: "user123",
+    personaName: "Alice",
+  });
+});
+
+test("handleBridgePacket save_user_persona null clears the persona", async () => {
+  const deps = createDeps();
+  await handleBridgePacket(
+    {
+      type: "save_user_persona",
+      chatId: "conv1",
+      platform: "telegram",
+      userId: "tguser",
+      personaName: null,
+    },
+    deps,
+  );
+
+  assert.equal(deps.__personaSaves.length, 1);
+  assert.equal(deps.__personaSaves[0].personaName, null);
+});
+
+test("handleBridgePacket save_user_persona defaults platform to discord", async () => {
+  const deps = createDeps();
+  await handleBridgePacket(
+    {
+      type: "save_user_persona",
+      chatId: "conv1",
+      userId: "user123",
+      personaName: "Bob",
+    },
+    deps,
+  );
+
+  assert.equal(deps.__personaSaves[0].platform, "discord");
 });
 
 test("handleBridgePacket send_images fans out full images array", async () => {
