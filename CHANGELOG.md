@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `imagePlaceholderTimeoutSeconds` now correctly controls both the actual generation timeout and the duration shown in the `🎨 Generating image…` placeholder message. Previously the value was validated and converted to milliseconds in `config-logic.js` but never forwarded to the extension, so the timeout always fired at the hardcoded 3-minute default regardless of what was set in `config.js`. The bridge now includes `imagePlaceholderTimeoutMs` in the `bridge_config` handshake packet, and the extension applies it to the live timer, the watchdog, the log message, and the placeholder text.
+
 ## [1.5.0] - 2026-03-15
 
 ### Added
