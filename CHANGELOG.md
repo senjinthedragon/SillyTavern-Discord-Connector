@@ -9,12 +9,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Added per-user persona mapping. The bridge can now automatically switch the active SillyTavern persona before processing each incoming message based on who sent it. Mappings are defined in two places: a static `discordPersonaMap` object in `config.js` (owner-managed) and a runtime `server/persona-map.json` file written by the new `/mypersona` command (user-managed). Runtime entries take priority over config entries. The persona map module logs a summary of loaded mappings on startup and handles a missing `persona-map.json` gracefully - the file is created on first save.
 - Added `/mypersona <name>` slash command. Users can save their preferred persona so it switches automatically on every message without needing to run `/persona` each time. `/mypersona clear` removes the saved preference. Autocompletes from the ST persona list; accepts unlisted names to create temporary personas consistent with existing `/persona` behaviour.
-- Added `discordPersonaMap` to `config.example.js` with inline documentation covering the owner-config/user-save priority model.
+- Added `discordPersonaMap`, `telegramPersonaMap`, and `signalPersonaMap` to `config.example.js` with inline documentation covering the owner-config/user-save priority model.
 - Added `allowUserPersonaSave` toggle to the extension settings panel. When unchecked, `/mypersona` returns an error and the command is hidden from the `/sthelp` output. Defaults to enabled so existing installs are unaffected.
 - Active persona is now shown in `/status` output as `🎭 PersonaName`.
 - Added `userId` and `platform` fields to all `user_message` and `execute_command` packets sent from `discord.js` to the extension. These are used for persona map lookups and are echoed back in `save_user_persona` packets so the server knows which platform and user to associate the saved preference with.
 - Added `save_user_persona` packet type (`extension → server`). Handled in `websocket-router.js` by calling `setPersonaForUser` directly - no fanout needed since persona persistence is a server-level concern rather than a per-platform one.
 - The `🎨 Generating image…` placeholder message on Discord now counts down live. While more than one minute remains it updates every 60 seconds showing minutes left; during the final minute it switches to 10-second updates showing seconds left. The countdown is driven server-side using the Discord message edit API so no extra packets are needed. The placeholder is also now correctly deleted (and the countdown stopped) when generation is cancelled via `/image cancel` or fails before the timeout - previously the placeholder could be left stuck in the channel indefinitely.
+
+### Added _(Pro version only)_
+
+- Persona mapping now works on Telegram and Signal. The `onUserMessage` and `onCommand` handlers in `websocket.js` now accept a `userId` parameter and include `userId`, `platform`, and `mappedPersona` (when a mapping exists) in the packets sent to the extension - the same fields Discord already sent. The `persona-map.js` config fallback is now generic: it checks `config[platform + "PersonaMap"]` for any platform rather than hardcoding `config.discordPersonaMap`, so `telegramPersonaMap` and `signalPersonaMap` in `config.js` are resolved automatically.
+- Telegram plugin passes `msg.from?.id` as `userId` in both `onUserMessage` and `onCommand` calls. In direct messages this is the Telegram user's numeric ID; in group contexts it distinguishes individual senders from the group chat ID.
+- Signal plugin passes `source` (the sender's phone number) as `userId` in both callback calls. For Signal this is the same value as `chatId` since Signal conversations are identified by phone number, but having it explicit in the packet keeps the persona-map contract consistent with the other platforms.
+- Added `/mypersona` to Telegram's registered bot command list so it appears in Telegram's `/` command menu.
 
 ### Fixed
 

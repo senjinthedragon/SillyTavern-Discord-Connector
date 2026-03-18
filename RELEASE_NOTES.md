@@ -9,11 +9,11 @@ The bridge can now automatically switch the active SillyTavern persona before pr
 **Two ways to set it up:**
 
 - **Owner-configured** - add a `discordPersonaMap` object to `config.js` mapping Discord user IDs to persona names. Useful for assigning personas that users cannot change themselves.
-- **User-configured** - users can run `/mypersona <name>` in Discord to save their own preference. Their saved choice takes priority over any entry in `config.js`. Run `/mypersona clear` to remove it.
+- **User-configured** - users can run `/mypersona <name>` to save their own preference. Their saved choice takes priority over any entry in `config.js`. Run `/mypersona clear` to remove it.
 
 Saved user preferences are stored in `server/persona-map.json` alongside your config. The file is created automatically on first save and is separate from `config.js` so bridge updates cannot overwrite it. The bridge logs a summary of loaded mappings on startup.
 
-The `/mypersona` command autocompletes from your ST persona list and accepts unlisted names to create temporary personas, consistent with the existing `/persona` behaviour.
+The `/mypersona` command autocompletes from your ST persona list and accepts unlisted names to create temporary personas, consistent with the existing `/persona` behaviour. On Telegram and Signal the same `/mypersona` command works identically once those plugins are active.
 
 **Server manager controls:**
 
@@ -43,3 +43,18 @@ Persona names passed to SillyTavern's slash command runner are now sanitized bef
 The `imagePlaceholderTimeoutSeconds` config option was validated at startup and documented correctly, but the value was never sent to the extension. The extension had its own hardcoded 3-minute constant that controlled both the real timeout timer and the `🎨 Generating image… (timeout: 3 minutes; …)` placeholder text, so changing the config had no effect at all.
 
 The bridge now includes the configured value in the `bridge_config` handshake packet it sends to the extension on connect. The extension reads it and uses it in place of the hardcoded constant, so the timeout, the watchdog, the log message, and the placeholder text all reflect whatever you have set in `config.js`.
+
+---
+
+## Pro plugins
+
+### Persona mapping on Telegram and Signal
+
+Persona mapping now works on all three platforms. The `onUserMessage` and `onCommand` handlers in `websocket.js` now pass `userId`, `platform`, and a resolved `mappedPersona` (when a mapping exists) through to the extension - the same fields that Discord already sent. The config fallback in `persona-map.js` is now generic: it reads `config[platform + "PersonaMap"]`, so `telegramPersonaMap` and `signalPersonaMap` entries in `config.js` are picked up automatically alongside the existing `discordPersonaMap`.
+
+- **Telegram** - the sender's numeric user ID (`msg.from?.id`) is used as the mapping key. In direct messages this matches the chat ID; in group contexts it correctly identifies the individual sender.
+- **Signal** - the sender's phone number (`source`, e.g. `+31612345678`) is used as both the chat ID and the mapping key, consistent with how Signal identifies users.
+
+`/mypersona` has been added to Telegram's registered bot command list so it shows up in the `/` menu. The `allowUserPersonaSave` toggle in the extension settings applies to all platforms - one setting covers them all.
+
+Owner-configured persona maps now use separate keys per platform in `config.js`: `discordPersonaMap`, `telegramPersonaMap`, and `signalPersonaMap`. All three are documented with examples in `config.example.js`.
