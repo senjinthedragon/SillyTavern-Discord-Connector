@@ -119,6 +119,7 @@ wss.on("connection", (ws) => {
       timezone: config.timezone || null,
       locale: config.locale || null,
       plugins: pluginStatus,
+      imagePlaceholderTimeoutMs: config.imagePlaceholderTimeoutMs,
     }),
   );
 

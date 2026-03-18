@@ -663,8 +663,7 @@ function captureAndSendIntroMessage(chatId) {
 // within the same conversation while still allowing other channels to proceed.
 // ---------------------------------------------------------------------------
 
-const IMAGE_GENERATION_TIMEOUT_MS = 3 * 60 * 1000;
-const IMAGE_QUEUE_WATCHDOG_MS = IMAGE_GENERATION_TIMEOUT_MS + 10_000;
+let imageGenerationTimeoutMs = 3 * 60 * 1000;
 const IMAGE_RATE_LIMIT_WINDOW_MS = 60_000;
 const IMAGE_RATE_LIMIT_MAX_REQUESTS = 3;
 const IMAGE_BREAKER_THRESHOLD = 3;
@@ -776,7 +775,7 @@ function enqueueImageGeneration(chatId, fn) {
               `[Discord Bridge] Image queue watchdog released a stuck task for ${chatId}.`,
             );
             release();
-          }, IMAGE_QUEUE_WATCHDOG_MS);
+          }, imageGenerationTimeoutMs + 10_000);
 
           Promise.resolve()
             .then(fn)
@@ -901,7 +900,7 @@ function generateAndSendImage(chatId, requestId, prompt) {
     hardTimeoutId = setTimeout(() => {
       finish('timed_out', 'timeout', () => {
         console.warn(
-          `[Discord Bridge] Image generation timed out after ${IMAGE_GENERATION_TIMEOUT_MS / 1000}s.`,
+          `[Discord Bridge] Image generation timed out after ${imageGenerationTimeoutMs / 1000}s.`,
         );
         sendImageError(
           chatId,
@@ -909,7 +908,7 @@ function generateAndSendImage(chatId, requestId, prompt) {
           'Image generation timed out. Please try again.',
         );
       });
-    }, IMAGE_GENERATION_TIMEOUT_MS);
+    }, imageGenerationTimeoutMs);
 
     try {
       await executeSlashCommandsWithOptions(`/sd ${prompt}`);
@@ -1585,7 +1584,7 @@ async function handleExecuteCommand(data) {
               type: 'image_placeholder',
               chatId: data.chatId,
               requestId,
-              text: '🎨 Generating image… (timeout: 3 minutes; use /image cancel to abort)',
+              text: `🎨 Generating image… (timeout: ${imageGenerationTimeoutMs / 60_000} minutes; use /image cancel to abort)`,
             }),
           );
         }
@@ -2156,6 +2155,9 @@ function connect() {
           bridgeLocale = null;
         }
         bridgePlugins = data.plugins || null;
+        if (typeof data.imagePlaceholderTimeoutMs === 'number' && data.imagePlaceholderTimeoutMs > 0) {
+          imageGenerationTimeoutMs = data.imagePlaceholderTimeoutMs;
+        }
         return;
       }
 
