@@ -199,7 +199,8 @@ const SLASH_COMMANDS = [
       {
         name: "name",
         type: 3,
-        description: "Persona name to save, or 'clear' to remove your saved preference",
+        description:
+          "Persona name to save, or 'clear' to remove your saved preference",
         required: true,
         autocomplete: true,
       },

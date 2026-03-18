@@ -41,7 +41,10 @@ function load() {
     runtimeMap = {};
     if (err.code !== "ENOENT") {
       // ENOENT is expected on first run - no file yet, nothing to warn about.
-      log("warn", `[PersonaMap] Could not read persona-map.json: ${err.message}`);
+      log(
+        "warn",
+        `[PersonaMap] Could not read persona-map.json: ${err.message}`,
+      );
     }
   }
 
@@ -68,7 +71,10 @@ function getPersonaForUser(platform, userId) {
   if (!userId) return null;
 
   const platformMap = runtimeMap[platform];
-  if (platformMap && Object.prototype.hasOwnProperty.call(platformMap, userId)) {
+  if (
+    platformMap &&
+    Object.prototype.hasOwnProperty.call(platformMap, userId)
+  ) {
     return platformMap[userId] || null;
   }
 

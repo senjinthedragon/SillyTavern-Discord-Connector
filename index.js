@@ -944,7 +944,7 @@ function sanitizePersonaName(name) {
   return name
     .replace(/[|\n\r]/g, "") // strip pipe and newlines (command injection vectors)
     .trim()
-    .slice(0, 200);          // reasonable cap - no persona name needs to be longer
+    .slice(0, 200); // reasonable cap - no persona name needs to be longer
 }
 
 // ---------------------------------------------------------------------------
@@ -964,7 +964,9 @@ async function handleUserMessage(data) {
   // Auto-switch to the user's saved persona before injecting their message.
   if (data.mappedPersona) {
     try {
-      await executeSlashCommandsWithOptions(`/persona-set ${sanitizePersonaName(data.mappedPersona)}`);
+      await executeSlashCommandsWithOptions(
+        `/persona-set ${sanitizePersonaName(data.mappedPersona)}`,
+      );
     } catch (err) {
       console.warn(
         `[Discord Bridge] Failed to auto-switch persona to "${data.mappedPersona}":`,
@@ -1792,8 +1794,7 @@ async function handleExecuteCommand(data) {
           ? (context.groups || []).find((g) => g.id === context.groupId)
               ?.name || "(unknown)"
           : "(none)";
-        const activePersona =
-          context.powerUserSettings?.persona || "(none)";
+        const activePersona = context.powerUserSettings?.persona || "(none)";
 
         let lastErrorText = "";
         if (imageMetrics.lastError) {
@@ -2337,7 +2338,10 @@ jQuery(async () => {
     $("#discord_bridge_url").val(settings.bridgeUrl);
     $("#discord_auto_connect").prop("checked", settings.autoConnect);
     $("#discord_expression_mode").val(settings.expressionMode);
-    $("#discord_allow_user_persona_save").prop("checked", settings.allowUserPersonaSave);
+    $("#discord_allow_user_persona_save").prop(
+      "checked",
+      settings.allowUserPersonaSave,
+    );
 
     $("#discord_bridge_url").on("input", () => {
       getSettings().bridgeUrl = $("#discord_bridge_url").val();
@@ -2357,7 +2361,9 @@ jQuery(async () => {
     });
 
     $("#discord_allow_user_persona_save").on("change", () => {
-      getSettings().allowUserPersonaSave = $("#discord_allow_user_persona_save").prop("checked");
+      getSettings().allowUserPersonaSave = $(
+        "#discord_allow_user_persona_save",
+      ).prop("checked");
       saveSettingsDebounced();
     });
 
