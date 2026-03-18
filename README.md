@@ -6,6 +6,8 @@
 
 Bridge your SillyTavern character to Discord for real-time roleplay. Messages sent in a Discord channel are routed through SillyTavern's AI pipeline and responded to as your active character, with full streaming, image and expression support.
 
+Most people set this up on their own private Discord server and keep it to themselves - and that works perfectly. But you can also invite a small group of trusted friends and chat together around the same character, like a campfire where the character actually talks back. Everyone shares the same story and the same character; each person can set their own persona so the character knows who they are. Just keep in mind it's not designed for large groups where everyone wants a completely private session with their own separate chat history - it's a shared experience by design.
+
 *This is an independent extension for SillyTavern and is not affiliated with the SillyTavern development team*
 
 <p align="center">
