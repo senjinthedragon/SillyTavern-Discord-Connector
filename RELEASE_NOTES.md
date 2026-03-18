@@ -1,4 +1,15 @@
-# v1.6.0 — In Progress
+# v1.6.0 - In Progress
+
+## New
+
+### Live countdown on the image generation placeholder
+
+The `🎨 Generating image…` message in Discord now counts down in real time so you can always see how long is left before the request times out.
+
+- While more than one minute remains, the message updates every 60 seconds: `🎨 Generating image… (4 minutes remaining; use /image cancel to abort)`
+- During the final minute it switches to 10-second updates: `🎨 Generating image… (50 seconds remaining; use /image cancel to abort)`
+
+The countdown runs server-side using the Discord message edit API - no extra extension packets required. It also cleans up correctly in all exit paths: the placeholder is deleted (and the countdown stopped) when the image arrives, when generation is cancelled via `/image cancel`, or when generation fails before the timeout. Previously the placeholder could be left stuck in the channel on cancel or failure.
 
 ## Fixes
 

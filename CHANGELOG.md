@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The `🎨 Generating image…` placeholder message on Discord now counts down live. While more than one minute remains it updates every 60 seconds showing minutes left; during the final minute it switches to 10-second updates showing seconds left. The countdown is driven server-side using the Discord message edit API so no extra packets are needed. The placeholder is also now correctly deleted (or its countdown stopped) when generation is cancelled via `/image cancel` or fails before the timeout - previously the placeholder could be left stuck in the channel indefinitely.
+
 ### Fixed
 
 - `imagePlaceholderTimeoutSeconds` now correctly controls both the actual generation timeout and the duration shown in the `🎨 Generating image…` placeholder message. Previously the value was validated and converted to milliseconds in `config-logic.js` but never forwarded to the extension, so the timeout always fired at the hardcoded 3-minute default regardless of what was set in `config.js`. The bridge now includes `imagePlaceholderTimeoutMs` in the `bridge_config` handshake packet, and the extension applies it to the live timer, the watchdog, the log message, and the placeholder text.
