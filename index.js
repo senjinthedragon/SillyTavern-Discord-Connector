@@ -812,120 +812,124 @@ function enqueueImageGeneration(chatId, fn) {
  * @param {string} prompt
  * @returns {Promise<{status: string, reason?: string|null}>}
  */
-function generateAndSendImage(chatId, requestId, prompt) {
-  return new Promise(async (resolve) => {
-    const chatEl = document.getElementById("chat");
-    if (!chatEl || ws?.readyState !== WebSocket.OPEN) {
+async function generateAndSendImage(chatId, requestId, prompt) {
+  const chatEl = document.getElementById("chat");
+  if (!chatEl || ws?.readyState !== WebSocket.OPEN) {
+    safeSend({
+      type: "generate_image_error",
+      chatId,
+      requestId,
+      text: "Could not find the SillyTavern chat element.",
+    });
+    return { status: "failed", reason: "chat_element_missing" };
+  }
+
+  const existingSrcs = new Set(
+    Array.from(chatEl.querySelectorAll("img.mes_img"))
+      .map((img) => img.getAttribute("src"))
+      .filter(Boolean),
+  );
+
+  let hardTimeoutId = null;
+  let observer = null;
+  let settled = false;
+  let resolve;
+  const promise = new Promise((r) => {
+    resolve = r;
+  });
+
+  const finish = (status, reason, cleanupFn) => {
+    if (settled) return;
+    settled = true;
+    if (observer) observer.disconnect();
+    clearTimeout(hardTimeoutId);
+    cleanupFn();
+    if (activeImageJobs.get(chatId) === cancelJob)
+      activeImageJobs.delete(chatId);
+    resolve({ status, reason });
+  };
+
+  const cancelJob = {
+    cancel: () => {
+      finish("cancelled", "cancelled_by_user", () => {
+        sendImageError(
+          chatId,
+          requestId,
+          "Image generation cancelled.",
+          "cancelled",
+        );
+      });
+    },
+  };
+  activeImageJobs.set(chatId, cancelJob);
+
+  const onNewImage = async (src) => {
+    const fetched = await fetchLocalImageAsBase64(src);
+    if (!fetched) {
+      finish("failed", "image_fetch_failed", () => {
+        sendImageError(
+          chatId,
+          requestId,
+          "Image was generated but could not be fetched from SillyTavern.",
+        );
+      });
+      return;
+    }
+    finish("success", null, () => {
       safeSend({
-        type: "generate_image_error",
+        type: "generate_image_result",
         chatId,
         requestId,
-        text: "Could not find the SillyTavern chat element.",
+        image: { type: "inline", ...fetched },
       });
-      return resolve({ status: "failed", reason: "chat_element_missing" });
-    }
+    });
+  };
 
-    const existingSrcs = new Set(
-      Array.from(chatEl.querySelectorAll("img.mes_img"))
-        .map((img) => img.getAttribute("src"))
-        .filter(Boolean),
-    );
-
-    let hardTimeoutId = null;
-    let observer = null;
-    let settled = false;
-
-    const finish = (status, reason, cleanupFn) => {
-      if (settled) return;
-      settled = true;
-      if (observer) observer.disconnect();
-      clearTimeout(hardTimeoutId);
-      cleanupFn();
-      if (activeImageJobs.get(chatId) === cancelJob)
-        activeImageJobs.delete(chatId);
-      resolve({ status, reason });
-    };
-
-    const cancelJob = {
-      cancel: () => {
-        finish("cancelled", "cancelled_by_user", () => {
-          sendImageError(
-            chatId,
-            requestId,
-            "Image generation cancelled.",
-            "cancelled",
-          );
-        });
-      },
-    };
-    activeImageJobs.set(chatId, cancelJob);
-
-    const onNewImage = async (src) => {
-      const fetched = await fetchLocalImageAsBase64(src);
-      if (!fetched) {
-        finish("failed", "image_fetch_failed", () => {
-          sendImageError(
-            chatId,
-            requestId,
-            "Image was generated but could not be fetched from SillyTavern.",
-          );
-        });
+  observer = new MutationObserver(() => {
+    for (const img of chatEl.querySelectorAll("img.mes_img")) {
+      const src = img.getAttribute("src");
+      if (src && !existingSrcs.has(src)) {
+        onNewImage(src);
         return;
       }
-      finish("success", null, () => {
-        safeSend({
-          type: "generate_image_result",
-          chatId,
-          requestId,
-          image: { type: "inline", ...fetched },
-        });
-      });
-    };
-
-    observer = new MutationObserver(() => {
-      for (const img of chatEl.querySelectorAll("img.mes_img")) {
-        const src = img.getAttribute("src");
-        if (src && !existingSrcs.has(src)) {
-          onNewImage(src);
-          return;
-        }
-      }
-    });
-
-    observer.observe(chatEl, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["src"],
-    });
-
-    hardTimeoutId = setTimeout(() => {
-      finish("timed_out", "timeout", () => {
-        console.warn(
-          `[Discord Bridge] Image generation timed out after ${imageGenerationTimeoutMs / 1000}s.`,
-        );
-        sendImageError(
-          chatId,
-          requestId,
-          "Image generation timed out. Please try again.",
-          "timed_out",
-        );
-      });
-    }, imageGenerationTimeoutMs);
-
-    try {
-      await executeSlashCommandsWithOptions(`/sd ${sanitizeSlashArg(prompt)}`);
-    } catch (err) {
-      finish("failed", "sd_command_failed", () => {
-        console.error("[Discord Bridge] /sd command failed:", err);
-        sendImageError(
-          chatId,
-          requestId,
-          `Image generation failed: ${err.message || "Unknown error"}`,
-        );
-      });
     }
   });
+
+  observer.observe(chatEl, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["src"],
+  });
+
+  hardTimeoutId = setTimeout(() => {
+    finish("timed_out", "timeout", () => {
+      console.warn(
+        `[Discord Bridge] Image generation timed out after ${imageGenerationTimeoutMs / 1000}s.`,
+      );
+      sendImageError(
+        chatId,
+        requestId,
+        "Image generation timed out. Please try again.",
+        "timed_out",
+      );
+    });
+  }, imageGenerationTimeoutMs);
+
+  try {
+    await executeSlashCommandsWithOptions(`/sd ${sanitizeSlashArg(prompt)}`);
+  } catch (err) {
+    finish("failed", "sd_command_failed", () => {
+      console.error("[Discord Bridge] /sd command failed:", err);
+      sendImageError(
+        chatId,
+        requestId,
+        `Image generation failed: ${err.message || "Unknown error"}`,
+      );
+    });
+  }
+
+  return promise;
 }
 
 // ---------------------------------------------------------------------------
