@@ -102,16 +102,17 @@ async function handleBridgePacket(data, deps) {
       if (data.reason === "cancelled") {
         deps.cancelledImageRequests.add(key);
         // Self-expiring after 30 minutes in case the image never arrives.
+        // unref() so the timer does not keep the Node process alive (e.g. in tests).
         setTimeout(
           () => deps.cancelledImageRequests.delete(key),
           30 * 60 * 1000,
-        );
+        ).unref();
       } else if (data.reason === "timed_out") {
         deps.timedOutImageRequests.add(key);
         setTimeout(
           () => deps.timedOutImageRequests.delete(key),
           30 * 60 * 1000,
-        );
+        ).unref();
       }
 
       await fanout(
