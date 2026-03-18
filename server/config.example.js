@@ -11,7 +11,7 @@
  * 3. Adjust advanced settings only if your environment requires it.
  *
  * Note: Essential settings (Discord token, access control) are at the top,
- * followed by general environment preferences and advanced logic for 
+ * followed by general environment preferences and advanced logic for
  * circuit breakers and pro-plugin routing.
  */
 
