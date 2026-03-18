@@ -175,9 +175,7 @@ function connect() {
         // default_persona if no per-chat override is set.
         const pSettings = SillyTavern.getContext().powerUserSettings;
         const personaId = pSettings?.default_persona || pSettings?.persona;
-        const personaName = personaId
-          ? pSettings?.personas?.[personaId]
-          : null;
+        const personaName = personaId ? pSettings?.personas?.[personaId] : null;
         if (personaName) safeSend({ type: "client_info", personaName });
         return;
       }

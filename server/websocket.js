@@ -96,7 +96,8 @@ const pluginLoader = createPluginLoader({
     // Cross-relay the user's message to all other platforms in the same
     // conversation so every connected client stays in sync.
     const originKey = `${platform}:${chatId}`;
-    const senderLabel = mappedPersona || getDefaultPersonaName() || `[${platform}]`;
+    const senderLabel =
+      mappedPersona || getDefaultPersonaName() || `[${platform}]`;
     const relayText = `${senderLabel}: ${text}`;
     for (const route of getRoutes(conversationId)) {
       if (route === originKey) continue;
@@ -105,10 +106,7 @@ const pluginLoader = createPluginLoader({
       const frontend = getFrontend(targetPlatform);
       if (!frontend?.sendText) continue;
       frontend.sendText(targetChatId, relayText).catch((err) => {
-        log(
-          "warn",
-          `[Bridge] Cross-relay to ${route} failed: ${err.message}`,
-        );
+        log("warn", `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
       });
     }
   },

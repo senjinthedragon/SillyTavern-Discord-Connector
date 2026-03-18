@@ -560,7 +560,8 @@ if (DISCORD_PLUGIN_ENABLED) {
       );
 
       // Cross-relay to other platforms in the same conversation.
-      const senderLabel = mappedPersona || getDefaultPersonaName() || `[discord]`;
+      const senderLabel =
+        mappedPersona || getDefaultPersonaName() || `[discord]`;
       const relayText = `${senderLabel}: ${content}`;
       const originKey = `discord:${message.channel.id}`;
       for (const route of getRoutes(conversationId)) {
@@ -570,7 +571,10 @@ if (DISCORD_PLUGIN_ENABLED) {
         const frontend = getFrontend(targetPlatform);
         if (!frontend?.sendText) continue;
         frontend.sendText(targetChatId, relayText).catch((err) => {
-          log("warn", `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
+          log(
+            "warn",
+            `[Bridge] Cross-relay to ${route} failed: ${err.message}`,
+          );
         });
       }
     }
