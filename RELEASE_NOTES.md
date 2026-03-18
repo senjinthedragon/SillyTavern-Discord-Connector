@@ -64,3 +64,9 @@ Persona mapping now works on all three platforms. The `onUserMessage` and `onCom
 `/mypersona` has been added to Telegram's registered bot command list so it shows up in the `/` menu. The `allowUserPersonaSave` toggle in the extension settings applies to all platforms - one setting covers them all.
 
 Owner-configured persona maps now use separate keys per platform in `config.js`: `discordPersonaMap`, `telegramPersonaMap`, and `signalPersonaMap`. All three are documented with examples in `config.example.js`.
+
+---
+
+## Thanks
+
+A special thanks to **Themysterycat** on Discord for suggesting the persona mapping feature that inspired everything in this section. Great idea!
