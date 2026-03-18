@@ -8,7 +8,65 @@
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * Styles for the settings panel, status indicators, and custom 
- * SillyTavern UI injections. This file ensures the connector's 
- * interface matches the native SillyTavern theme and layout.
+ * All colors are derived from currentColor or low-opacity neutrals so the
+ * panel looks correct regardless of which SillyTavern theme is active.
+ * Hardcoded colors are used only for semantic status indicators (green/red).
  */
+
+/* ---------------------------------------------------------------------------
+ * Section titles
+ * Small all-caps label that groups related settings. A faint border underneath
+ * provides separation without introducing a specific color.
+ * --------------------------------------------------------------------------- */
+.dc-section-title {
+  margin: 14px 0 6px;
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+  padding-bottom: 4px;
+}
+
+/* Remove the top margin on the very first section title so it sits flush with
+ * the top of the drawer content. */
+.inline-drawer-content .dc-section-title:first-child {
+  margin-top: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Connection status badge
+ * Shown between the buttons and the auto-connect checkbox. The JS in index.js
+ * sets element.style.color directly for green/red/orange; the badge just
+ * provides a subtle container and consistent typography.
+ * --------------------------------------------------------------------------- */
+.dc-status {
+  margin: 6px 0;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+  background: rgba(128, 128, 128, 0.08);
+  border: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+/* ---------------------------------------------------------------------------
+ * Helper text
+ * Used under selects and checkboxes. Replaces the previous inline
+ * style="opacity: 0.8" approach for consistency.
+ * --------------------------------------------------------------------------- */
+.dc-hint {
+  display: block;
+  font-size: 0.8em;
+  line-height: 1.45;
+  opacity: 0.6;
+}
+
+/* ---------------------------------------------------------------------------
+ * Block spacing
+ * A small consistent gap between each setting row.
+ * --------------------------------------------------------------------------- */
+.discord-connector_block {
+  margin-bottom: 6px;
+}
