@@ -31,7 +31,7 @@ const {
   getAutocompleteDebouncers,
 } = require("./discord");
 const { handleBridgePacket } = require("./websocket-router");
-const { getPersonaForUser } = require("./persona-map");
+const { load: loadPersonaMap, getPersonaForUser } = require("./persona-map");
 
 const version = require("./package.json").version;
 const width = 70;
@@ -53,6 +53,8 @@ ${purple}╔${"═".repeat(width)}╗
 ║${gold}${support.padEnd(width)}${purple}║
 ╚${"═".repeat(width)}╝${reset}
 `);
+
+loadPersonaMap();
 
 let sillyTavernClient = null;
 const pendingImageMessages = {};

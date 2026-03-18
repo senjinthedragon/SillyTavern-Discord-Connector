@@ -115,6 +115,4 @@ function setPersonaForUser(platform, userId, personaName) {
   }
 }
 
-load();
-
-module.exports = { getPersonaForUser, setPersonaForUser };
+module.exports = { load, getPersonaForUser, setPersonaForUser };
