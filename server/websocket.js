@@ -35,6 +35,8 @@ const {
   load: loadPersonaMap,
   getPersonaForUser,
   setPersonaForUser,
+  setDefaultPersonaName,
+  getDefaultPersonaName,
 } = require("./persona-map");
 
 const version = require("./package.json").version;
@@ -94,7 +96,8 @@ const pluginLoader = createPluginLoader({
     // Cross-relay the user's message to all other platforms in the same
     // conversation so every connected client stays in sync.
     const originKey = `${platform}:${chatId}`;
-    const relayText = `[${platform}] ${text}`;
+    const senderLabel = mappedPersona || getDefaultPersonaName() || `[${platform}]`;
+    const relayText = `${senderLabel}: ${text}`;
     for (const route of getRoutes(conversationId)) {
       if (route === originKey) continue;
       const { platform: targetPlatform, nativeChatId: targetChatId } =
@@ -193,12 +196,14 @@ wss.on("connection", (ws) => {
       setBridgeActivity,
       getPendingAutocompletes,
       setPersonaForUser,
+      setCurrentPersonaName: setDefaultPersonaName,
       log,
     });
   });
 
   ws.on("close", () => {
     sillyTavernClient = null;
+    setDefaultPersonaName(null);
     setBridgeActivity(null);
 
     for (const key of Object.keys(streamSessions)) {

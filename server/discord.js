@@ -42,9 +42,15 @@ const { client } = require("./client");
 const { sendLong, sendImagesToChannel } = require("./messaging");
 const { splitLongText } = require("./text-chunking");
 const { enqueue } = require("./queue");
-const { addRoute, resolveConversationId } = require("./frontend-manager");
+const {
+  addRoute,
+  resolveConversationId,
+  getRoutes,
+  getFrontend,
+  parseRoute,
+} = require("./frontend-manager");
 const { streamSessions, scheduleEdit } = require("./streaming");
-const { getPersonaForUser } = require("./persona-map");
+const { getPersonaForUser, getDefaultPersonaName } = require("./persona-map");
 const version = require("./package.json").version;
 
 const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes(
@@ -552,6 +558,21 @@ if (DISCORD_PLUGIN_ENABLED) {
           ...(mappedPersona ? { mappedPersona } : {}),
         }),
       );
+
+      // Cross-relay to other platforms in the same conversation.
+      const senderLabel = mappedPersona || getDefaultPersonaName() || `[discord]`;
+      const relayText = `${senderLabel}: ${content}`;
+      const originKey = `discord:${message.channel.id}`;
+      for (const route of getRoutes(conversationId)) {
+        if (route === originKey) continue;
+        const { platform: targetPlatform, nativeChatId: targetChatId } =
+          parseRoute(route);
+        const frontend = getFrontend(targetPlatform);
+        if (!frontend?.sendText) continue;
+        frontend.sendText(targetChatId, relayText).catch((err) => {
+          log("warn", `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
+        });
+      }
     }
   });
 }

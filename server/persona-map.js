@@ -131,9 +131,17 @@ function createPersonaMapStore(options = {}) {
 // Default singleton used by the rest of the application.
 const defaultStore = createPersonaMapStore();
 
+// The active ST persona name sent by the extension on connect. Used as the
+// cross-relay sender label when no per-user mapping is configured.
+let _defaultPersonaName = null;
+
 module.exports = {
   load: () => defaultStore.load(),
   getPersonaForUser: (p, u) => defaultStore.getPersonaForUser(p, u),
   setPersonaForUser: (p, u, n) => defaultStore.setPersonaForUser(p, u, n),
+  setDefaultPersonaName: (name) => {
+    _defaultPersonaName = name || null;
+  },
+  getDefaultPersonaName: () => _defaultPersonaName,
   createPersonaMapStore,
 };

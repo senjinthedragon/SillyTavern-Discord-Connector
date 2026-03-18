@@ -850,7 +850,11 @@ export async function handleExecuteCommand(data) {
           ? (context.groups || []).find((g) => g.id === context.groupId)
               ?.name || "(unknown)"
           : "(none)";
-        const activePersona = context.powerUserSettings?.persona || "(none)";
+        const pSettings = context.powerUserSettings;
+        const personaId = pSettings?.default_persona || pSettings?.persona;
+        const activePersona = personaId
+          ? pSettings?.personas?.[personaId] || personaId
+          : "(none)";
 
         let lastErrorText = "";
         if (metrics.lastError) {

@@ -44,6 +44,11 @@ async function handleBridgePacket(data, deps) {
     return;
   }
 
+  if (data.type === "client_info") {
+    if (data.personaName) deps.setCurrentPersonaName(String(data.personaName));
+    return;
+  }
+
   const conversationId = data.chatId;
   if (!conversationId) return;
 

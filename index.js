@@ -169,6 +169,16 @@ function connect() {
         ) {
           setImageGenerationTimeoutMs(data.imagePlaceholderTimeoutMs);
         }
+        // Tell the server the active persona name so it can label cross-relay
+        // messages correctly without requiring a /mypersona setup first.
+        // powerUserSettings.persona is the active persona ID; fall back to
+        // default_persona if no per-chat override is set.
+        const pSettings = SillyTavern.getContext().powerUserSettings;
+        const personaId = pSettings?.default_persona || pSettings?.persona;
+        const personaName = personaId
+          ? pSettings?.personas?.[personaId]
+          : null;
+        if (personaName) safeSend({ type: "client_info", personaName });
         return;
       }
 

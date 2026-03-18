@@ -103,6 +103,15 @@ function resolveConversationId(platform, nativeChatId) {
     }
   }
 
+  // No match found - fall back to a platform-scoped ID. If conversationLinks
+  // are configured this is likely a format mismatch (e.g. phone number vs UUID,
+  // or a leading + missing). Log a warning so it is easy to spot.
+  if (links.length > 0) {
+    log(
+      "warn",
+      `[Frontends] No conversationLink match for ${platform}:${nativeChatId} - routing in isolation. Check the signalChatId/telegramChatId/discordChannelId format in your config.`,
+    );
+  }
   return `${platform}:${nativeChatId}`;
 }
 
