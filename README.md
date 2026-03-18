@@ -128,29 +128,31 @@ Use these slash commands in Discord to control the session:
 
 | Command | Description |
 |---|---|
-| **`/sthelp`** | *Show available commands* |
-| **`/status`** | *Show if everything is connected and how image requests are doing* |
-| **`/reaction <mode>`** | *Set reaction mode (`off`, `status`, or `full`)* |
-| **`/listchars`** | *List all characters with their shortcut numbers* |
-| **`/listgroups`** | *List all groups with their shortcut numbers* |
-| **`/switchchar <name>`** | *Switch to a character by name - supports live autocomplete* |
-| **`/switchchar_#`** | *Switch to a character by number from `/listchars`* |
-| **`/switchgroup <name>`** | *Switch to a group by name - supports live autocomplete* |
-| **`/switchgroup_#`** | *Switch to a group by number from `/listgroups`* |
-| **`/newchat`** | *Start a fresh chat and receive the character's greeting* |
-| **`/listchats`** | *List saved chats for the current character with shortcut numbers* |
-| **`/switchchat <name>`** | *Load a saved chat by name - supports live autocomplete* |
-| **`/switchchat_#`** | *Load a saved chat by number from `/listchats`* |
-| **`/history <n>`** | *Show the last n exchanges from the current chat, assumes 5 when not specified* |
-| **`/mood <n>`** | *Show a character's current mood and expression image. Autocompletes with group members in group chat, or the active character in solo chat* |
-| **`/charimage <n>`** | *Post a character's avatar. Autocompletes with group members in group chat, or the active character in solo chat* |
-| **`/note <text>`** | *Set the author's note for the current chat to guide how the scene develops. Omit text to read the current note* |
-| **`/listpersonas`** | *List your available personas* |
-| **`/persona <name>`** | *Switch your active persona by name - supports live autocomplete* |
-| **`/impersonate`** | *Have the AI write your next response in character, with an optional prompt to guide it* |
-| **`/continue`** | *Continue the last AI message* |
-| **`/image <prompt>`** | *Generate an AI image via SillyTavern - supports live autocomplete for built-in keywords* |
-| **`/image cancel`** | *Cancel the active image generation request* |
+| **`/sthelp`** | *Show the list of all available commands* |
+| **`/status`** | *Check if the bot is connected and see how image requests are going* |
+| **`/reaction <mode>`** | *Change how the character's mood is shown (`off` = nothing, `status` = bot status bar only, `full` = status bar and expression images)* |
+| **`/listchars`** | *List all your characters with their shortcut numbers* |
+| **`/listgroups`** | *List all your groups with their shortcut numbers* |
+| **`/switchchar <name>`** | *Switch to a different character by name* |
+| **`/switchchar_#`** | *Switch to a character by its number from `/listchars`* |
+| **`/switchgroup <name>`** | *Switch to a different group by name* |
+| **`/switchgroup_#`** | *Switch to a group by its number from `/listgroups`* |
+| **`/newchat`** | *Start a fresh new chat and get the character's opening message* |
+| **`/listchats`** | *Show your saved chats for the current character, newest first* |
+| **`/switchchat <name>`** | *Load a saved chat by name* |
+| **`/switchchat_#`** | *Load a saved chat by its number from `/listchats`* |
+| **`/history <n>`** | *Show the last few messages from the current chat (shows 5 by default)* |
+| **`/mood <name>`** | *Show what mood or expression the character is currently displaying* |
+| **`/charimage <name>`** | *Post a character's picture in chat* |
+| **`/note <text>`** | *Add a hidden note that shapes the story or the character's behavior. Leave out the text to read what's currently set* |
+| **`/listpersonas`** | *See all your available personas* |
+| **`/persona <name>`** | *Choose who you appear to be in the conversation. You can type a name that isn't in the list to use it as a temporary persona* |
+| **`/mypersona <name>`** | *Save your persona so it gets set for you automatically every time you chat* |
+| **`/mypersona clear`** | *Remove your saved persona setting* |
+| **`/impersonate`** | *Have the AI write your next message for you, as your character would say it. Add an optional prompt to guide it* |
+| **`/continue`** | *Ask the AI to keep writing from where it left off* |
+| **`/image <prompt>`** | *Generate an AI image. Use a keyword or describe what you want to see* |
+| **`/image cancel`** | *Stop an image that is currently being generated* |
 
 **`/image` keywords**
 
@@ -168,11 +170,11 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 | **`cancel`** | *Cancel the active image generation task* |
 
 > [!NOTE]
-> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder immediately so you know it's working, then replaces it with the finished image when it's ready.
+> Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder straight away so you know it's working, then replaces it with the finished image when it's ready. The placeholder counts down so you can always see how much time is left.
 >
-> If generation gets stuck, this message will change after a few minutes and tell you to try again.
+> If it runs out of time, the placeholder disappears and you can just run `/image` again.
 >
-> To keep things stable, the connector may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a little and run `/image` again.
+> To keep things stable, the bot may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a moment and try again.
 
 > [!TIP]
 > Reactions can arrive a little after the chat text. That's normal.
@@ -180,9 +182,9 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 > If you use `off` or `status` mode for reactions, run `/mood` any time you want to post the current expression image in chat.
 
 > [!NOTE]
-> Commands marked as supporting live autocomplete show a dropdown of matching names or keywords as you type. Character and group lists are sorted alphabetically and refresh every 60 seconds, so a character or group added in SillyTavern's UI may take up to a minute to appear in the dropdown. `/mood` and `/charimage` autocomplete with the members of your active group, or your solo character's name if you're in a solo chat. `/persona` autocompletes with the personas you have defined in SillyTavern - you can also type a name that isn't in the list to create a temporary persona on the fly. Chat history shows your most recent chats first and updates immediately after any `/newchat` or switch command issued through the bot.
+> Many commands show a dropdown of suggestions as you type - just start typing and pick from the list. Character and group lists refresh every 60 seconds, so something added in SillyTavern may take up to a minute to appear. `/mood` and `/charimage` suggest the members of your active group, or just your current character in a solo chat. `/persona` and `/mypersona` suggest the personas you have set up - you can also type a name that isn't in the list to use it as a one-time persona. Chat history shows your most recent chats first and updates right away after any switch or new chat.
 >
-> Numbered shortcuts (`/switchchar_3`, `/switchgroup_2`, `/switchchat_1` etc.) are not registered as slash commands because the number of entries varies for everyone. Type them as plain text messages - they work exactly the same way.
+> Numbered shortcuts (`/switchchar_3`, `/switchgroup_2`, `/switchchat_1` etc.) don't appear in the slash command menu because everyone has a different number of characters. Just type them as a normal message - they work exactly the same way.
 
 ## How It Works
 

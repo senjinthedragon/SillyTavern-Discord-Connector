@@ -71,6 +71,17 @@ module.exports = {
   // and showing a timeout message (seconds).
   imagePlaceholderTimeoutSeconds: 180,
 
+  // Map Discord user IDs to SillyTavern persona names.
+  // When set, the persona switches automatically before each message from that user.
+  // Users can also save their own preference with the /mypersona command, which
+  // takes priority over entries here.
+  // To get a User ID: enable Developer Mode in Discord settings, then right-click
+  // a user and select "Copy User ID".
+  discordPersonaMap: {
+    // "123456789012345678": "Alice",
+    // "987654321098765432": "Bob",
+  },
+
   // Which frontend plugins to load. "discord" is the built-in free plugin.
   // Add "telegram" or "signal" here only if you have purchased the pro plugins.
   enabledPlugins: ["discord"],

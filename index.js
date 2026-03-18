@@ -89,6 +89,7 @@ const DEFAULT_SETTINGS = {
   bridgeUrl: "ws://127.0.0.1:2333",
   autoConnect: true,
   expressionMode: "status",
+  allowUserPersonaSave: true,
 };
 
 // String fallback covers older ST versions that don't export this event type.
@@ -926,6 +927,27 @@ function generateAndSendImage(chatId, requestId, prompt) {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Sanitizes a persona name before it is passed to executeSlashCommandsWithOptions
+ * or stored in the persona map. SillyTavern's slash command runner supports pipe
+ * chaining (|), so an unsanitized name like "Alice | /newchat" would execute
+ * /newchat as a second command. Newlines carry the same risk. Length is capped
+ * so an oversized string cannot be used to slow down the parser.
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+function sanitizePersonaName(name) {
+  return name
+    .replace(/[|\n\r]/g, "") // strip pipe and newlines (command injection vectors)
+    .trim()
+    .slice(0, 200);          // reasonable cap - no persona name needs to be longer
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket message handlers
 // ---------------------------------------------------------------------------
 
@@ -938,6 +960,19 @@ function generateAndSendImage(chatId, requestId, prompt) {
  */
 async function handleUserMessage(data) {
   lastActiveChatId = data.chatId || lastActiveChatId;
+
+  // Auto-switch to the user's saved persona before injecting their message.
+  if (data.mappedPersona) {
+    try {
+      await executeSlashCommandsWithOptions(`/persona-set ${sanitizePersonaName(data.mappedPersona)}`);
+    } catch (err) {
+      console.warn(
+        `[Discord Bridge] Failed to auto-switch persona to "${data.mappedPersona}":`,
+        err,
+      );
+    }
+  }
+
   const messageState = { chatId: data.chatId, isStreaming: false };
 
   if (ws?.readyState === WebSocket.OPEN) {
@@ -1676,13 +1711,59 @@ async function handleExecuteCommand(data) {
       }
 
       case "persona": {
-        const personaName = data.args?.[0] ?? "";
+        const personaName = sanitizePersonaName(data.args?.[0] ?? "");
         if (!personaName) {
           replyText = "Please provide a persona name. Example: `/persona Aria`";
           break;
         }
         await executeSlashCommandsWithOptions(`/persona-set ${personaName}`);
         replyText = `Persona set to: _${personaName}_`;
+        break;
+      }
+
+      case "mypersona": {
+        if (!getSettings().allowUserPersonaSave) {
+          replyText =
+            "Saving persona preferences is disabled by the server administrator. Use `/persona <name>` to switch manually.";
+          break;
+        }
+        const personaArg = sanitizePersonaName(data.args?.[0] ?? "");
+        if (!personaArg) {
+          replyText =
+            "Usage: `/mypersona <name>` - save your persona so it switches automatically each time you chat.\n" +
+            "Use `/mypersona clear` to remove your saved preference.\n" +
+            "Use `/listpersonas` to see available personas.";
+          break;
+        }
+        if (personaArg.toLowerCase() === "clear") {
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: "save_user_persona",
+                chatId: data.chatId,
+                platform: data.platform || "discord",
+                userId: data.userId || "",
+                personaName: null,
+              }),
+            );
+          }
+          replyText =
+            "Your persona preference has been cleared. Messages will use whatever persona is currently active.";
+          break;
+        }
+        await executeSlashCommandsWithOptions(`/persona-set ${personaArg}`);
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "save_user_persona",
+              chatId: data.chatId,
+              platform: data.platform || "discord",
+              userId: data.userId || "",
+              personaName: personaArg,
+            }),
+          );
+        }
+        replyText = `Persona _${personaArg}_ saved. It will be set automatically each time you send a message.`;
         break;
       }
 
@@ -1711,6 +1792,8 @@ async function handleExecuteCommand(data) {
           ? (context.groups || []).find((g) => g.id === context.groupId)
               ?.name || "(unknown)"
           : "(none)";
+        const activePersona =
+          context.powerUserSettings?.persona || "(none)";
 
         let lastErrorText = "";
         if (imageMetrics.lastError) {
@@ -1753,6 +1836,7 @@ async function handleExecuteCommand(data) {
           `**Connection:** ${ws?.readyState === WebSocket.OPEN ? "🟢 Online" : "🔴 Offline"}\n` +
           `**Plugins:** ${platformLine}\n` +
           `**Active:** ${activeGroup !== "(none)" ? `👥 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `👤 ${activeCharacter}` : "_Nothing loaded_"}\n` +
+          `**Persona:** ${activePersona !== "(none)" ? `🎭 ${activePersona}` : "_None set_"}\n` +
           `**Mood snapshots cached:** ${expressionCache.size}\n\n` +
           "**🖼️ Image Generation**\n" +
           `> **Status:** ${!breakerState ? "✅ Ready" : `⏸️ Paused - cooling down (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s left, will resume automatically)`}\n` +
@@ -1772,26 +1856,29 @@ async function handleExecuteCommand(data) {
           "## 🐲 __Bridge Commands:__\n" +
           "**System & Status**\n" +
           "> `/sthelp` - Show this menu\n" +
-          "> `/status` - Check bridge and image pipeline health\n" +
-          "> `/reaction <mode>` - Set mode (`off`, `status`, `full`)\n\n" +
+          "> `/status` - Check connection and image stats\n" +
+          "> `/reaction <mode>` - Set mood display: `off`, `status`, or `full`\n\n" +
           "**Management**\n" +
-          "> `/listchars` | `/listgroups` - List available characters/groups\n" +
-          "> `/switchchar` | `/switchgroup` - Switch character/group\n" +
-          "> `/newchat` - Start a new chat with the active character or group\n" +
-          "> `/listchats` | `/switchchat` - List and switch to previous chat\n" +
-          "> `/history [n]` - Show last n exchanges (default: 5, omit n for all)\n" +
-          "> *💡 Tip: You can also use `_#` (e.g., `/switchchar_3`) to select by index.*\n\n" +
-          "**Immersion & Mood**\n" +
-          "> `/mood` - Show character expression\n" +
-          "> `/charimage` - Show character's avatar\n" +
-          "> `/note <text>` - Set the author's note for the current chat; omit text to read the current note\n" +
-          "> `/persona <name>` - Switch your active persona by name\n" +
-          "> `/listpersonas` - List your available personas\n" +
-          "> `/impersonate [prompt]` - Have the AI write your next response in character, with an optional guiding prompt\n" +
+          "> `/listchars` | `/listgroups` - List characters / groups\n" +
+          "> `/switchchar` | `/switchgroup` - Switch character / group\n" +
+          "> `/newchat` - Start a fresh chat\n" +
+          "> `/listchats` | `/switchchat` - List and load saved chats\n" +
+          "> `/history [n]` - Show last n messages (default: 5)\n" +
+          "> *💡 `/switchchar_3`, `/switchgroup_2` etc. work as plain text messages*\n\n" +
+          "**Mood & Persona**\n" +
+          "> `/mood` - Show the character's current expression\n" +
+          "> `/charimage` - Post the character's picture\n" +
+          "> `/note <text>` - Set a hidden story note; omit text to read it\n" +
+          "> `/persona <name>` - Switch your persona\n" +
+          (getSettings().allowUserPersonaSave
+            ? "> `/mypersona <name>` - Save your persona for automatic use; `clear` to remove\n"
+            : "") +
+          "> `/listpersonas` - List your personas\n" +
+          "> `/impersonate [prompt]` - Have the AI write your next message\n" +
           "> `/continue` - Continue the last AI message\n\n" +
           "**Image Generation**\n" +
-          "> `/image <prompt or keyword>` - Generate AI image (Keywords: `you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
-          "> `/image cancel` - Abort active image generation\n\n" +
+          "> `/image <prompt or keyword>` - Generate an image (`you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
+          "> `/image cancel` - Cancel active image generation\n\n" +
           "~~                                                                                                                                          ~~\n" +
           "*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n" +
           "*Please support my work:* <https://github.com/sponsors/senjinthedragon>";
@@ -2250,6 +2337,7 @@ jQuery(async () => {
     $("#discord_bridge_url").val(settings.bridgeUrl);
     $("#discord_auto_connect").prop("checked", settings.autoConnect);
     $("#discord_expression_mode").val(settings.expressionMode);
+    $("#discord_allow_user_persona_save").prop("checked", settings.allowUserPersonaSave);
 
     $("#discord_bridge_url").on("input", () => {
       getSettings().bridgeUrl = $("#discord_bridge_url").val();
@@ -2266,6 +2354,11 @@ jQuery(async () => {
       lastExpressionSignature = "";
       saveSettingsDebounced();
       scheduleExpressionUpdate(lastActiveChatId);
+    });
+
+    $("#discord_allow_user_persona_save").on("change", () => {
+      getSettings().allowUserPersonaSave = $("#discord_allow_user_persona_save").prop("checked");
+      saveSettingsDebounced();
     });
 
     $("#discord_connect_button").on("click", connect);

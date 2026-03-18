@@ -162,6 +162,16 @@ async function handleBridgePacket(data, deps) {
       await fanout(conversationId, "sendRecap", data.entries || []);
       break;
 
+    case "save_user_persona": {
+      const { setPersonaForUser } = require("./persona-map");
+      setPersonaForUser(
+        data.platform || "discord",
+        data.userId || "",
+        data.personaName ?? null,
+      );
+      break;
+    }
+
     case "send_images":
       await fanout(
         conversationId,

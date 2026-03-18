@@ -2,6 +2,27 @@
 
 ## New
 
+### Per-user persona mapping
+
+The bridge can now automatically switch the active SillyTavern persona before processing each incoming message, based on who sent it.
+
+**Two ways to set it up:**
+
+- **Owner-configured** - add a `discordPersonaMap` object to `config.js` mapping Discord user IDs to persona names. Useful for assigning personas that users cannot change themselves.
+- **User-configured** - users can run `/mypersona <name>` in Discord to save their own preference. Their saved choice takes priority over any entry in `config.js`. Run `/mypersona clear` to remove it.
+
+Saved user preferences are stored in `server/persona-map.json` alongside your config. The file is created automatically on first save and is separate from `config.js` so bridge updates cannot overwrite it. The bridge logs a summary of loaded mappings on startup.
+
+The `/mypersona` command autocompletes from your ST persona list and accepts unlisted names to create temporary personas, consistent with the existing `/persona` behaviour.
+
+**Server manager controls:**
+
+A new toggle in the extension settings panel - "Allow users to save their persona with /mypersona" - lets you disable user-managed preferences entirely. When off, `/mypersona` returns an error and the command is hidden from the `/sthelp` output. The toggle is on by default.
+
+### Active persona shown in /status
+
+The `/status` command now shows the currently active SillyTavern persona alongside the active character and group.
+
 ### Live countdown on the image generation placeholder
 
 The `🎨 Generating image…` message in Discord now counts down in real time so you can always see how long is left before the request times out.
@@ -12,6 +33,10 @@ The `🎨 Generating image…` message in Discord now counts down in real time s
 The countdown runs server-side using the Discord message edit API - no extra extension packets required. It also cleans up correctly in all exit paths: the placeholder is deleted (and the countdown stopped) when the image arrives, when generation is cancelled via `/image cancel`, or when generation fails before the timeout. Previously the placeholder could be left stuck in the channel on cancel or failure.
 
 ## Fixes
+
+### Persona name injection hardening
+
+Persona names passed to SillyTavern's slash command runner are now sanitized before use. The runner supports pipe chaining (`|`), so a crafted name such as `Alice | /newchat` would have silently executed `/newchat` as a second command - allowing a Discord user to trigger arbitrary ST slash commands. Newlines carry the same risk. Pipe characters and newlines are now stripped and names are capped at 200 characters. The fix applies to `/persona`, `/mypersona`, and the automatic persona switch on incoming messages.
 
 ### `imagePlaceholderTimeoutSeconds` now actually works
 

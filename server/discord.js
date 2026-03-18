@@ -44,6 +44,7 @@ const { splitLongText } = require("./text-chunking");
 const { enqueue } = require("./queue");
 const { addRoute, resolveConversationId } = require("./frontend-manager");
 const { streamSessions, scheduleEdit } = require("./streaming");
+const { getPersonaForUser } = require("./persona-map");
 const version = require("./package.json").version;
 
 const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes(
@@ -192,6 +193,19 @@ const SLASH_COMMANDS = [
     description: "List your available personas",
   },
   {
+    name: "mypersona",
+    description: "Save your persona so it switches automatically when you chat",
+    options: [
+      {
+        name: "name",
+        type: 3,
+        description: "Persona name to save, or 'clear' to remove your saved preference",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
     name: "switchchar",
     description: "Switch to a character by exact name",
     options: [
@@ -330,6 +344,7 @@ const AUTOCOMPLETE_LIST_MAP = {
   charimage: "group_members",
   mood: "group_members",
   image: "image_prompts",
+  mypersona: "personas",
 };
 
 function getPendingAutocompletes() {
@@ -470,6 +485,8 @@ if (DISCORD_PLUGIN_ENABLED) {
         command,
         args,
         chatId: conversationId,
+        userId: interaction.user.id,
+        platform: "discord",
       }),
     );
 
@@ -518,14 +535,20 @@ if (DISCORD_PLUGIN_ENABLED) {
           command,
           args,
           chatId: conversationId,
+          userId: message.author.id,
+          platform: "discord",
         }),
       );
     } else {
+      const mappedPersona = getPersonaForUser("discord", message.author.id);
       stClient.send(
         JSON.stringify({
           type: "user_message",
           text: content,
           chatId: conversationId,
+          userId: message.author.id,
+          platform: "discord",
+          ...(mappedPersona ? { mappedPersona } : {}),
         }),
       );
     }
