@@ -542,9 +542,12 @@ async function sendText(channelId, text) {
       const timerId = startPlaceholderCountdown(channelId, msg, config.imagePlaceholderTimeoutMs);
       placeholderMessages[channelId] = { msg, timerId };
     } else if (placeholderMessages[channelId]) {
-      // A non-placeholder text (e.g. an error message) arrived while a countdown
-      // is running - stop the timer so it no longer edits the stale placeholder.
+      // A non-placeholder text (e.g. a cancel/error message) arrived while a
+      // countdown is running. Stop the timer and delete the stale placeholder
+      // so it doesn't sit in the channel forever.
       clearTimeout(placeholderMessages[channelId].timerId);
+      await placeholderMessages[channelId].msg.delete().catch(() => {});
+      delete placeholderMessages[channelId];
     }
   });
 }
