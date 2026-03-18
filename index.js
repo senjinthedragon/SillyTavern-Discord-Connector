@@ -693,7 +693,7 @@ function makeImageRequestId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function sendImageError(chatId, requestId, text) {
+function sendImageError(chatId, requestId, text, reason = "failed") {
   if (ws?.readyState !== WebSocket.OPEN) return;
   ws.send(
     JSON.stringify({
@@ -701,6 +701,7 @@ function sendImageError(chatId, requestId, text) {
       chatId,
       requestId,
       text,
+      reason,
     }),
   );
 }
@@ -849,7 +850,12 @@ function generateAndSendImage(chatId, requestId, prompt) {
     const cancelJob = {
       cancel: () => {
         finish("cancelled", "cancelled_by_user", () => {
-          sendImageError(chatId, requestId, "Image generation cancelled.");
+          sendImageError(
+            chatId,
+            requestId,
+            "Image generation cancelled.",
+            "cancelled",
+          );
         });
       },
     };
@@ -907,6 +913,7 @@ function generateAndSendImage(chatId, requestId, prompt) {
           chatId,
           requestId,
           "Image generation timed out. Please try again.",
+          "timed_out",
         );
       });
     }, imageGenerationTimeoutMs);

@@ -61,8 +61,31 @@ async function handleBridgePacket(data, deps) {
       );
       break;
 
-    case "generate_image_result":
-      delete pendingImageMessages[data.requestId || conversationId];
+    case "generate_image_result": {
+      const key = data.requestId || conversationId;
+      delete pendingImageMessages[key];
+
+      if (deps.cancelledImageRequests.has(key)) {
+        // User explicitly cancelled - silently discard the late arrival.
+        deps.cancelledImageRequests.delete(key);
+        break;
+      }
+
+      if (deps.timedOutImageRequests.has(key)) {
+        // Image arrived after the bridge gave up waiting - send it with a note
+        // so the user gets their image and the manager knows the timeout is short.
+        deps.timedOutImageRequests.delete(key);
+        if (data.image) {
+          await fanout(
+            conversationId,
+            "sendText",
+            "_(Image arrived after timeout - consider increasing `imagePlaceholderTimeoutSeconds` in config.js.)_",
+          );
+          await fanout(conversationId, "sendImages", [data.image], null);
+        }
+        break;
+      }
+
       // Use sendGeneratedImage rather than sendImages so each platform's plugin
       // can delete its own placeholder before posting the real image. Plugins
       // that have no placeholder concept (Telegram, Signal) should alias
@@ -70,15 +93,34 @@ async function handleBridgePacket(data, deps) {
       if (data.image)
         await fanout(conversationId, "sendGeneratedImage", [data.image], null);
       break;
+    }
 
-    case "generate_image_error":
-      delete pendingImageMessages[data.requestId || conversationId];
+    case "generate_image_error": {
+      const key = data.requestId || conversationId;
+      delete pendingImageMessages[key];
+
+      if (data.reason === "cancelled") {
+        deps.cancelledImageRequests.add(key);
+        // Self-expiring after 30 minutes in case the image never arrives.
+        setTimeout(
+          () => deps.cancelledImageRequests.delete(key),
+          30 * 60 * 1000,
+        );
+      } else if (data.reason === "timed_out") {
+        deps.timedOutImageRequests.add(key);
+        setTimeout(
+          () => deps.timedOutImageRequests.delete(key),
+          30 * 60 * 1000,
+        );
+      }
+
       await fanout(
         conversationId,
         "sendText",
         data.text || "Image generation failed.",
       );
       break;
+    }
 
     case "stream_chunk": {
       const streamId = data.streamId || conversationId;

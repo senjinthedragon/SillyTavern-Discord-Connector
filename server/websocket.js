@@ -62,6 +62,8 @@ loadPersonaMap();
 
 let sillyTavernClient = null;
 const pendingImageMessages = {};
+const cancelledImageRequests = new Set();
+const timedOutImageRequests = new Set();
 const streamHandled = new Set();
 const streamReceived = new Set();
 
@@ -161,6 +163,8 @@ wss.on("connection", (ws) => {
       streamHandled,
       streamReceived,
       pendingImageMessages,
+      cancelledImageRequests,
+      timedOutImageRequests,
       setBridgeActivity,
       getPendingAutocompletes,
       setPersonaForUser,
@@ -181,6 +185,8 @@ wss.on("connection", (ws) => {
     for (const key of Object.keys(pendingImageMessages)) {
       delete pendingImageMessages[key];
     }
+    cancelledImageRequests.clear();
+    timedOutImageRequests.clear();
 
     const autocompleteDebouncers = getAutocompleteDebouncers();
     for (const [key, debouncer] of Object.entries(autocompleteDebouncers)) {

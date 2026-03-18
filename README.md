@@ -154,7 +154,7 @@ Use these slash commands in Discord to control the session:
 | **`/impersonate`** | *Have the AI write your next message for you, as your character would say it. Add an optional prompt to guide it* |
 | **`/continue`** | *Ask the AI to keep writing from where it left off* |
 | **`/image <prompt>`** | *Generate an AI image. Use a keyword or describe what you want to see* |
-| **`/image cancel`** | *Stop an image that is currently being generated* |
+| **`/image cancel`** | *Cancel an image that is currently being generated - the result will be discarded even if it finishes* |
 
 **`/image` keywords**
 
@@ -169,12 +169,12 @@ Instead of a custom prompt you can use one of these shorthand keywords:
 | **`last`** | *An image based on the last message sent by the character* |
 | **`raw_last`** | *Uses the character's last message verbatim as the prompt* |
 | **`background`** | *A backdrop image based on the current setting/location* |
-| **`cancel`** | *Cancel the active image generation task* |
+| **`cancel`** | *Cancel the active image generation task - the result will be discarded even if it finishes* |
 
 > [!NOTE]
 > Image generation can take anywhere from a few seconds to several minutes depending on your hardware. The bot posts a 🎨 **Generating image…** placeholder straight away so you know it's working, then replaces it with the finished image when it's ready. The placeholder counts down so you can always see how much time is left.
 >
-> If it runs out of time, the placeholder disappears and you can just run `/image` again.
+> If it runs out of time, the placeholder disappears and you can try again. If the image happens to finish after the timeout, it will still be posted with a small note so it isn't lost.
 >
 > To keep things stable, the bot may briefly pause new image requests if too many are sent at once or if several fail in a row. Just wait a moment and try again.
 

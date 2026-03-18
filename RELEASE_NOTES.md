@@ -32,6 +32,12 @@ The `🎨 Generating image…` message in Discord now counts down in real time s
 
 The countdown runs server-side using the Discord message edit API - no extra extension packets required. It also cleans up correctly in all exit paths: the placeholder is deleted (and the countdown stopped) when the image arrives, when generation is cancelled via `/image cancel`, or when generation fails before the timeout. Previously the placeholder could be left stuck in the channel on cancel or failure.
 
+### /image cancel now actually cancels
+
+Previously, `/image cancel` removed the placeholder and stopped the countdown, but if the image finished generating anyway it would still pop up in the channel. Now it doesn't - the bridge marks the request as cancelled and silently discards any late-arriving result.
+
+The timeout case is handled differently by design: if an image arrives after the bridge gave up waiting, it is still posted but with a brief note - "_(Image arrived after timeout)_" - so the user gets their image and the manager has a clear hint that `imagePlaceholderTimeoutSeconds` in `config.js` may need to be raised.
+
 ## Fixes
 
 ### Persona name injection hardening

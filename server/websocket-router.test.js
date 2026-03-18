@@ -63,6 +63,8 @@ function createDeps(overrides = {}) {
     streamHandled: new Set(),
     streamReceived: new Set(),
     pendingImageMessages: {},
+    cancelledImageRequests: new Set(),
+    timedOutImageRequests: new Set(),
     setBridgeActivity: () => {},
     getPendingAutocompletes: () => ({}),
     setPersonaForUser: (platform, userId, personaName) => {
@@ -173,6 +175,94 @@ test("handleBridgePacket save_user_persona defaults platform to discord", async 
   );
 
   assert.equal(deps.__personaSaves[0].platform, "discord");
+});
+
+test("handleBridgePacket generate_image_error cancelled adds to set and posts message", async () => {
+  const deps = createDeps();
+  await handleBridgePacket(
+    {
+      type: "generate_image_error",
+      chatId: "conv1",
+      requestId: "req1",
+      text: "Image generation cancelled.",
+      reason: "cancelled",
+    },
+    deps,
+  );
+
+  assert.ok(deps.cancelledImageRequests.has("req1"));
+  assert.ok(
+    deps.__calls.some((c) => c[1] === "sendText" && /cancelled/i.test(c[3])),
+  );
+});
+
+test("handleBridgePacket generate_image_error timed_out adds to set and posts message", async () => {
+  const deps = createDeps();
+  await handleBridgePacket(
+    {
+      type: "generate_image_error",
+      chatId: "conv1",
+      requestId: "req1",
+      text: "Image generation timed out.",
+      reason: "timed_out",
+    },
+    deps,
+  );
+
+  assert.ok(deps.timedOutImageRequests.has("req1"));
+  assert.ok(
+    deps.__calls.some((c) => c[1] === "sendText" && /timed out/i.test(c[3])),
+  );
+});
+
+test("handleBridgePacket generate_image_result silently discards cancelled request", async () => {
+  const deps = createDeps();
+  deps.cancelledImageRequests.add("req1");
+
+  await handleBridgePacket(
+    {
+      type: "generate_image_result",
+      chatId: "conv1",
+      requestId: "req1",
+      image: { type: "inline", data: "abc" },
+    },
+    deps,
+  );
+
+  assert.equal(
+    deps.__calls.filter(
+      (c) => c[1] === "sendGeneratedImage" || c[1] === "sendImages",
+    ).length,
+    0,
+  );
+  assert.equal(deps.cancelledImageRequests.has("req1"), false);
+});
+
+test("handleBridgePacket generate_image_result sends late image with note for timed_out request", async () => {
+  const deps = createDeps();
+  deps.timedOutImageRequests.add("req1");
+
+  const fanoutCalls = [];
+  deps.fanout = async (_conv, fnName, ...args) => {
+    fanoutCalls.push([fnName, ...args]);
+    return [];
+  };
+
+  await handleBridgePacket(
+    {
+      type: "generate_image_result",
+      chatId: "conv1",
+      requestId: "req1",
+      image: { type: "inline", data: "abc" },
+    },
+    deps,
+  );
+
+  assert.ok(
+    fanoutCalls.some((c) => c[0] === "sendText" && /timeout/i.test(c[1])),
+  );
+  assert.ok(fanoutCalls.some((c) => c[0] === "sendImages"));
+  assert.equal(deps.timedOutImageRequests.has("req1"), false);
 });
 
 test("handleBridgePacket send_images fans out full images array", async () => {
