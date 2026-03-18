@@ -919,7 +919,7 @@ function generateAndSendImage(chatId, requestId, prompt) {
     }, imageGenerationTimeoutMs);
 
     try {
-      await executeSlashCommandsWithOptions(`/sd ${prompt}`);
+      await executeSlashCommandsWithOptions(`/sd ${sanitizeSlashArg(prompt)}`);
     } catch (err) {
       finish("failed", "sd_command_failed", () => {
         console.error("[Discord Bridge] /sd command failed:", err);
@@ -938,20 +938,23 @@ function generateAndSendImage(chatId, requestId, prompt) {
 // ---------------------------------------------------------------------------
 
 /**
- * Sanitizes a persona name before it is passed to executeSlashCommandsWithOptions
- * or stored in the persona map. SillyTavern's slash command runner supports pipe
- * chaining (|), so an unsanitized name like "Alice | /newchat" would execute
- * /newchat as a second command. Newlines carry the same risk. Length is capped
- * so an oversized string cannot be used to slow down the parser.
+ * Sanitizes a string before it is interpolated into a slash command passed to
+ * executeSlashCommandsWithOptions. SillyTavern's slash command runner supports
+ * pipe chaining (|), so an unsanitized value like "Alice | /newchat" would
+ * execute /newchat as a second command. Newlines carry the same risk. Length
+ * is capped so an oversized string cannot be used to slow down the parser.
  *
- * @param {string} name
+ * Apply this to ALL user-supplied arguments before interpolating them into
+ * slash command strings.
+ *
+ * @param {string} value
  * @returns {string}
  */
-function sanitizePersonaName(name) {
-  return name
+function sanitizeSlashArg(value) {
+  return String(value)
     .replace(/[|\n\r]/g, "") // strip pipe and newlines (command injection vectors)
     .trim()
-    .slice(0, 200); // reasonable cap - no persona name needs to be longer
+    .slice(0, 200);
 }
 
 // ---------------------------------------------------------------------------
@@ -972,7 +975,7 @@ async function handleUserMessage(data) {
   if (data.mappedPersona) {
     try {
       await executeSlashCommandsWithOptions(
-        `/persona-set ${sanitizePersonaName(data.mappedPersona)}`,
+        `/persona-set ${sanitizeSlashArg(data.mappedPersona)}`,
       );
     } catch (err) {
       console.warn(
@@ -1296,10 +1299,19 @@ function buildHistory(chat, n) {
  * Called immediately after a successful switch so the listener is scoped
  * tightly to the chat load we just triggered.
  *
+ * Any previously pending recap listener is removed before registering a new
+ * one so rapid successive switches don't stack up multiple listeners that all
+ * fire on the same CHAT_LOADED event and send duplicate recaps.
+ *
  * @param {string} chatId
  */
+let _pendingRecapListener = null;
 function scheduleRecap(chatId) {
-  eventSource.once(event_types.CHAT_LOADED, () => {
+  if (_pendingRecapListener) {
+    eventSource.removeListener(event_types.CHAT_LOADED, _pendingRecapListener);
+  }
+  _pendingRecapListener = () => {
+    _pendingRecapListener = null;
     const { chat } = SillyTavern.getContext();
     const result = buildLastExchange(chat);
     if (!result) return;
@@ -1312,7 +1324,8 @@ function scheduleRecap(chatId) {
         }),
       );
     }
-  });
+  };
+  eventSource.once(event_types.CHAT_LOADED, _pendingRecapListener);
 }
 
 /**
@@ -1392,7 +1405,7 @@ async function handleExecuteCommand(data) {
         );
         if (target) {
           scheduleRecap(data.chatId);
-          await executeSlashCommandsWithOptions(`/go ${target.name}`);
+          await executeSlashCommandsWithOptions(`/go ${sanitizeSlashArg(target.name)}`);
           invalidateChatCache();
           replyText = `Switched to group "${targetName}".`;
         } else {
@@ -1691,7 +1704,7 @@ async function handleExecuteCommand(data) {
       }
 
       case "impersonate": {
-        const prompt = data.args?.[0] ?? "";
+        const prompt = sanitizeSlashArg(data.args?.[0] ?? "");
         await executeSlashCommandsWithOptions(
           prompt
             ? `/impersonate await=true ${prompt}`
@@ -1720,7 +1733,7 @@ async function handleExecuteCommand(data) {
       }
 
       case "persona": {
-        const personaName = sanitizePersonaName(data.args?.[0] ?? "");
+        const personaName = sanitizeSlashArg(data.args?.[0] ?? "");
         if (!personaName) {
           replyText = "Please provide a persona name. Example: `/persona Aria`";
           break;
@@ -1736,7 +1749,7 @@ async function handleExecuteCommand(data) {
             "Saving persona preferences is disabled by the server administrator. Use `/persona <name>` to switch manually.";
           break;
         }
-        const personaArg = sanitizePersonaName(data.args?.[0] ?? "");
+        const personaArg = sanitizeSlashArg(data.args?.[0] ?? "");
         if (!personaArg) {
           replyText =
             "Usage: `/mypersona <name>` - save your persona so it switches automatically each time you chat.\n" +
@@ -1777,7 +1790,7 @@ async function handleExecuteCommand(data) {
       }
 
       case "note": {
-        const noteText = data.args?.[0] ?? "";
+        const noteText = sanitizeSlashArg(data.args?.[0] ?? "");
         if (noteText) {
           await executeSlashCommandsWithOptions(`/note ${noteText}`);
           replyText = `Author's note set to: _${noteText}_`;
@@ -1961,7 +1974,7 @@ async function handleExecuteCommand(data) {
           const groups = context.groups || [];
           if (index >= 0 && index < groups.length) {
             scheduleRecap(data.chatId);
-            await executeSlashCommandsWithOptions(`/go ${groups[index].name}`);
+            await executeSlashCommandsWithOptions(`/go ${sanitizeSlashArg(groups[index].name)}`);
             invalidateChatCache();
             replyText = `Switched to group "${groups[index].name}".`;
           } else {

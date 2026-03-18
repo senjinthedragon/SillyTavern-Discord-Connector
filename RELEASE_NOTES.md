@@ -40,9 +40,17 @@ The timeout case is handled differently by design: if an image arrives after the
 
 ## Fixes
 
-### Persona name injection hardening
+### Slash command injection hardening
 
-Persona names passed to SillyTavern's slash command runner are now sanitized before use. The runner supports pipe chaining (`|`), so a crafted name such as `Alice | /newchat` would have silently executed `/newchat` as a second command - allowing a Discord user to trigger arbitrary ST slash commands. Newlines carry the same risk. Pipe characters and newlines are now stripped and names are capped at 200 characters. The fix applies to `/persona`, `/mypersona`, and the automatic persona switch on incoming messages.
+SillyTavern's slash command runner supports pipe chaining (`|`), meaning a crafted input like `hello | /newchat` would execute two commands instead of one. The original fix only covered persona names. A full audit found the same vulnerability in `/note`, `/impersonate`, and `/sd` prompts - all of which accept free-form user text that was being passed directly to the runner without sanitization.
+
+The `sanitizePersonaName` helper has been renamed `sanitizeSlashArg` and is now applied to every point where user-supplied or externally-sourced text is interpolated into a slash command string. `/switchgroup` group names (from ST's own data, not user input) are also sanitized as an extra precaution.
+
+### Other fixes
+
+- Rapid successive `/switchchar`, `/switchgroup`, or `/switchchat` commands no longer send duplicate recap messages. Each call to `scheduleRecap` now cancels any previously pending listener before registering a new one.
+- If a second SillyTavern tab connects while one is already active, the previous connection is now closed cleanly instead of being silently orphaned.
+- Signal plugin's message deduplication set is now bounded to 2000 entries to prevent slow memory growth on long-running instances.
 
 ### `imagePlaceholderTimeoutSeconds` now actually works
 
