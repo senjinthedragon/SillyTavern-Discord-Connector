@@ -1,4 +1,23 @@
 /**
+ * SillyTavern-Discord-Connector - Bridge Extension for SillyTavern
+ * Copyright (C) 2026 Senjin the Dragon
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * AI image generation.
  *
  * Sends an image_placeholder immediately, fires /sd, then watches #chat for
@@ -30,19 +49,20 @@ const imageQueues = new Map();
 const activeImageJobs = new Map();
 const imageRateHistory = new Map();
 const imageCircuitState = new Map();
+// All counters reset to zero on extension reload (i.e. page load).
 const imageMetrics = {
-  totalRequests: 0,
+  totalRequests: 0,        // requests that passed rate + breaker checks
   succeeded: 0,
   timedOut: 0,
   failed: 0,
   canceled: 0,
-  rateLimited: 0,
-  breakerRejected: 0,
-  breakerTrips: 0,
-  inFlight: 0,
+  rateLimited: 0,          // rejected by the per-channel rate window
+  breakerRejected: 0,      // rejected while circuit breaker was open
+  breakerTrips: 0,         // times the breaker opened due to consecutive failures
+  inFlight: 0,             // currently executing (inside enqueueImageGeneration)
   maxConcurrentInFlight: 0,
-  lastError: null,
-  lastErrorAt: null,
+  lastError: null,         // string description of the most recent failure
+  lastErrorAt: null,       // timestamp (ms) of lastError
 };
 
 // ---------------------------------------------------------------------------
@@ -57,6 +77,14 @@ export function getImageGenerationTimeoutMs() {
   return imageGenerationTimeoutMs;
 }
 
+/**
+ * Returns the active circuit breaker state for a channel, or null if the
+ * breaker is closed (i.e. generation is allowed). Also auto-clears expired
+ * state so callers never see a stale open breaker.
+ *
+ * @param {string} chatId
+ * @returns {{consecutiveFailures: number, openUntil: number}|null}
+ */
 export function getBreakerState(chatId) {
   const state = imageCircuitState.get(chatId);
   if (!state) return null;

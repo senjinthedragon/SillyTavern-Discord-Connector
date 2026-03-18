@@ -1,9 +1,30 @@
 /**
+ * SillyTavern-Discord-Connector - Bridge Extension for SillyTavern
+ * Copyright (C) 2026 Senjin the Dragon
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
  * WebSocket message handlers and command dispatch.
  *
- * Handles user_message, execute_command, and get_autocomplete packets from
- * the bridge. All ST interaction (generation, character switching, etc.)
- * happens here.
+ * handleUserMessage   - injects a Discord message into ST, streams the reply back
+ * handleExecuteCommand - runs slash commands (/switchchar, /image, /status, etc.)
+ * handleGetAutocomplete - serves cached name lists for Discord's dropdown menus
+ * captureAndSendIntroMessage - forwards /newchat greeting messages via DOM observer
+ * invalidateChatCache - clears the per-character chat file cache after state changes
  */
 
 import {
@@ -106,6 +127,16 @@ export function invalidateChatCache() {
 // adds any messages at all.
 // ---------------------------------------------------------------------------
 
+/**
+ * Captures /newchat greeting messages from the DOM and forwards them to the
+ * bridge as intro_message packets. Uses a MutationObserver so greetings that
+ * are written synchronously by doNewChat are caught before any generation
+ * events fire. In group chats, waits until all members' greetings have
+ * appeared or a 600ms settle timer fires after the DOM goes quiet. A 10s
+ * hard timeout disconnects the observer if ST never produces messages.
+ *
+ * @param {string} chatId
+ */
 export function captureAndSendIntroMessage(chatId) {
   const chatEl = document.getElementById("chat");
   if (!chatEl || !chatId) return;

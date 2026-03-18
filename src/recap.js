@@ -1,15 +1,36 @@
 /**
- * Chat recap.
+ * SillyTavern-Discord-Connector - Bridge Extension for SillyTavern
+ * Copyright (C) 2026 Senjin the Dragon
+ * https://github.com/senjinthedragon/SillyTavern-Discord-Connector
  *
- * After a successful character, group, or chat switch, a recap_message packet
- * is sent to the bridge once the new chat has fully loaded. The bridge renders
- * it as a styled embed on Discord and plain text on other platforms.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * Chat recap and history.
+ *
+ * buildLastExchange and buildHistory extract message entries from ST's chat
+ * array in the format expected by recap_message packets. scheduleRecap wires
+ * them to the CHAT_LOADED event so a recap fires automatically after any
+ * character, group, or chat switch.
  */
 
 import { eventSource, event_types } from "../../../../../script.js";
 import { safeSend } from "./ws.js";
 import { clearExpressionCache } from "./expression-relay.js";
 
+// Cap on AI messages included in a single recap to avoid flooding in large groups.
 const RECAP_MAX_AI_MESSAGES = 10;
 
 // ---------------------------------------------------------------------------
