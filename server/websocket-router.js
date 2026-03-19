@@ -18,12 +18,16 @@ async function handleBridgePacket(data, deps) {
     getRoutes,
     getFrontend,
     parseRoute,
-    streamSessions,
     streamHandled,
     streamReceived,
     pendingImageMessages,
+    cancelledImageRequests,
+    timedOutImageRequests,
     setBridgeActivity,
     getPendingAutocompletes,
+    setPersonaForUser,
+    setCurrentPersonaName,
+    setCrossRelayEnabled,
     log,
   } = deps;
 
@@ -45,9 +49,9 @@ async function handleBridgePacket(data, deps) {
   }
 
   if (data.type === "client_info") {
-    if (data.personaName) deps.setCurrentPersonaName(String(data.personaName));
+    if (data.personaName) setCurrentPersonaName(String(data.personaName));
     if (data.crossPlatformRelay !== undefined)
-      deps.setCrossRelayEnabled(data.crossPlatformRelay);
+      setCrossRelayEnabled(data.crossPlatformRelay);
     return;
   }
 
@@ -72,16 +76,16 @@ async function handleBridgePacket(data, deps) {
       const key = data.requestId || conversationId;
       delete pendingImageMessages[key];
 
-      if (deps.cancelledImageRequests.has(key)) {
+      if (cancelledImageRequests.has(key)) {
         // User explicitly cancelled - silently discard the late arrival.
-        deps.cancelledImageRequests.delete(key);
+        cancelledImageRequests.delete(key);
         break;
       }
 
-      if (deps.timedOutImageRequests.has(key)) {
+      if (timedOutImageRequests.has(key)) {
         // Image arrived after the bridge gave up waiting - send it with a note
         // so the user gets their image and the manager knows the timeout is short.
-        deps.timedOutImageRequests.delete(key);
+        timedOutImageRequests.delete(key);
         if (data.image) {
           await fanout(
             conversationId,
@@ -107,17 +111,17 @@ async function handleBridgePacket(data, deps) {
       delete pendingImageMessages[key];
 
       if (data.reason === "cancelled") {
-        deps.cancelledImageRequests.add(key);
+        cancelledImageRequests.add(key);
         // Self-expiring after 30 minutes in case the image never arrives.
         // unref() so the timer does not keep the Node process alive (e.g. in tests).
         setTimeout(
-          () => deps.cancelledImageRequests.delete(key),
+          () => cancelledImageRequests.delete(key),
           30 * 60 * 1000,
         ).unref();
       } else if (data.reason === "timed_out") {
-        deps.timedOutImageRequests.add(key);
+        timedOutImageRequests.add(key);
         setTimeout(
-          () => deps.timedOutImageRequests.delete(key),
+          () => timedOutImageRequests.delete(key),
           30 * 60 * 1000,
         ).unref();
       }
@@ -133,10 +137,6 @@ async function handleBridgePacket(data, deps) {
     case "stream_chunk": {
       const streamId = data.streamId || conversationId;
       streamReceived.add(conversationId);
-      streamSessions[streamId] = {
-        pendingText: data.text || "",
-        characterName: data.characterName || null,
-      };
       await fanout(conversationId, "streamChunk", {
         streamId,
         text: data.text || "",
@@ -147,10 +147,7 @@ async function handleBridgePacket(data, deps) {
 
     case "stream_end": {
       const streamId = data.streamId || conversationId;
-      const s = streamSessions[streamId];
-      const finalText =
-        data.finalText != null ? data.finalText : s?.pendingText || "";
-      delete streamSessions[streamId];
+      const finalText = data.finalText ?? "";
 
       const streamPayload = {
         streamId,
@@ -176,7 +173,6 @@ async function handleBridgePacket(data, deps) {
         }
       }
 
-      delete streamSessions[streamId];
       streamHandled.add(conversationId);
       setTimeout(() => streamHandled.delete(conversationId), 10000);
       break;
@@ -214,7 +210,7 @@ async function handleBridgePacket(data, deps) {
       break;
 
     case "save_user_persona": {
-      deps.setPersonaForUser(
+      setPersonaForUser(
         data.platform || "discord",
         data.userId || "",
         data.personaName ?? null,

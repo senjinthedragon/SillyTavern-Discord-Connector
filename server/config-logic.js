@@ -25,6 +25,7 @@
 
 function createConfig(rawConfig) {
   const config = {
+    wssPort: 2333,
     queueTaskTimeoutSeconds: 30,
     imagePlaceholderTimeoutSeconds: 180,
     ...rawConfig,
@@ -33,6 +34,16 @@ function createConfig(rawConfig) {
   config.queueTaskTimeoutMs = config.queueTaskTimeoutSeconds * 1_000;
   config.imagePlaceholderTimeoutMs =
     config.imagePlaceholderTimeoutSeconds * 1_000;
+
+  if (
+    !Number.isInteger(config.wssPort) ||
+    config.wssPort < 1 ||
+    config.wssPort > 65535
+  ) {
+    throw new Error(
+      "config.wssPort must be an integer between 1 and 65535 (default: 2333).",
+    );
+  }
 
   if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
     throw new Error("Set your Discord Bot Token in config.js!");

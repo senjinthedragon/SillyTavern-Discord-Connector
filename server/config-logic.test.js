@@ -43,6 +43,24 @@ test("createConfig applies timeout defaults and derived millisecond fields", () 
   assert.deepEqual(warnings, []);
 });
 
+test("createConfig defaults wssPort to 2333 and rejects invalid values", () => {
+  const { config } = createConfig({ discordToken: "token" });
+  assert.equal(config.wssPort, 2333);
+
+  assert.throws(
+    () => createConfig({ discordToken: "token", wssPort: 0 }),
+    /wssPort must be an integer/,
+  );
+  assert.throws(
+    () => createConfig({ discordToken: "token", wssPort: 99999 }),
+    /wssPort must be an integer/,
+  );
+  assert.throws(
+    () => createConfig({ discordToken: "token", wssPort: 2.5 }),
+    /wssPort must be an integer/,
+  );
+});
+
 test("createConfig throws for placeholder Discord token when Discord plugin is enabled", () => {
   assert.throws(
     () =>

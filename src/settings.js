@@ -31,23 +31,23 @@ export const DEFAULT_SETTINGS = {
   crossPlatformRelay: true,
 };
 
+let _initialized = false;
+
 export function getSettings() {
   const { extensionSettings } = SillyTavern.getContext();
-  extensionSettings[MODULE_NAME] = {
-    ...DEFAULT_SETTINGS,
-    ...(extensionSettings[MODULE_NAME] || {}),
-  };
-
-  if (
-    !["off", "status", "full"].includes(
-      extensionSettings[MODULE_NAME].expressionMode,
-    )
-  ) {
-    extensionSettings[MODULE_NAME].expressionMode =
-      DEFAULT_SETTINGS.expressionMode;
+  if (!_initialized) {
+    extensionSettings[MODULE_NAME] = {
+      ...DEFAULT_SETTINGS,
+      ...(extensionSettings[MODULE_NAME] || {}),
+    };
+    _initialized = true;
   }
 
-  return extensionSettings[MODULE_NAME];
+  const s = extensionSettings[MODULE_NAME];
+  if (!["off", "status", "full"].includes(s.expressionMode)) {
+    s.expressionMode = DEFAULT_SETTINGS.expressionMode;
+  }
+  return s;
 }
 
 export function updateStatus(message, color) {

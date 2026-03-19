@@ -70,6 +70,8 @@ function createDeps(overrides = {}) {
     setPersonaForUser: (platform, userId, personaName) => {
       personaSaves.push({ platform, userId, personaName });
     },
+    setCurrentPersonaName: () => {},
+    setCrossRelayEnabled: () => {},
     log: () => {},
     __calls: calls,
     __wsSent: sentByWs,
@@ -87,8 +89,6 @@ test("handleBridgePacket heartbeat responds immediately", async () => {
 
 test("handleBridgePacket stream_end falls back sendText for non-streaming frontends", async () => {
   const deps = createDeps();
-  deps.streamSessions.s1 = { pendingText: "final" };
-
   await handleBridgePacket(
     {
       type: "stream_end",
