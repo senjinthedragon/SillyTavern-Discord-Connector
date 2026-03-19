@@ -87,7 +87,9 @@ export async function fetchLocalImageAsBase64(src) {
     }
 
     const url = resolveLocalUrl(src);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+    });
     if (!response.ok) {
       console.warn(
         `[Discord Bridge] Image fetch failed (${response.status}): ${url}`,

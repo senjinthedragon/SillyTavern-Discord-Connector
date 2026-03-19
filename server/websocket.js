@@ -19,6 +19,7 @@ const { createPluginLoader } = require("./plugin-loader");
 const {
   fanout,
   addRoute,
+  clearRoutes,
   resolveConversationId,
   getRoutes,
   getFrontend,
@@ -207,6 +208,7 @@ wss.on("connection", (ws) => {
     sillyTavernClient = null;
     setDefaultPersonaName(null);
     setCrossRelayEnabled(true);
+    clearRoutes();
     setBridgeActivity(null);
 
     for (const key of Object.keys(streamSessions)) {

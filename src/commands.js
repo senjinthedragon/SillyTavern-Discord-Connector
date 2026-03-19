@@ -339,7 +339,9 @@ export async function handleUserMessage(data) {
       });
     }
 
-    sendLastMessageImages(messageState.chatId);
+    sendLastMessageImages(messageState.chatId).catch((err) =>
+      console.warn("[Discord Bridge] sendLastMessageImages failed:", err),
+    );
   };
 
   // Assigns a new streamId at the start of each character turn so the bridge

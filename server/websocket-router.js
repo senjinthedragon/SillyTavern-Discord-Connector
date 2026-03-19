@@ -150,6 +150,7 @@ async function handleBridgePacket(data, deps) {
       const s = streamSessions[streamId];
       const finalText =
         data.finalText != null ? data.finalText : s?.pendingText || "";
+      delete streamSessions[streamId];
 
       const streamPayload = {
         streamId,

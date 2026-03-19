@@ -183,8 +183,13 @@ function getRegisteredPlatforms() {
   return new Set(frontends.keys());
 }
 
+function clearRoutes() {
+  routesByConversation.clear();
+}
+
 module.exports = {
   addRoute,
+  clearRoutes,
   resolveConversationId,
   registerFrontend,
   getFrontend,

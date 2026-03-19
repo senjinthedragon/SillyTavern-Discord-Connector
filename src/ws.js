@@ -35,5 +35,10 @@ export function getWs() {
 
 /** Send a JSON payload only when the socket is open. */
 export function safeSend(payload) {
-  if (_ws?.readyState === WebSocket.OPEN) _ws.send(JSON.stringify(payload));
+  if (_ws?.readyState !== WebSocket.OPEN) return;
+  try {
+    _ws.send(JSON.stringify(payload));
+  } catch (err) {
+    console.warn("[Discord Bridge] safeSend failed:", err);
+  }
 }

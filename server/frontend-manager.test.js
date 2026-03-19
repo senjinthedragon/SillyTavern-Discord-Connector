@@ -5,8 +5,8 @@
  * Licensed under the MIT License.
  * See /server/LICENSE for full license information.
  *
- * Tests for plugin-first config validation in config-logic.js, covering
- * external plugin registration and Discord token requirements.
+ * Tests for config-logic.js: plugin-first config validation, external plugin
+ * registration requirements, and Discord token validation.
  * Run with: npm test (from the server folder)
  */
 
