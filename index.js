@@ -163,8 +163,8 @@ function connect() {
           sharedState.bridgeLocale = null;
         }
         sharedState.bridgePlugins = data.plugins || null;
-        const hasProPlugin = Object.values(data.plugins || {}).some(
-          (s) => s === "active",
+        const hasProPlugin = Object.entries(data.plugins || {}).some(
+          ([platform, status]) => platform !== "discord" && status === "active",
         );
         $("#discord_multi_platform_section").toggle(hasProPlugin);
         if (
