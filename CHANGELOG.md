@@ -51,6 +51,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `/status` now shows the active persona's display name instead of its internal ID key.
 - Signal plugin now prefers `sourceNumber` (E.164 phone number) over `source` when identifying the sender. Newer versions of `signal-cli-rest-api` set `source` to a UUID rather than a phone number, causing `conversationLinks` lookups to fail silently. Using `sourceNumber` ensures the value matches what is configured in `signalChatId`. If `sourceNumber` is absent the plugin falls back to `source` as before.
 - `resolveConversationId` now logs a warning when `conversationLinks` are configured but no entry matches the incoming platform and chat ID, making format mismatches (phone number vs UUID, missing `+` prefix, etc.) immediately visible in the server log.
+- Fixed a memory leak where each completed streaming session left a dangling bare `streamId` key in `streamSessions`. The key is now deleted immediately after `stream_end` processes it; only the `${channelId}:${streamId}` key (written by the Discord plugin) remains until the session is fully cleaned up.
+- Fixed a memory leak where `routesByConversation` in `frontend-manager.js` accumulated entries for every conversation seen in a session and was never pruned. `clearRoutes()` is now called when the SillyTavern WebSocket connection closes, resetting the table for the next session.
+- Fixed `client_info` packets (which carry the active persona name used as the cross-relay sender label) being silently discarded by the `if (!conversationId) return` guard in `websocket-router.js`. The handler is now placed before the guard so the persona name is stored on arrival regardless of whether a conversation is active.
+- External plugins loaded via `config.externalPlugins` are now checked for the expected interface methods (`sendText`, `sendTyping`, `sendImages`, `sendExpression`, `streamChunk`, `streamEnd`, `sendRecap`) immediately after `createPlugin()` returns. Any missing methods are logged as a warning so misconfigured plugins surface clearly at load time.
+- Browser-side image fetches in the extension (`image-relay.js`) now use a 15-second `AbortSignal` timeout. Previously a slow or unresponsive SillyTavern server could stall image forwarding indefinitely with no error or feedback.
+- `sendLastMessageImages` call in `commands.js` now has a `.catch()` handler so a fetch or send failure during post-generation image scanning is logged rather than becoming an unhandled promise rejection.
+- `safeSend` in `ws.js` now wraps `JSON.stringify` in a try-catch. A non-serialisable payload previously caused an unhandled exception that could crash the extension's send path silently.
+- Tooltip info icons (`ⓘ`) in `settings.html` now carry `role="button"` so assistive technologies and keyboard-only users can identify and activate them correctly.
 
 ## [1.5.0] - 2026-03-15
 

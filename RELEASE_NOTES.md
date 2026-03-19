@@ -119,6 +119,11 @@ The `/status` command now shows your active persona's display name (e.g. `🎭 S
 - Rapid successive `/switchchar`, `/switchgroup`, or `/switchchat` commands no longer send duplicate recap messages. Each call to `scheduleRecap` now cancels any previously pending listener before registering a new one.
 - If a second SillyTavern tab connects while one is already active, the previous connection is now closed cleanly instead of being silently orphaned.
 - Signal plugin's message deduplication set is now bounded to 2000 entries to prevent slow memory growth on long-running instances.
+- Fixed a memory leak where each completed stream left a dangling bare key in the stream session map. The bare key is now deleted immediately after `stream_end` is processed.
+- Fixed a memory leak where the per-conversation route table accumulated entries across the session and was never cleared. It is now reset when SillyTavern disconnects.
+- Fixed the `client_info` packet (which carries your active persona name for cross-relay labels) being silently discarded when no conversation was active at connect time. The packet is now handled before the conversation-ID guard so the persona name is available from the very first message.
+- Browser-side image fetches in the extension now time out after 15 seconds. Previously a slow or unresponsive SillyTavern server could stall image forwarding indefinitely with no error.
+- Tooltip info icons (`ⓘ`) in the extension settings panel now carry `role="button"` so screen readers and keyboard-only users can identify and activate them correctly.
 
 ### `imagePlaceholderTimeoutSeconds` now actually works
 
