@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed the "Relay messages to all connected clients" toggle appearing in the extension settings panel even when no pro plugins are loaded. The check was testing whether any plugin was active, which included Discord itself. The section now only shows when at least one non-Discord platform (Telegram, Signal) is actually running.
+
 ## [1.6.0] - 2026-03-19
 
 ### Added

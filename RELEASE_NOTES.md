@@ -1,3 +1,13 @@
+# v1.7.0 - In Progress
+
+## Fixes
+
+### Cross-platform relay toggle no longer shown on free installs
+
+The "Relay messages to all connected clients" toggle was visible in the extension settings even when no pro plugins were loaded. It appeared because the visibility check counted Discord itself as an active plugin. The section now correctly stays hidden unless Telegram or Signal are actually running.
+
+---
+
 # v1.6.0
 
 ## New
