@@ -172,3 +172,13 @@ test("createConfig throws for invalid circuit breaker cooldown", () => {
     /circuitBreaker\.cooldownSeconds/,
   );
 });
+
+test("createConfig accepts plugin-first config without discord token", () => {
+  const { config } = createConfig({
+    enabledPlugins: ["telegram"],
+    plugins: { telegram: { enabled: true, botToken: "abc" } },
+    wssPort: 2333,
+  });
+
+  assert.deepEqual(config.enabledPlugins, ["telegram"]);
+});

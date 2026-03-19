@@ -189,7 +189,6 @@ wss.on("connection", (ws) => {
       getRoutes,
       getFrontend,
       parseRoute,
-      streamSessions,
       streamHandled,
       streamReceived,
       pendingImageMessages,
