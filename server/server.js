@@ -61,6 +61,8 @@ const RESTART_WINDOW_MS = 60_000;
       process.exit(1);
     }
   } catch (err) {
+    // Intentional resilience: if the protection file is corrupted or the
+    // filesystem errors, we boot unprotected rather than refusing to start.
     console.error("[ERROR] Restart protection check failed:", err);
   }
 })();

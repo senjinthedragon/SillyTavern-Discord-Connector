@@ -8,7 +8,100 @@
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
- * Styles for the settings panel, status indicators, and custom 
- * SillyTavern UI injections. This file ensures the connector's 
- * interface matches the native SillyTavern theme and layout.
+ * Colors are either currentColor, low-opacity neutrals, or the universal
+ * dark-on-light tooltip convention - so the panel adapts to any ST theme.
+ * The only hardcoded colors are semantic: green/red for connection status
+ * (set by index.js) and the tooltip background (dark bg + light text is
+ * the convention regardless of page theme).
  */
+
+/* ---------------------------------------------------------------------------
+ * Section titles
+ * Small all-caps label that groups related settings visually.
+ * --------------------------------------------------------------------------- */
+.dc-section-title {
+  margin: 14px 0 6px;
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+  padding-bottom: 4px;
+}
+
+.inline-drawer-content .dc-section-title:first-child {
+  margin-top: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Connection status badge
+ * The JS in index.js sets element.style.color directly for green/red/orange;
+ * the badge provides a subtle container and consistent typography around it.
+ * --------------------------------------------------------------------------- */
+.dc-status {
+  margin: 6px 0;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+  background: rgba(128, 128, 128, 0.08);
+  border: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+/* ---------------------------------------------------------------------------
+ * Block spacing
+ * --------------------------------------------------------------------------- */
+.discord-connector_block {
+  margin-bottom: 6px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Info icon and tooltip
+ *
+ * Usage: <span class="dc-info" tabindex="0" data-tooltip="Your explanation here.">ⓘ</span>
+ *
+ * The tooltip itself is a single #dc-tooltip div injected into <body> by
+ * index.js and positioned with position:fixed via getBoundingClientRect().
+ * This escapes any overflow:hidden ancestor (like ST's extensions panel)
+ * and works consistently across all viewport sizes including tablets.
+ * --------------------------------------------------------------------------- */
+.dc-info {
+  display: inline-block;
+  cursor: help;
+  font-style: normal;
+  font-size: 0.85em;
+  margin-left: 3px;
+  opacity: 0.45;
+  vertical-align: middle;
+  transition: opacity 0.1s ease;
+}
+
+.dc-info:hover,
+.dc-info:focus {
+  opacity: 0.9;
+  outline: none;
+}
+
+/* Global tooltip div - created once by index.js, reused for all .dc-info elements */
+#dc-tooltip {
+  position: fixed;
+  z-index: 99999;
+  max-width: 240px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  background: rgba(18, 18, 18, 0.93);
+  color: #e8e8e8;
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+  pointer-events: none;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+#dc-tooltip.dc-tooltip-visible {
+  opacity: 1;
+}

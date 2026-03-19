@@ -25,7 +25,7 @@
  * starting with "/", which messageCreate forwards as execute_command.
  */
 
-'use strict';
+"use strict";
 
 const {
   Events,
@@ -34,26 +34,37 @@ const {
   MessageFlags,
   ActivityType,
   EmbedBuilder,
-} = require('discord.js');
+} = require("discord.js");
 
-const { log } = require('./logger');
-const { config, token } = require('./config-loader');
-const { client } = require('./client');
-const { sendLong, sendImagesToChannel } = require('./messaging');
-const { splitLongText } = require('./text-chunking');
-const { enqueue } = require('./queue');
-const { addRoute, resolveConversationId } = require('./frontend-manager');
-const { streamSessions, scheduleEdit } = require('./streaming');
-const version = require('./package.json').version;
+const { log } = require("./logger");
+const { config, token } = require("./config-loader");
+const { client } = require("./client");
+const { sendLong, sendImagesToChannel } = require("./messaging");
+const { splitLongText } = require("./text-chunking");
+const { enqueue } = require("./queue");
+const {
+  addRoute,
+  resolveConversationId,
+  getRoutes,
+  getFrontend,
+  parseRoute,
+} = require("./frontend-manager");
+const { streamSessions, scheduleEdit } = require("./streaming");
+const {
+  getPersonaForUser,
+  getDefaultPersonaName,
+  isCrossRelayEnabled,
+} = require("./persona-map");
+const version = require("./package.json").version;
 
-const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ['discord']).includes(
-  'discord',
+const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes(
+  "discord",
 );
 
 const ACTIVITY_BASE = `SillyTavern Bridge v${version}`;
-const { formatBridgeActivity } = require('./activity-format');
+const { formatBridgeActivity } = require("./activity-format");
 
-let lastActivityText = '';
+let lastActivityText = "";
 
 function setBridgeActivity(expression, ownerName) {
   if (!client?.user) return;
@@ -72,7 +83,7 @@ function setBridgeActivity(expression, ownerName) {
 // circular dependency. By the time any handler fires, both modules are
 // fully initialised and getSillyTavernClient is available.
 function getSillyTavernClient() {
-  return require('./websocket').getSillyTavernClient();
+  return require("./websocket").getSillyTavernClient();
 }
 
 // ---------------------------------------------------------------------------
@@ -87,11 +98,11 @@ function getSillyTavernClient() {
 
 const SLASH_COMMANDS = [
   {
-    name: 'image',
-    description: 'Generate or cancel an AI image task.',
+    name: "image",
+    description: "Generate or cancel an AI image task.",
     options: [
       {
-        name: 'prompt',
+        name: "prompt",
         type: 3,
         description: "Prompt, keyword, or 'cancel'",
         required: true,
@@ -100,58 +111,58 @@ const SLASH_COMMANDS = [
     ],
   },
   {
-    name: 'mood',
-    description: 'Show the current expression for this character',
+    name: "mood",
+    description: "Show the current expression for this character",
     options: [
       {
-        name: 'name',
+        name: "name",
         type: 3,
         description:
-          'Character name (optional in solo chat; autocompletes group members in group chat)',
+          "Character name (optional in solo chat; autocompletes group members in group chat)",
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: 'reaction',
-    description: 'Set how expressions are shown on Discord',
+    name: "reaction",
+    description: "Set how expressions are shown on Discord",
     options: [
       {
-        name: 'mode',
+        name: "mode",
         type: 3,
-        description: 'off, status, or full',
+        description: "off, status, or full",
         required: true,
         choices: [
-          { name: 'Off', value: 'off' },
-          { name: 'Status only', value: 'status' },
+          { name: "Off", value: "off" },
+          { name: "Status only", value: "status" },
           {
-            name: 'Status and image updates',
-            value: 'full',
+            name: "Status and image updates",
+            value: "full",
           },
         ],
       },
     ],
   },
   {
-    name: 'status',
-    description: 'Show bridge health and image pipeline stats',
+    name: "status",
+    description: "Show bridge health and image pipeline stats",
   },
-  { name: 'sthelp', description: 'Show all available bridge commands' },
+  { name: "sthelp", description: "Show all available bridge commands" },
   {
-    name: 'newchat',
-    description: 'Start a fresh chat with the current character',
-  },
-  {
-    name: 'listchars',
-    description: 'List all characters (includes numbered shortcuts)',
+    name: "newchat",
+    description: "Start a fresh chat with the current character",
   },
   {
-    name: 'note',
+    name: "listchars",
+    description: "List all characters (includes numbered shortcuts)",
+  },
+  {
+    name: "note",
     description: "Set or read the author's note for the current chat",
     options: [
       {
-        name: 'text',
+        name: "text",
         type: 3,
         description: "The author's note text (omit to read the current note)",
         required: false,
@@ -159,106 +170,120 @@ const SLASH_COMMANDS = [
     ],
   },
   {
-    name: 'continue',
-    description: 'Continue the last AI message',
+    name: "continue",
+    description: "Continue the last AI message",
   },
   {
-    name: 'impersonate',
-    description: 'Have the AI write your next response in character',
+    name: "impersonate",
+    description: "Have the AI write your next response in character",
     options: [
       {
-        name: 'prompt',
+        name: "prompt",
         type: 3,
-        description: 'Optional prompt to guide the impersonation',
+        description: "Optional prompt to guide the impersonation",
         required: false,
       },
     ],
   },
   {
-    name: 'persona',
-    description: 'Switch your active persona by name',
+    name: "persona",
+    description: "Switch your active persona by name",
     options: [
       {
-        name: 'name',
+        name: "name",
         type: 3,
-        description: 'The name of the persona to switch to',
+        description: "The name of the persona to switch to",
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: 'listpersonas',
-    description: 'List your available personas',
+    name: "listpersonas",
+    description: "List your available personas",
   },
   {
-    name: 'switchchar',
-    description: 'Switch to a character by exact name',
+    name: "mypersona",
+    description: "Save your persona so it switches automatically when you chat",
     options: [
       {
-        name: 'name',
+        name: "name",
         type: 3,
-        description: 'Character name',
+        description:
+          "Persona name to save, or 'clear' to remove your saved preference",
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: 'listgroups',
-    description: 'List all groups (includes numbered shortcuts)',
-  },
-  {
-    name: 'switchgroup',
-    description: 'Switch to a group by exact name',
+    name: "switchchar",
+    description: "Switch to a character by exact name",
     options: [
       {
-        name: 'name',
+        name: "name",
         type: 3,
-        description: 'Group name',
+        description: "Character name",
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: 'listchats',
-    description: 'List chat history for the current character',
+    name: "listgroups",
+    description: "List all groups (includes numbered shortcuts)",
   },
   {
-    name: 'history',
-    description: 'Show past chat exchanges in this channel',
+    name: "switchgroup",
+    description: "Switch to a group by exact name",
     options: [
       {
-        name: 'exchanges',
+        name: "name",
+        type: 3,
+        description: "Group name",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
+  {
+    name: "listchats",
+    description: "List chat history for the current character",
+  },
+  {
+    name: "history",
+    description: "Show past chat exchanges in this channel",
+    options: [
+      {
+        name: "exchanges",
         type: 4,
-        description: 'Number of exchanges to show (default: 5)',
+        description: "Number of exchanges to show (default: 5)",
         required: false,
       },
     ],
   },
   {
-    name: 'switchchat',
-    description: 'Load a past chat by name (omit .jsonl)',
+    name: "switchchat",
+    description: "Load a past chat by name (omit .jsonl)",
     options: [
       {
-        name: 'name',
+        name: "name",
         type: 3,
-        description: 'Chat filename (omit .jsonl)',
+        description: "Chat filename (omit .jsonl)",
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: 'charimage',
+    name: "charimage",
     description: "Show a character's avatar",
     options: [
       {
-        name: 'name',
+        name: "name",
         type: 3,
         description:
-          'Character name (optional in solo chat; autocompletes group members in group chat)',
+          "Character name (optional in solo chat; autocompletes group members in group chat)",
         required: true,
         autocomplete: true,
       },
@@ -276,21 +301,61 @@ const autocompleteDebouncers = {};
 const pendingAutocompletes = {};
 
 // Tracks the Discord message sent as an image placeholder ("🎨 Generating image…")
-// keyed by channelId. Deleted by sendImages when the real image arrives, or
-// edited to an error message if generation fails.
+// keyed by channelId. Each entry is { msg, timerId } - msg is the Discord Message
+// object and timerId is the handle for the live countdown timer. Cleared by
+// sendGeneratedImage when the real image arrives.
 const placeholderMessages = {};
+
+// Edits the placeholder message on a self-rescheduling timer to show how much
+// generation time remains. Updates every 60 seconds while more than one minute
+// remains, then every 10 seconds during the final minute.
+function startPlaceholderCountdown(channelId, msg, timeoutMs) {
+  const endTime = Date.now() + timeoutMs;
+
+  function formatRemaining(ms) {
+    if (ms <= 60_000) {
+      return `${Math.ceil(ms / 1_000)} seconds remaining`;
+    }
+    const minutes = Math.ceil(ms / 60_000);
+    return `${minutes} minute${minutes !== 1 ? "s" : ""} remaining`;
+  }
+
+  function scheduleNext() {
+    const remaining = endTime - Date.now();
+    if (remaining <= 0) return null;
+    const delay = remaining > 60_000 ? 60_000 : 10_000;
+    return setTimeout(async () => {
+      if (!placeholderMessages[channelId]) return;
+      const rem = endTime - Date.now();
+      if (rem <= 0) return;
+      try {
+        await msg.edit(
+          `🎨 Generating image… (${formatRemaining(rem)}; use /image cancel to abort)`,
+        );
+      } catch {
+        // Message was deleted or inaccessible - stop the countdown.
+        return;
+      }
+      if (!placeholderMessages[channelId]) return;
+      placeholderMessages[channelId].timerId = scheduleNext();
+    }, delay);
+  }
+
+  return scheduleNext();
+}
 
 // Maps each autocomplete-enabled command to the list type the extension queries.
 // charimage uses "group_members" (active group only, not the full library).
 // image uses "image_prompts" (a static keyword list built inline by the extension).
 const AUTOCOMPLETE_LIST_MAP = {
-  persona: 'personas',
-  switchchar: 'characters',
-  switchgroup: 'groups',
-  switchchat: 'chats',
-  charimage: 'group_members',
-  mood: 'group_members',
-  image: 'image_prompts',
+  persona: "personas",
+  switchchar: "characters",
+  switchgroup: "groups",
+  switchchat: "chats",
+  charimage: "group_members",
+  mood: "group_members",
+  image: "image_prompts",
+  mypersona: "personas",
 };
 
 function getPendingAutocompletes() {
@@ -307,20 +372,20 @@ if (DISCORD_PLUGIN_ENABLED) {
   client.on(Events.ClientReady, async (c) => {
     setBridgeActivity(null);
 
-    log('log', `[Discord] Ready! Logged in as ${c.user.tag}`);
-    const rest = new REST({ version: '10' }).setToken(token);
+    log("log", `[Discord] Ready! Logged in as ${c.user.tag}`);
+    const rest = new REST({ version: "10" }).setToken(token);
     try {
-      log('log', '[Discord] Registering slash commands...');
+      log("log", "[Discord] Registering slash commands...");
       await rest.put(Routes.applicationCommands(c.user.id), {
         body: SLASH_COMMANDS,
       });
-      log('log', '[Discord] Slash commands registered.');
+      log("log", "[Discord] Slash commands registered.");
     } catch (err) {
-      log('error', '[Discord] Failed to register slash commands:', err);
+      log("error", "[Discord] Failed to register slash commands:", err);
     }
   });
 
-  client.on('error', (err) => log('error', '[Discord] Client error:', err));
+  client.on("error", (err) => log("error", "[Discord] Client error:", err));
 
   // ---------------------------------------------------------------------------
   // Interaction handler (autocomplete + slash commands)
@@ -357,7 +422,7 @@ if (DISCORD_PLUGIN_ENABLED) {
           const timeout = setTimeout(async () => {
             if (!pendingAutocompletes[requestId]) return;
             delete pendingAutocompletes[requestId];
-            log('warn', `[Autocomplete] Request ${requestId} timed out`);
+            log("warn", `[Autocomplete] Request ${requestId} timed out`);
             await interaction.respond([]).catch(() => {});
           }, AUTOCOMPLETE_TIMEOUT_MS);
 
@@ -365,7 +430,7 @@ if (DISCORD_PLUGIN_ENABLED) {
 
           stClient.send(
             JSON.stringify({
-              type: 'get_autocomplete',
+              type: "get_autocomplete",
               requestId,
               list,
               query: focusedValue,
@@ -384,7 +449,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     ) {
       await interaction
         .reply({
-          content: 'You are not authorised to use this bot.',
+          content: "You are not authorised to use this bot.",
           flags: [MessageFlags.Ephemeral],
         })
         .catch(() => {});
@@ -397,7 +462,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     ) {
       await interaction
         .reply({
-          content: 'This bot is not enabled in this channel.',
+          content: "This bot is not enabled in this channel.",
           flags: [MessageFlags.Ephemeral],
         })
         .catch(() => {});
@@ -408,7 +473,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     if (!stClient) {
       await interaction
         .reply({
-          content: 'Bridge is not connected to SillyTavern.',
+          content: "Bridge is not connected to SillyTavern.",
           flags: [MessageFlags.Ephemeral],
         })
         .catch(() => {});
@@ -420,17 +485,19 @@ if (DISCORD_PLUGIN_ENABLED) {
       .filter((opt) => opt.type === 3 || opt.type === 4)
       .map((opt) => String(opt.value));
     const conversationId = resolveConversationId(
-      'discord',
+      "discord",
       interaction.channelId,
     );
-    addRoute(conversationId, 'discord', interaction.channelId);
+    addRoute(conversationId, "discord", interaction.channelId);
 
     stClient.send(
       JSON.stringify({
-        type: 'execute_command',
+        type: "execute_command",
         command,
         args,
         chatId: conversationId,
+        userId: interaction.user.id,
+        platform: "discord",
       }),
     );
 
@@ -438,7 +505,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     // Ephemeral also prevents messageCreate from seeing this echo as a new "/" message.
     await interaction
       .reply({
-        content: `✓ ${command}${args.length ? ' ' + args.join(' ') : ''}`,
+        content: `✓ ${command}${args.length ? " " + args.join(" ") : ""}`,
         flags: [MessageFlags.Ephemeral],
       })
       .catch(() => {});
@@ -448,7 +515,7 @@ if (DISCORD_PLUGIN_ENABLED) {
   // Incoming Discord messages → SillyTavern
   // ---------------------------------------------------------------------------
 
-  client.on('messageCreate', (message) => {
+  client.on("messageCreate", (message) => {
     if (message.author.bot) return;
     if (
       config.allowedUserIds?.length > 0 &&
@@ -463,32 +530,58 @@ if (DISCORD_PLUGIN_ENABLED) {
 
     const stClient = getSillyTavernClient();
     if (!stClient) {
-      message.reply('Bridge is not connected to SillyTavern.').catch(() => {});
+      message.reply("Bridge is not connected to SillyTavern.").catch(() => {});
       return;
     }
 
-    const conversationId = resolveConversationId('discord', message.channel.id);
-    addRoute(conversationId, 'discord', message.channel.id);
+    const conversationId = resolveConversationId("discord", message.channel.id);
+    addRoute(conversationId, "discord", message.channel.id);
     const content = message.content;
 
-    if (content.startsWith('/')) {
-      const [command, ...args] = content.slice(1).split(' ');
+    if (content.startsWith("/")) {
+      const [command, ...args] = content.slice(1).split(" ");
       stClient.send(
         JSON.stringify({
-          type: 'execute_command',
+          type: "execute_command",
           command,
           args,
           chatId: conversationId,
+          userId: message.author.id,
+          platform: "discord",
         }),
       );
     } else {
+      const mappedPersona = getPersonaForUser("discord", message.author.id);
       stClient.send(
         JSON.stringify({
-          type: 'user_message',
+          type: "user_message",
           text: content,
           chatId: conversationId,
+          userId: message.author.id,
+          platform: "discord",
+          ...(mappedPersona ? { mappedPersona } : {}),
         }),
       );
+
+      // Cross-relay to other platforms in the same conversation.
+      if (!isCrossRelayEnabled()) return;
+      const senderLabel =
+        mappedPersona || getDefaultPersonaName() || `[discord]`;
+      const relayText = `${senderLabel}: ${content}`;
+      const originKey = `discord:${message.channel.id}`;
+      for (const route of getRoutes(conversationId)) {
+        if (route === originKey) continue;
+        const { platform: targetPlatform, nativeChatId: targetChatId } =
+          parseRoute(route);
+        const frontend = getFrontend(targetPlatform);
+        if (!frontend?.sendText) continue;
+        frontend.sendText(targetChatId, relayText).catch((err) => {
+          log(
+            "warn",
+            `[Bridge] Cross-relay to ${route} failed: ${err.message}`,
+          );
+        });
+      }
     }
   });
 }
@@ -498,11 +591,23 @@ async function sendText(channelId, text) {
   if (!channel) return;
   enqueue(channelId, async () => {
     const msg = await sendLong(channel, text);
-    // Save the message reference so sendImages can delete it when the real
-    // image arrives. Keyed by channelId - only one placeholder per channel
+    // Save the message reference so sendGeneratedImage can delete it when the
+    // real image arrives. Keyed by channelId - only one placeholder per channel
     // at a time since image generation is serialised per channel.
-    if (text.includes('🎨 Generating image')) {
-      placeholderMessages[channelId] = msg;
+    if (text.includes("🎨 Generating image")) {
+      const timerId = startPlaceholderCountdown(
+        channelId,
+        msg,
+        config.imagePlaceholderTimeoutMs,
+      );
+      placeholderMessages[channelId] = { msg, timerId };
+    } else if (placeholderMessages[channelId]) {
+      // A non-placeholder text (e.g. a cancel/error message) arrived while a
+      // countdown is running. Stop the timer and delete the stale placeholder
+      // so it doesn't sit in the channel forever.
+      clearTimeout(placeholderMessages[channelId].timerId);
+      await placeholderMessages[channelId].msg.delete().catch(() => {});
+      delete placeholderMessages[channelId];
     }
   });
 }
@@ -527,8 +632,9 @@ async function sendGeneratedImage(channelId, images, caption) {
   if (!channel) return;
   enqueue(channelId, async () => {
     if (placeholderMessages[channelId]) {
-      await placeholderMessages[channelId].delete().catch((err) => {
-        log('warn', `[Images] Could not delete placeholder: ${err.message}`);
+      clearTimeout(placeholderMessages[channelId].timerId);
+      await placeholderMessages[channelId].msg.delete().catch((err) => {
+        log("warn", `[Images] Could not delete placeholder: ${err.message}`);
       });
       delete placeholderMessages[channelId];
     }
@@ -588,7 +694,7 @@ async function sendRecap(channelId, entries) {
           .setDescription(description);
 
         if (isFirst) {
-          embed.setTitle('📜 Last exchange');
+          embed.setTitle("📜 Last exchange");
           isFirst = false;
         }
 
@@ -603,20 +709,20 @@ async function streamChunk(channelId, payload) {
   if (!channel) return;
 
   const streamId = `${channelId}:${payload?.streamId || channelId}`;
-  const rawText = payload?.text || '';
+  const rawText = payload?.text || "";
   if (!rawText.trim()) return;
 
   const activeName = payload.characterName || null;
   let processedText = rawText;
   if (activeName) {
-    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, 'i'), '');
+    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, "i"), "");
   }
 
   if (!streamSessions[streamId]) {
     streamSessions[streamId] = {
       streamMessage: null,
-      pendingText: '',
+      pendingText: "",
       characterName: activeName,
       editInFlight: false,
       nextEdit: false,
@@ -652,12 +758,12 @@ async function streamEnd(channelId, payload) {
   }
 
   const rawText =
-    payload?.finalText != null ? payload.finalText : s.pendingText || '';
+    payload?.finalText != null ? payload.finalText : s.pendingText || "";
   const activeName = payload?.characterName || null;
   let processedText = rawText;
   if (activeName) {
-    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, 'i'), '');
+    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, "i"), "");
   }
 
   const finalText = activeName

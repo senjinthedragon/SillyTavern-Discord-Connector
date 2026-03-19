@@ -11,7 +11,7 @@
  * 3. Adjust advanced settings only if your environment requires it.
  *
  * Note: Essential settings (Discord token, access control) are at the top,
- * followed by general environment preferences and advanced logic for 
+ * followed by general environment preferences and advanced logic for
  * circuit breakers and pro-plugin routing.
  */
 
@@ -70,6 +70,29 @@ module.exports = {
   // How long the "🎨 Generating image…" placeholder waits before giving up
   // and showing a timeout message (seconds).
   imagePlaceholderTimeoutSeconds: 180,
+
+  // Map platform user IDs to SillyTavern persona names.
+  // When set, the persona switches automatically before each message from that user.
+  // Users can also save their own preference with the /mypersona command, which
+  // takes priority over entries here.
+
+  // Discord: enable Developer Mode in Discord settings, then right-click a user
+  // and select "Copy User ID" to get their numeric ID.
+  discordPersonaMap: {
+    // "123456789012345678": "Alice",
+    // "987654321098765432": "Bob",
+  },
+
+  // Telegram: use the numeric user ID (not the @username).
+  // You can get it from the bot's getUpdates response (msg.from.id).
+  telegramPersonaMap: {
+    // "123456789": "Alice",
+  },
+
+  // Signal: use the full phone number in E.164 format (e.g. "+31612345678").
+  signalPersonaMap: {
+    // "+31612345678": "Alice",
+  },
 
   // Which frontend plugins to load. "discord" is the built-in free plugin.
   // Add "telegram" or "signal" here only if you have purchased the pro plugins.

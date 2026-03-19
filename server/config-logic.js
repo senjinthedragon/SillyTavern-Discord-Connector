@@ -6,18 +6,18 @@
  * See /server/LICENSE for full license information.
  *
  * Implements the "fail-fast" validation logic for the bridge configuration.
- * Processes raw user settings from config.js and ensures all required 
+ * Processes raw user settings from config.js and ensures all required
  * parameters are present and correctly typed before the server boots.
  *
  * Key responsibilities:
  * - Enforces the presence of essential credentials like the Discord Bot Token.
- * - Normalizes user-friendly time settings (seconds) into internal 
+ * - Normalizes user-friendly time settings (seconds) into internal
  * millisecond values used by the queue and watchdog timers.
- * - Validates plugin structures, ensuring that both built-in and external 
+ * - Validates plugin structures, ensuring that both built-in and external
  * pro-plugins are formatted correctly to prevent runtime execution errors.
- * - Performs safety checks on circuit breaker thresholds to prevent 
+ * - Performs safety checks on circuit breaker thresholds to prevent
  * misconfigurations from hammering external APIs.
- * - Sanitizes IANA timezones and BCP 47 locales, falling back to safe defaults 
+ * - Sanitizes IANA timezones and BCP 47 locales, falling back to safe defaults
  * (UTC/System) while collecting non-fatal warnings for the bridge logger.
  */
 
@@ -25,6 +25,7 @@
 
 function createConfig(rawConfig) {
   const config = {
+    wssPort: 2333,
     queueTaskTimeoutSeconds: 30,
     imagePlaceholderTimeoutSeconds: 180,
     ...rawConfig,
@@ -33,6 +34,16 @@ function createConfig(rawConfig) {
   config.queueTaskTimeoutMs = config.queueTaskTimeoutSeconds * 1_000;
   config.imagePlaceholderTimeoutMs =
     config.imagePlaceholderTimeoutSeconds * 1_000;
+
+  if (
+    !Number.isInteger(config.wssPort) ||
+    config.wssPort < 1 ||
+    config.wssPort > 65535
+  ) {
+    throw new Error(
+      "config.wssPort must be an integer between 1 and 65535 (default: 2333).",
+    );
+  }
 
   if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
     throw new Error("Set your Discord Bot Token in config.js!");

@@ -19,6 +19,7 @@ const { createPluginLoader } = require("./plugin-loader");
 const {
   fanout,
   addRoute,
+  clearRoutes,
   resolveConversationId,
   getRoutes,
   getFrontend,
@@ -31,6 +32,15 @@ const {
   getAutocompleteDebouncers,
 } = require("./discord");
 const { handleBridgePacket } = require("./websocket-router");
+const {
+  load: loadPersonaMap,
+  getPersonaForUser,
+  setPersonaForUser,
+  setDefaultPersonaName,
+  getDefaultPersonaName,
+  setCrossRelayEnabled,
+  isCrossRelayEnabled,
+} = require("./persona-map");
 
 const version = require("./package.json").version;
 const width = 70;
@@ -53,8 +63,12 @@ ${purple}╔${"═".repeat(width)}╗
 ╚${"═".repeat(width)}╝${reset}
 `);
 
+loadPersonaMap();
+
 let sillyTavernClient = null;
 const pendingImageMessages = {};
+const cancelledImageRequests = new Set();
+const timedOutImageRequests = new Set();
 const streamHandled = new Set();
 const streamReceived = new Set();
 
@@ -69,12 +83,38 @@ function sendToSillyTavern(payload) {
 }
 
 const pluginLoader = createPluginLoader({
-  onUserMessage(platform, chatId, text) {
+  onUserMessage(platform, chatId, text, userId = "") {
     const conversationId = resolveConversationId(platform, chatId);
     addRoute(conversationId, platform, chatId);
-    sendToSillyTavern({ type: "user_message", text, chatId: conversationId });
+    const mappedPersona = getPersonaForUser(platform, userId);
+    sendToSillyTavern({
+      type: "user_message",
+      text,
+      chatId: conversationId,
+      userId,
+      platform,
+      ...(mappedPersona ? { mappedPersona } : {}),
+    });
+
+    // Cross-relay the user's message to all other platforms in the same
+    // conversation so every connected client stays in sync.
+    if (!isCrossRelayEnabled()) return;
+    const originKey = `${platform}:${chatId}`;
+    const senderLabel =
+      mappedPersona || getDefaultPersonaName() || `[${platform}]`;
+    const relayText = `${senderLabel}: ${text}`;
+    for (const route of getRoutes(conversationId)) {
+      if (route === originKey) continue;
+      const { platform: targetPlatform, nativeChatId: targetChatId } =
+        parseRoute(route);
+      const frontend = getFrontend(targetPlatform);
+      if (!frontend?.sendText) continue;
+      frontend.sendText(targetChatId, relayText).catch((err) => {
+        log("warn", `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
+      });
+    }
   },
-  onCommand(platform, chatId, command, args) {
+  onCommand(platform, chatId, command, args, userId = "") {
     const conversationId = resolveConversationId(platform, chatId);
     addRoute(conversationId, platform, chatId);
     sendToSillyTavern({
@@ -82,6 +122,8 @@ const pluginLoader = createPluginLoader({
       command,
       args,
       chatId: conversationId,
+      userId,
+      platform,
     });
   },
 });
@@ -97,6 +139,13 @@ const wss = new WebSocket.Server({
 log("log", `[Bridge] WebSocket server listening on port ${wssPort}`);
 
 wss.on("connection", (ws) => {
+  if (sillyTavernClient && sillyTavernClient.readyState === WebSocket.OPEN) {
+    log(
+      "warn",
+      "[Bridge] New SillyTavern connection received while one is already active - closing previous.",
+    );
+    sillyTavernClient.close(1008, "Replaced by new connection");
+  }
   sillyTavernClient = ws;
   log("log", "[Bridge] SillyTavern connected");
 
@@ -119,6 +168,7 @@ wss.on("connection", (ws) => {
       timezone: config.timezone || null,
       locale: config.locale || null,
       plugins: pluginStatus,
+      imagePlaceholderTimeoutMs: config.imagePlaceholderTimeoutMs,
     }),
   );
 
@@ -139,18 +189,25 @@ wss.on("connection", (ws) => {
       getRoutes,
       getFrontend,
       parseRoute,
-      streamSessions,
       streamHandled,
       streamReceived,
       pendingImageMessages,
+      cancelledImageRequests,
+      timedOutImageRequests,
       setBridgeActivity,
       getPendingAutocompletes,
+      setPersonaForUser,
+      setCurrentPersonaName: setDefaultPersonaName,
+      setCrossRelayEnabled,
       log,
     });
   });
 
   ws.on("close", () => {
     sillyTavernClient = null;
+    setDefaultPersonaName(null);
+    setCrossRelayEnabled(true);
+    clearRoutes();
     setBridgeActivity(null);
 
     for (const key of Object.keys(streamSessions)) {
@@ -162,6 +219,8 @@ wss.on("connection", (ws) => {
     for (const key of Object.keys(pendingImageMessages)) {
       delete pendingImageMessages[key];
     }
+    cancelledImageRequests.clear();
+    timedOutImageRequests.clear();
 
     const autocompleteDebouncers = getAutocompleteDebouncers();
     for (const [key, debouncer] of Object.entries(autocompleteDebouncers)) {
