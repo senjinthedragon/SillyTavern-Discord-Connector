@@ -36,10 +36,23 @@ async function loadExternalPlugins(handlers) {
 
       const instance = mod.createPlugin(handlers, plugin.config || {});
 
-      const EXPECTED_METHODS = ["sendText", "sendTyping", "sendImages", "sendExpression", "streamChunk", "streamEnd", "sendRecap"];
-      const missing = EXPECTED_METHODS.filter((m) => typeof instance[m] !== "function");
+      const EXPECTED_METHODS = [
+        "sendText",
+        "sendTyping",
+        "sendImages",
+        "sendExpression",
+        "streamChunk",
+        "streamEnd",
+        "sendRecap",
+      ];
+      const missing = EXPECTED_METHODS.filter(
+        (m) => typeof instance[m] !== "function",
+      );
       if (missing.length > 0) {
-        log("warn", `[Plugins] Plugin "${plugin.name}" is missing methods: ${missing.join(", ")}`);
+        log(
+          "warn",
+          `[Plugins] Plugin "${plugin.name}" is missing methods: ${missing.join(", ")}`,
+        );
       }
 
       registerFrontend(plugin.name, instance);
