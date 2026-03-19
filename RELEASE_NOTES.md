@@ -1,4 +1,4 @@
-# v1.6.0 - In Progress
+# v1.6.0
 
 ## New
 
