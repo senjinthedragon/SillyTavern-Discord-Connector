@@ -11,14 +11,19 @@
  *
  * Key responsibilities:
  * - Enforces the presence of essential credentials like the Discord Bot Token.
+ *   Requires a non-empty, non-whitespace string when the Discord plugin is
+ *   enabled (default). Rejects the placeholder value from config.example.js.
+ * - Validates enabledPlugins before checking Discord token requirements so
+ *   invalid types produce a clean error rather than a raw TypeError.
+ * - Validates wssPort as an integer in the range 1-65535 (default: 2333).
  * - Normalizes user-friendly time settings (seconds) into internal
- * millisecond values used by the queue and watchdog timers.
+ *   millisecond values used by the queue and watchdog timers.
  * - Validates plugin structures, ensuring that both built-in and external
- * pro-plugins are formatted correctly to prevent runtime execution errors.
+ *   pro-plugins are formatted correctly to prevent runtime execution errors.
  * - Performs safety checks on circuit breaker thresholds to prevent
- * misconfigurations from hammering external APIs.
+ *   misconfigurations from hammering external APIs.
  * - Sanitizes IANA timezones and BCP 47 locales, falling back to safe defaults
- * (UTC/System) while collecting non-fatal warnings for the bridge logger.
+ *   (UTC/System) while collecting non-fatal warnings for the bridge logger.
  */
 
 "use strict";
@@ -45,10 +50,6 @@ function createConfig(rawConfig) {
     );
   }
 
-  if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
-    throw new Error("Set your Discord Bot Token in config.js!");
-  }
-
   if (
     config.enabledPlugins !== undefined &&
     (!Array.isArray(config.enabledPlugins) ||
@@ -59,6 +60,24 @@ function createConfig(rawConfig) {
     throw new Error(
       'config.enabledPlugins entries must be non-empty strings (e.g. ["discord"]).',
     );
+  }
+
+  const discordEnabled =
+    config.enabledPlugins === undefined ||
+    (Array.isArray(config.enabledPlugins) &&
+      config.enabledPlugins.includes("discord"));
+  if (discordEnabled) {
+    if (config.discordToken === "YOUR_DISCORD_BOT_TOKEN_HERE") {
+      throw new Error("Set your Discord Bot Token in config.js!");
+    }
+    if (
+      typeof config.discordToken !== "string" ||
+      config.discordToken.trim() === ""
+    ) {
+      throw new Error(
+        "config.discordToken is required when the Discord plugin is enabled.",
+      );
+    }
   }
 
   if (
@@ -131,6 +150,38 @@ function createConfig(rawConfig) {
         `[Config] Invalid locale "${config.locale}" - falling back to system default`,
       );
       config.locale = null;
+    }
+  }
+
+  if (config.userLocale !== undefined && typeof config.userLocale !== "string") {
+    warnings.push(
+      `[Config] config.userLocale must be a BCP 47 string (e.g. "ja-JP") - ignoring`,
+    );
+    config.userLocale = null;
+  }
+
+  for (const platform of ["discord", "telegram", "signal"]) {
+    const mapKey = `${platform}LanguageMap`;
+    if (config[mapKey] !== undefined) {
+      if (
+        typeof config[mapKey] !== "object" ||
+        config[mapKey] === null ||
+        Array.isArray(config[mapKey])
+      ) {
+        warnings.push(
+          `[Config] config.${mapKey} must be an object mapping user IDs to BCP 47 strings - ignoring`,
+        );
+        config[mapKey] = {};
+      } else {
+        for (const [userId, lang] of Object.entries(config[mapKey])) {
+          if (typeof lang !== "string") {
+            warnings.push(
+              `[Config] config.${mapKey}["${userId}"] must be a BCP 47 string - ignoring entry`,
+            );
+            delete config[mapKey][userId];
+          }
+        }
+      }
     }
   }
 

@@ -66,6 +66,12 @@ import { setWs, getWs, safeSend } from "./src/ws.js";
 import { MODULE_NAME, getSettings, updateStatus } from "./src/settings.js";
 import { sharedState } from "./src/state.js";
 import {
+  loadUserLocale,
+  loadUiLocale,
+  applyUiTranslations,
+  ts,
+} from "./src/i18n.js";
+import {
   resetExpressionSignature,
   setupExpressionObserver,
   scheduleExpressionUpdate,
@@ -101,7 +107,7 @@ function connect() {
 
   const settings = getSettings();
   if (!settings.bridgeUrl) {
-    updateStatus("URL not set!", "red");
+    updateStatus(ts("ui.status.urlNotSet"), "red");
     return;
   }
 
@@ -110,12 +116,12 @@ function connect() {
     reconnectTimeout = null;
   }
 
-  updateStatus("Connecting...", "orange");
+  updateStatus(ts("ui.status.connecting"), "orange");
   const socket = new WebSocket(settings.bridgeUrl);
   setWs(socket);
 
   socket.onopen = () => {
-    updateStatus("Connected", "green");
+    updateStatus(ts("ui.status.connected"), "green");
     console.log("[Discord Bridge] Connected to bridge server");
     resetExpressionSignature();
     setupExpressionObserver();
@@ -162,7 +168,13 @@ function connect() {
         } else {
           sharedState.bridgeLocale = null;
         }
+        // Load the user-facing locale for Discord command replies.
+        // Always load at least the English fallback so t() never returns raw keys.
+        loadUserLocale(data.userLocale || "en").catch(() => {});
         sharedState.bridgePlugins = data.plugins || null;
+        if (Array.isArray(data.availableLanguages)) {
+          sharedState.availableLanguages = data.availableLanguages;
+        }
         const hasProPlugin = Object.entries(data.plugins || {}).some(
           ([platform, status]) => platform !== "discord" && status === "active",
         );
@@ -221,7 +233,7 @@ function connect() {
   };
 
   socket.onclose = () => {
-    updateStatus("Disconnected", "red");
+    updateStatus(ts("ui.status.disconnected"), "red");
     setWs(null);
     $("#discord_multi_platform_section").hide();
 
@@ -232,7 +244,7 @@ function connect() {
 
     const settings = getSettings();
     if (settings.autoConnect && shouldReconnect) {
-      updateStatus("Reconnecting...", "orange");
+      updateStatus(ts("ui.status.reconnecting"), "orange");
       if (!reconnectTimeout) {
         reconnectTimeout = setTimeout(() => {
           reconnectTimeout = null;
@@ -244,7 +256,7 @@ function connect() {
 
   socket.onerror = (error) => {
     console.error("[Discord Bridge] WebSocket error:", error);
-    updateStatus("Connection error", "red");
+    updateStatus(ts("ui.status.error"), "red");
   };
 }
 
@@ -256,7 +268,7 @@ function disconnect() {
     clearTimeout(reconnectTimeout);
     reconnectTimeout = null;
   }
-  updateStatus("Disconnected", "red");
+  updateStatus(ts("ui.status.disconnected"), "red");
 }
 
 // ---------------------------------------------------------------------------
@@ -265,10 +277,26 @@ function disconnect() {
 
 jQuery(async () => {
   try {
+    // Detect SillyTavern's active language for the settings panel UI.
+    // Falls back to English if the i18n module is unavailable (older ST builds).
+    let stLocale = "en";
+    try {
+      const { getCurrentLocale } = await import(
+        "../../../../../scripts/i18n.js"
+      );
+      stLocale = getCurrentLocale() || "en";
+    } catch {
+      // Older ST build without getCurrentLocale - stay with English.
+    }
+    await loadUiLocale(stLocale);
+
     const settingsHtml = await $.get(
       `/scripts/extensions/third-party/${MODULE_NAME}/settings.html`,
     );
-    $("#extensions_settings").append(settingsHtml);
+    const $settings = $(settingsHtml);
+    const settingsRoot = $settings.filter("*")[0] ?? $settings.find("*")[0];
+    if (settingsRoot) applyUiTranslations(settingsRoot);
+    $("#extensions_settings").append($settings);
 
     const settings = getSettings();
     $("#discord_bridge_url").val(settings.bridgeUrl);

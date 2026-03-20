@@ -21,32 +21,32 @@
 // Used to set the bot's Discord activity status when an expression update
 // arrives. Unknown expressions fall back to 🎭 in formatBridgeActivity.
 const EXPRESSION_EMOJI_MAP = {
-  admiration: "😍",
+  admiration: "😳",
   amusement: "😄",
-  anger: "😠",
+  anger: "😤",
   annoyance: "😒",
   approval: "👍",
   caring: "🤗",
   confusion: "😕",
-  curiosity: "🤔",
-  desire: "💘",
+  curiosity: "🧐",
+  desire: ["😍", "❤️‍🔥", "🤤"],
   disappointment: "😞",
   disapproval: "👎",
-  disgust: "🤢",
-  embarrassment: "😳",
+  disgust: "🤮",
+  embarrassment: "🤭",
   excitement: "🤩",
   fear: "😨",
-  gratitude: "🙏",
-  grief: "😢",
-  joy: "😊",
-  love: "❤️",
-  nervousness: "😬",
-  optimism: "🌤️",
-  pride: "😌",
+  gratitude: "😊",
+  grief: "😭",
+  joy: "😃",
+  love: "🥰",
+  nervousness: "😰",
+  optimism: "👌",
+  pride: "😎",
   realization: "💡",
   relief: "😮‍💨",
-  remorse: "🥺",
-  sadness: "😔",
+  remorse: "😔",
+  sadness: "😢",
   surprise: "😲",
   neutral: "😐",
 };
@@ -84,8 +84,13 @@ function formatBridgeActivity(activityBase, expression, ownerName) {
   // Empty expression - show the base activity string instead.
   if (!normalized) return activityBase;
 
-  // Known expression → mapped emoji; unknown → 🎭 as a visible fallback.
-  const base = `${EXPRESSION_EMOJI_MAP[normalized] || "🎭"} ${normalized}`;
+  // Known expression → mapped emoji; arrays pick one at random for variety.
+  // Unknown expressions fall back to 🎭 as a visible fallback.
+  const mapped = EXPRESSION_EMOJI_MAP[normalized];
+  const emoji = Array.isArray(mapped)
+    ? mapped[Math.floor(Math.random() * mapped.length)]
+    : mapped;
+  const base = `${emoji || "🎭"} ${normalized}`;
   return ownerName?.trim() ? `${base} (${ownerName.trim()})` : base;
 }
 

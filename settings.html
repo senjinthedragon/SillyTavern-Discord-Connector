@@ -30,9 +30,9 @@
     <div class="inline-drawer-content">
 
       <!-- Connection -->
-      <p class="dc-section-title">Connection</p>
+      <p class="dc-section-title" data-i18n="ui.section.connection">Connection</p>
       <div class="discord-connector_block flex-container flexFlowColumn gap5">
-        <label for="discord_bridge_url">Bridge URL</label>
+        <label for="discord_bridge_url" data-i18n="ui.label.bridgeUrl">Bridge URL</label>
         <input
           type="text"
           id="discord_bridge_url"
@@ -41,54 +41,54 @@
         />
       </div>
       <div class="discord-connector_block flex-container gap5">
-        <input id="discord_connect_button"    class="menu_button flex1" type="button" value="Connect" />
-        <input id="discord_disconnect_button" class="menu_button flex1" type="button" value="Disconnect" />
+        <input id="discord_connect_button"    class="menu_button flex1" type="button" data-i18n="[value]ui.button.connect"    value="Connect" />
+        <input id="discord_disconnect_button" class="menu_button flex1" type="button" data-i18n="[value]ui.button.disconnect" value="Disconnect" />
       </div>
-      <div id="discord_connection_status" class="dc-status">
+      <div id="discord_connection_status" class="dc-status" data-i18n="ui.status.initial">
         Status: Click Connect to connect
       </div>
       <div class="discord-connector_block flex-container">
         <label class="checkbox_label" for="discord_auto_connect">
           <input type="checkbox" id="discord_auto_connect" />
-          <span>Auto-connect on page load</span>
+          <span data-i18n="ui.checkbox.autoConnect">Auto-connect on page load</span>
         </label>
       </div>
 
       <!-- Mood & Expressions -->
-      <p class="dc-section-title">Mood &amp; Expressions</p>
+      <p class="dc-section-title" data-i18n="ui.section.mood">Mood &amp; Expressions</p>
       <div class="discord-connector_block flex-container flexFlowColumn gap5">
         <label for="discord_expression_mode">
-          Expression mode
-          <span class="dc-info" role="button" tabindex="0" data-tooltip="Controls how the character's mood is shown in Discord. Off disables it entirely. Status only updates the bot's Discord status bar. Full also posts the expression image to the active channel whenever the mood changes.">ⓘ</span>
+          <span data-i18n="ui.label.expressionMode">Expression mode</span>
+          <span class="dc-info" role="button" tabindex="0" data-i18n="[data-tooltip]ui.tooltip.expressionMode" data-tooltip="Controls how the character's mood is shown in Discord. Off disables it entirely. Status only updates the bot's Discord status bar. Full also posts the expression image to the active channel whenever the mood changes.">ⓘ</span>
         </label>
         <select id="discord_expression_mode" class="text_pole">
-          <option value="off">Off</option>
-          <option value="status" selected>Discord status only</option>
-          <option value="full">Discord status + expression images</option>
+          <option value="off"    data-i18n="ui.expr.off">Off</option>
+          <option value="status" data-i18n="ui.expr.statusOnly" selected>Discord status only</option>
+          <option value="full"   data-i18n="ui.expr.full">Discord status + expression images</option>
         </select>
       </div>
 
       <!-- Personas -->
-      <p class="dc-section-title">Personas</p>
+      <p class="dc-section-title" data-i18n="ui.section.personas">Personas</p>
       <div class="discord-connector_block flex-container">
         <label class="checkbox_label" for="discord_allow_user_persona_save">
           <input type="checkbox" id="discord_allow_user_persona_save" />
           <span>
-            Allow /mypersona persona saving
-            <span class="dc-info" role="button" tabindex="0" data-tooltip="When on, Discord users can type /mypersona [name] to save their persona - it will then switch automatically on every message they send. Turn this off to manage all persona assignments through config.js only.">ⓘ</span>
+            <span data-i18n="ui.checkbox.allowPersonaSave">Allow /mypersona persona saving</span>
+            <span class="dc-info" role="button" tabindex="0" data-i18n="[data-tooltip]ui.tooltip.allowPersonaSave" data-tooltip="When on, Discord users can type /mypersona [name] to save their persona - it will then switch automatically on every message they send. Turn this off to manage all persona assignments through config.js only.">ⓘ</span>
           </span>
         </label>
       </div>
 
       <!-- Multi-platform - only shown when at least one pro platform is active -->
       <div id="discord_multi_platform_section" style="display:none">
-      <p class="dc-section-title">Multi-platform</p>
+      <p class="dc-section-title" data-i18n="ui.section.multiplatform">Multi-platform</p>
       <div class="discord-connector_block flex-container">
         <label class="checkbox_label" for="discord_cross_platform_relay">
           <input type="checkbox" id="discord_cross_platform_relay" />
           <span>
-            Relay messages to all connected clients
-            <span class="dc-info" role="button" tabindex="0" data-tooltip="When on, a message typed on one platform (Discord, Telegram, Signal) is immediately echoed to all other connected platforms so every client stays in sync. When off, messages only reach the platform where they were typed.">ⓘ</span>
+            <span data-i18n="ui.checkbox.crossRelay">Relay messages to all connected clients</span>
+            <span class="dc-info" role="button" tabindex="0" data-i18n="[data-tooltip]ui.tooltip.crossRelay" data-tooltip="When on, a message typed on one platform (Discord, Telegram, Signal) is immediately echoed to all other connected platforms so every client stays in sync. When off, messages only reach the platform where they were typed.">ⓘ</span>
           </span>
         </label>
       </div>

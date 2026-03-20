@@ -72,6 +72,27 @@ test("createConfig throws for placeholder Discord token when Discord plugin is e
   );
 });
 
+test("createConfig throws when Discord is enabled but token is missing or empty", () => {
+  assert.throws(
+    () => createConfig({ enabledPlugins: ["discord"] }),
+    /discordToken is required/,
+  );
+  assert.throws(
+    () => createConfig({ enabledPlugins: ["discord"], discordToken: "" }),
+    /discordToken is required/,
+  );
+  assert.throws(
+    () => createConfig({ enabledPlugins: ["discord"], discordToken: null }),
+    /discordToken is required/,
+  );
+});
+
+test("createConfig does not require discordToken when Discord plugin is not enabled", () => {
+  assert.doesNotThrow(() =>
+    createConfig({ enabledPlugins: ["telegram"], wssPort: 2333 }),
+  );
+});
+
 test("createConfig allows non-discord enabled plugin names for external plugins", () => {
   const { config } = createConfig({
     enabledPlugins: ["discord", "telegram"],

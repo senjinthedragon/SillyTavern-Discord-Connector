@@ -40,3 +40,12 @@ export function sanitizeSlashArg(value) {
     .trim()
     .slice(0, 200);
 }
+
+// For free-text fields like /note where newlines are valid content.
+// Only strips the pipe character (ST slash command injection vector).
+export function sanitizeNoteArg(value) {
+  return String(value)
+    .replace(/\|/g, "") // strip pipe (command injection vector)
+    .trim()
+    .slice(0, 4096);
+}

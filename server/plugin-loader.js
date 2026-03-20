@@ -40,6 +40,7 @@ async function loadExternalPlugins(handlers) {
         "sendText",
         "sendTyping",
         "sendImages",
+        "sendGeneratedImage",
         "sendExpression",
         "streamChunk",
         "streamEnd",

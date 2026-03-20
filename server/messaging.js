@@ -109,7 +109,8 @@ function fetchImageBuffer(url, redirectsLeft = 5) {
             reject(new Error("Too many redirects"));
             return;
           }
-          resolve(fetchImageBuffer(res.headers.location, redirectsLeft - 1));
+          const next = new URL(res.headers.location, url).toString();
+          resolve(fetchImageBuffer(next, redirectsLeft - 1));
           return;
         }
         if (res.statusCode < 200 || res.statusCode >= 300) {

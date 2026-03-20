@@ -45,7 +45,8 @@ import { executeSlashCommandsWithOptions } from "../../../../../scripts/slash-co
 import { safeSend, getWs } from "./ws.js";
 import { getSettings } from "./settings.js";
 import { sharedState } from "./state.js";
-import { sanitizeSlashArg } from "./utils.js";
+import { sanitizeSlashArg, sanitizeNoteArg } from "./utils.js";
+import { t, makeT, getLocaleStrings } from "./i18n.js";
 import {
   sendImagesFromMesText,
   sendLastMessageImages,
@@ -59,7 +60,6 @@ import {
   clearExpressionCache,
   resetExpressionSignature,
   scheduleExpressionUpdate,
-  getExpressionCacheSize,
 } from "./expression-relay.js";
 import {
   getBreakerState,
@@ -224,6 +224,11 @@ export function captureAndSendIntroMessage(chatId) {
  */
 export async function handleUserMessage(data) {
   sharedState.lastActiveChatId = data.chatId || sharedState.lastActiveChatId;
+  sharedState.lastActiveUserLocale = data.userLocale || sharedState.lastActiveUserLocale;
+
+  // Resolve per-user locale so error messages reach the user in their language.
+  // eslint-disable-next-line no-shadow
+  const t = makeT(await getLocaleStrings(data.userLocale));
 
   // Auto-switch to the user's saved persona before injecting their message.
   if (data.mappedPersona) {
@@ -335,7 +340,7 @@ export async function handleUserMessage(data) {
       safeSend({
         type: "error_message",
         chatId: messageState.chatId,
-        text: "Something went wrong and no response was found. Try again?",
+        text: t("reply.noResponse"),
       });
     }
 
@@ -406,7 +411,7 @@ export async function handleUserMessage(data) {
     safeSend({
       type: "error_message",
       chatId: messageState.chatId,
-      text: `Generation failed. Your message was retracted - try again.\n\nError: ${error.message || "Unknown"}`,
+      text: t("reply.generationFailed", { message: error.message || "Unknown" }),
     });
     removeAllListeners();
     sendStreamEnd();
@@ -423,9 +428,14 @@ export async function handleUserMessage(data) {
  */
 export async function handleExecuteCommand(data) {
   sharedState.lastActiveChatId = data.chatId || sharedState.lastActiveChatId;
+  sharedState.lastActiveUserLocale = data.userLocale || sharedState.lastActiveUserLocale;
   safeSend({ type: "typing_action", chatId: data.chatId });
 
-  let replyText = "Command execution failed, try again later.";
+  // Resolve per-user locale so command replies reach the user in their language.
+  // eslint-disable-next-line no-shadow
+  const t = makeT(await getLocaleStrings(data.userLocale));
+
+  let replyText = null;
   const context = SillyTavern.getContext();
 
   try {
@@ -435,36 +445,36 @@ export async function handleExecuteCommand(data) {
         clearExpressionCache();
         invalidateChatCache();
         captureAndSendIntroMessage(data.chatId);
-        replyText = "New chat started.";
+        replyText = t("newchat.success");
         break;
 
       case "listchars": {
         const characters = context.characters.filter((c) => c.name?.trim());
         replyText =
           characters.length === 0
-            ? "No available characters found."
-            : "Available characters:\n\n" +
-              characters
-                .map((c, i) => `${i + 1}. /switchchar_${i + 1} - ${c.name}`)
-                .join("\n") +
-              "\n\nUse /switchchar_number or /switchchar character_name to switch.";
+            ? t("listchars.empty")
+            : t("listchars.list", {
+                list: characters
+                  .map((c, i) => `${i + 1}. /switchchar_${i + 1} - ${c.name}`)
+                  .join("\n"),
+              });
         break;
       }
 
       case "switchchar": {
         if (!data.args?.length) {
-          replyText = "Usage: /switchchar <n> or /switchchar_number";
+          replyText = t("switchchar.usage");
           break;
         }
         const targetName = data.args.join(" ");
         const target = context.characters.find((c) => c.name === targetName);
         if (target) {
-          scheduleRecap(data.chatId);
+          safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchchar.success", { name: targetName }) });
+          scheduleRecap(data.chatId, data.userId, data.userLocale);
           await selectCharacterById(context.characters.indexOf(target));
           invalidateChatCache();
-          replyText = `Switched to "${targetName}".`;
         } else {
-          replyText = `Character "${targetName}" not found.`;
+          replyText = t("switchchar.notFound", { name: targetName });
         }
         break;
       }
@@ -473,18 +483,18 @@ export async function handleExecuteCommand(data) {
         const allGroups = context.groups || [];
         replyText =
           allGroups.length === 0
-            ? "No groups found."
-            : "Available groups:\n\n" +
-              allGroups
-                .map((g, i) => `${i + 1}. /switchgroup_${i + 1} - ${g.name}`)
-                .join("\n") +
-              "\n\nUse /switchgroup_number or /switchgroup group_name to switch.";
+            ? t("listgroups.empty")
+            : t("listgroups.list", {
+                list: allGroups
+                  .map((g, i) => `${i + 1}. /switchgroup_${i + 1} - ${g.name}`)
+                  .join("\n"),
+              });
         break;
       }
 
       case "switchgroup": {
         if (!data.args?.length) {
-          replyText = "Usage: /switchgroup <n> or /switchgroup_number";
+          replyText = t("switchgroup.usage");
           break;
         }
         const targetName = data.args.join(" ");
@@ -492,50 +502,50 @@ export async function handleExecuteCommand(data) {
           (g) => g.name === targetName,
         );
         if (target) {
-          scheduleRecap(data.chatId);
+          safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchgroup.success", { name: targetName }) });
+          scheduleRecap(data.chatId, data.userId, data.userLocale);
           await executeSlashCommandsWithOptions(
             `/go ${sanitizeSlashArg(target.name)}`,
           );
           invalidateChatCache();
-          replyText = `Switched to group "${targetName}".`;
         } else {
-          replyText = `Group "${targetName}" not found.`;
+          replyText = t("switchgroup.notFound", { name: targetName });
         }
         break;
       }
 
       case "listchats": {
         if (context.characterId === undefined) {
-          replyText = "Please select a character first.";
+          replyText = t("listchats.noChar");
           break;
         }
         const chatFiles = await getPastCharacterChats(context.characterId);
         replyText =
           chatFiles.length === 0
-            ? "No chat history for current character."
-            : "Chat history:\n\n" +
-              chatFiles
-                .map(
-                  (c, i) =>
-                    `${i + 1}. /switchchat_${i + 1} - ${c.file_name.replace(".jsonl", "")}`,
-                )
-                .join("\n") +
-              "\n\nUse /switchchat_number or /switchchat chat_name to switch.";
+            ? t("listchats.empty")
+            : t("listchats.list", {
+                list: chatFiles
+                  .map(
+                    (c, i) =>
+                      `${i + 1}. /switchchat_${i + 1} - ${c.file_name.replace(".jsonl", "")}`,
+                  )
+                  .join("\n"),
+              });
         break;
       }
 
       case "switchchat": {
         if (!data.args?.length) {
-          replyText = "Usage: /switchchat <n>";
+          replyText = t("switchchat.usage");
           break;
         }
         const targetChatFile = data.args.join(" ");
         try {
-          scheduleRecap(data.chatId);
+          safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchchat.success", { name: targetChatFile }) });
+          scheduleRecap(data.chatId, data.userId, data.userLocale);
           await openCharacterChat(targetChatFile);
-          replyText = `Loaded chat: ${targetChatFile}`;
         } catch {
-          replyText = `Failed to load chat "${targetChatFile}". Check the name is exact.`;
+          replyText = t("switchchat.fail", { name: targetChatFile });
         }
         break;
       }
@@ -553,11 +563,11 @@ export async function handleExecuteCommand(data) {
             (c) => c.name?.toLowerCase() === targetName.toLowerCase(),
           );
           if (!target) {
-            replyText = `Character "${targetName}" not found.`;
+            replyText = t("charimage.notFound", { name: targetName });
             break;
           }
           sendCharacterAvatar(data.chatId, target); // async, not awaited
-          replyText = `Sending avatar for **${target.name}**\u2026`;
+          replyText = t("charimage.sending", { name: target.name });
         } else if (isGroup) {
           const activeGroup = (ctx.groups || []).find(
             (g) => g.id === ctx.groupId,
@@ -569,20 +579,22 @@ export async function handleExecuteCommand(data) {
             )
             .filter(Boolean);
           replyText = memberNames.length
-            ? "Group members:\n\n" +
-              memberNames.map((n) => `\u2022 ${n}`).join("\n") +
-              "\n\nUse /charimage <n> to see a member's avatar."
-            : "No members found in the current group.";
+            ? t("charimage.groupList", {
+                list: memberNames.map((n) => `\u2022 ${n}`).join("\n"),
+              })
+            : t("charimage.groupEmpty");
         } else {
           if (
             ctx.characterId === undefined ||
             !ctx.characters?.[ctx.characterId]
           ) {
-            replyText = "No character is currently selected.";
+            replyText = t("charimage.noChar");
             break;
           }
           sendCharacterAvatar(data.chatId, ctx.characters[ctx.characterId]); // async, not awaited
-          replyText = `Sending avatar for **${ctx.characters[ctx.characterId].name}**\u2026`;
+          replyText = t("charimage.sending", {
+            name: ctx.characters[ctx.characterId].name,
+          });
         }
         break;
       }
@@ -595,15 +607,13 @@ export async function handleExecuteCommand(data) {
           if (requestedName) {
             const cached = getCachedExpressionSnapshot(requestedName);
             if (!cached) {
-              replyText =
-                "No active expression is available right now, and no stored mood exists for that character yet.";
+              replyText = t("mood.noExprCached");
               break;
             }
             snapshot = cached;
             usedCachedSnapshot = true;
           } else {
-            replyText =
-              "No active expression is available right now. Make sure expressions are enabled in SillyTavern.";
+            replyText = t("mood.noExpr");
             break;
           }
         }
@@ -617,10 +627,11 @@ export async function handleExecuteCommand(data) {
           ) {
             const cached = getCachedExpressionSnapshot(requestedName);
             if (!cached) {
-              replyText =
-                `Current visible mood is for **${owner}** (` +
-                `**${snapshot.expression}**). ` +
-                `Mood for **${requestedName}** is not currently visible in SillyTavern and has not been seen yet.`;
+              replyText = t("mood.wrongChar", {
+                owner,
+                expression: snapshot.expression,
+                name: requestedName,
+              });
               break;
             }
             snapshot = cached;
@@ -634,21 +645,29 @@ export async function handleExecuteCommand(data) {
           ownerName: snapshot.ownerName || null,
           chatId: data.chatId,
           image: snapshot.image,
+          userLocale: data.userLocale || null,
         });
 
+        const exprKey = `expr.${snapshot.expression}`;
+        const translatedExpr =
+          t(exprKey) !== exprKey ? t(exprKey) : snapshot.expression;
         const ownerPrefix = snapshot.ownerName
-          ? `**${snapshot.ownerName}**: `
+          ? t("mood.ownerPrefix", { name: snapshot.ownerName })
           : "";
-        const cachedNote = usedCachedSnapshot ? " (last known mood)" : "";
-        replyText = snapshot.image
-          ? `Current mood: ${ownerPrefix}**${snapshot.expression}**${cachedNote} (image sent).`
-          : `Current mood: ${ownerPrefix}**${snapshot.expression}**${cachedNote} (no expression image available).`;
+        const cachedNote = usedCachedSnapshot ? t("mood.cachedNote") : "";
+        if (!snapshot.image) {
+          replyText = t("mood.noImage", {
+            ownerPrefix,
+            expression: translatedExpr,
+            cachedNote,
+          });
+        }
         break;
       }
 
       case "reaction": {
         if (!data.args?.length) {
-          replyText = "Usage: /reaction <mode>\nModes: off, status, full";
+          replyText = t("reaction.usage");
           break;
         }
 
@@ -656,7 +675,7 @@ export async function handleExecuteCommand(data) {
           .trim()
           .toLowerCase();
         if (!EXPRESSION_MODE_VALUES.has(mode)) {
-          replyText = "Invalid mode. Use one of: off, status, full.";
+          replyText = t("reaction.invalid");
           break;
         }
 
@@ -667,18 +686,17 @@ export async function handleExecuteCommand(data) {
 
         const modeLabel =
           mode === "off"
-            ? "Off"
+            ? t("reaction.modeOff")
             : mode === "status"
-              ? "Discord status only"
-              : "Discord status + expression images";
-        replyText = `Reaction mode set to: **${modeLabel}**.`;
+              ? t("reaction.modeStatus")
+              : t("reaction.modeFull");
+        replyText = t("reaction.success", { mode: modeLabel });
         break;
       }
 
       case "image": {
         if (!data.args?.length) {
-          replyText =
-            "Usage: /image <prompt> or /image <keyword>\nKeywords: you, face, me, scene, last, raw_last, background\nUse /image cancel to stop an active generation.";
+          replyText = t("image.usage");
           break;
         }
 
@@ -688,8 +706,8 @@ export async function handleExecuteCommand(data) {
         if (lowerPrompt === "cancel") {
           const cancelled = cancelActiveImageJob(data.chatId);
           replyText = cancelled
-            ? "Cancelled active image generation."
-            : "No active image generation to cancel.";
+            ? t("image.cancelled")
+            : t("image.nothingToCancel");
           break;
         }
 
@@ -699,14 +717,13 @@ export async function handleExecuteCommand(data) {
           const seconds = Math.ceil(
             (breakerState.openUntil - Date.now()) / 1000,
           );
-          replyText = `Image generation is temporarily paused after repeated failures. Try again in ~${seconds}s.`;
+          replyText = t("image.breakerOpen", { seconds });
           break;
         }
 
         const rateCheck = checkAndRecordRateLimit(data.chatId);
         if (!rateCheck.allowed) {
-          replyText =
-            "Too many image requests in a short time. Please wait a minute and try again.";
+          replyText = t("image.rateLimited");
           break;
         }
 
@@ -717,39 +734,27 @@ export async function handleExecuteCommand(data) {
           type: "image_placeholder",
           chatId: data.chatId,
           requestId,
-          text: `\uD83C\uDFA8 Generating image\u2026 (timeout: ${timeoutMinutes} minutes; use /image cancel to abort)`,
+          text: t("image.placeholder", { minutes: timeoutMinutes }),
         });
 
         // Queue and return early - generate_image_result/error sends its own packets.
-        enqueueAndGenerateImage(data.chatId, requestId, prompt);
+        enqueueAndGenerateImage(data.chatId, requestId, prompt, data.userLocale || null);
         return;
       }
 
       case "continue": {
-        const { chat: chatBefore } = SillyTavern.getContext();
-        const lastMsgBefore = [...chatBefore]
-          .reverse()
-          .find((m) => !m.is_user && m.mes?.trim());
-        const textBefore = lastMsgBefore?.mes?.trim() ?? "";
-
-        await executeSlashCommandsWithOptions("/continue await=true");
-
-        const { chat: chatAfter } = SillyTavern.getContext();
-        const lastMsgAfter = [...chatAfter]
-          .reverse()
-          .find((m) => !m.is_user && m.mes?.trim());
-        const textAfter = lastMsgAfter?.mes?.trim() ?? "";
-
-        const newText = textAfter.startsWith(textBefore)
-          ? textAfter.slice(textBefore.length).trim()
-          : textAfter;
-
-        replyText = newText || "Continuation returned nothing.";
+        // Fire the continuation and let the normal generation event handlers
+        // (collectAndSendReplies, streaming) deliver the result. Sending a
+        // separate replyText would duplicate or race against that output.
+        // Guard against synchronous throws (e.g. ST already generating).
+        try {
+          executeSlashCommandsWithOptions("/continue").catch(() => {});
+        } catch (_) {}
         break;
       }
 
       case "impersonate": {
-        const impPrompt = sanitizeSlashArg(data.args?.[0] ?? "");
+        const impPrompt = sanitizeNoteArg(data.args?.[0] ?? "");
         await executeSlashCommandsWithOptions(
           impPrompt
             ? `/impersonate await=true ${impPrompt}`
@@ -758,9 +763,9 @@ export async function handleExecuteCommand(data) {
         const impersonatedText = String($("#send_textarea").val()).trim();
         if (impersonatedText) {
           $("#send_textarea").val("").trigger("input");
-          replyText = `\uD83D\uDCAD *Suggested response* _(feel free to copy, edit and send as your own)_:\n${impersonatedText}`;
+          replyText = t("impersonate.suggestion", { text: impersonatedText });
         } else {
-          replyText = "Impersonation returned nothing.";
+          replyText = t("impersonate.empty");
         }
         break;
       }
@@ -771,35 +776,32 @@ export async function handleExecuteCommand(data) {
         ).filter((n) => n?.trim());
         replyText =
           personas.length > 0
-            ? "Available personas:\n\n" +
-              personas.map((n, i) => `${i + 1}. ${n}`).join("\n")
-            : "No personas found.";
+            ? t("listpersonas.list", {
+                list: personas.map((n, i) => `${i + 1}. ${n}`).join("\n"),
+              })
+            : t("listpersonas.empty");
         break;
       }
 
       case "persona": {
         const personaName = sanitizeSlashArg(data.args?.[0] ?? "");
         if (!personaName) {
-          replyText = "Please provide a persona name. Example: `/persona Aria`";
+          replyText = t("persona.usage");
           break;
         }
         await executeSlashCommandsWithOptions(`/persona-set ${personaName}`);
-        replyText = `Persona set to: _${personaName}_`;
+        replyText = t("persona.success", { name: personaName });
         break;
       }
 
       case "mypersona": {
         if (!getSettings().allowUserPersonaSave) {
-          replyText =
-            "Saving persona preferences is disabled by the server administrator. Use `/persona <name>` to switch manually.";
+          replyText = t("mypersona.disabled");
           break;
         }
         const personaArg = sanitizeSlashArg(data.args?.[0] ?? "");
         if (!personaArg) {
-          replyText =
-            "Usage: `/mypersona <name>` - save your persona so it switches automatically each time you chat.\n" +
-            "Use `/mypersona clear` to remove your saved preference.\n" +
-            "Use `/listpersonas` to see available personas.";
+          replyText = t("mypersona.usage");
           break;
         }
         if (personaArg.toLowerCase() === "clear") {
@@ -810,8 +812,7 @@ export async function handleExecuteCommand(data) {
             userId: data.userId || "",
             personaName: null,
           });
-          replyText =
-            "Your persona preference has been cleared. Messages will use whatever persona is currently active.";
+          replyText = t("mypersona.cleared");
           break;
         }
         await executeSlashCommandsWithOptions(`/persona-set ${personaArg}`);
@@ -822,21 +823,66 @@ export async function handleExecuteCommand(data) {
           userId: data.userId || "",
           personaName: personaArg,
         });
-        replyText = `Persona _${personaArg}_ saved. It will be set automatically each time you send a message.`;
+        replyText = t("mypersona.saved", { name: personaArg });
+        break;
+      }
+
+      case "setlang": {
+        const langArg = sanitizeSlashArg(data.args?.[0] ?? "");
+        if (!langArg) {
+          replyText = t("setlang.usage");
+          break;
+        }
+        if (langArg.toLowerCase() === "clear") {
+          safeSend({
+            type: "save_user_lang",
+            chatId: data.chatId,
+            platform: data.platform || "discord",
+            userId: data.userId || "",
+            localeCode: null,
+          });
+          replyText = t("setlang.reset");
+          break;
+        }
+        const langs = sharedState.availableLanguages || [];
+        const lower = langArg.toLowerCase();
+        const match = langs.find(
+          (l) =>
+            l.code?.toLowerCase() === lower ||
+            l.name?.toLowerCase() === lower ||
+            l.nativeName?.toLowerCase() === lower ||
+            (Array.isArray(l.names) &&
+              l.names.some((n) => n.toLowerCase() === lower)),
+        );
+        if (!match) {
+          replyText = t("setlang.unknown", { input: langArg });
+          break;
+        }
+        safeSend({
+          type: "save_user_lang",
+          chatId: data.chatId,
+          platform: data.platform || "discord",
+          userId: data.userId || "",
+          localeCode: match.code,
+        });
+        replyText = t("setlang.success", {
+          name: match.nativeName || match.name,
+          code: match.code,
+        });
         break;
       }
 
       case "note": {
-        const noteText = sanitizeSlashArg(data.args?.[0] ?? "");
+        const noteText = sanitizeNoteArg(data.args?.[0] ?? "");
         if (noteText) {
           await executeSlashCommandsWithOptions(`/note ${noteText}`);
-          replyText = `Author's note set to: _${noteText}_`;
+          replyText = t("note.success", { text: noteText });
         } else {
           const current =
             SillyTavern.getContext().chatMetadata?.note_prompt ?? "";
           replyText = current
-            ? `Current author's note: _${current}_`
-            : "No author's note is currently set.";
+            ? t("note.current", { text: current })
+            : t("note.none");
         }
         break;
       }
@@ -866,13 +912,19 @@ export async function handleExecuteCommand(data) {
           const errorTime = new Date(metrics.lastErrorAt);
           const timeString =
             minutesAgo < 1
-              ? "Just now"
+              ? t("status.timeNow")
               : minutesAgo < 60
-                ? `${minutesAgo}m ago`
+                ? t("status.timeMinutes", { m: minutesAgo })
                 : minutesAgo < 1440
-                  ? `${Math.floor(minutesAgo / 60)}h ${minutesAgo % 60}m ago`
+                  ? t("status.timeHours", {
+                      h: Math.floor(minutesAgo / 60),
+                      m: minutesAgo % 60,
+                    })
                   : errorTime.toLocaleString();
-          lastErrorText = `\n**\u26A0\uFE0F Last error:**\n> \`${metrics.lastError}\`\n> _${timeString}_`;
+          lastErrorText = t("status.lastError", {
+            error: metrics.lastError,
+            time: timeString,
+          });
         }
 
         const PLATFORM_LABELS = {
@@ -894,58 +946,101 @@ export async function handleExecuteCommand(data) {
               .join(" | ")
           : "Unknown";
 
-        replyText =
-          "## \uD83D\uDC32 __Bridge Status:__\n" +
-          `**Connection:** ${getWs()?.readyState === WebSocket.OPEN ? "\uD83D\uDFE2 Online" : "\uD83D\uDD34 Offline"}\n` +
-          `**Plugins:** ${platformLine}\n` +
-          `**Active:** ${activeGroup !== "(none)" ? `\uD83D\uDC65 Group: ${activeGroup}` : activeCharacter !== "(none)" ? `\uD83D\uDC64 ${activeCharacter}` : "_Nothing loaded_"}\n` +
-          `**Persona:** ${activePersona !== "(none)" ? `\uD83C\uDFAD ${activePersona}` : "_None set_"}\n` +
-          `**Mood snapshots cached:** ${getExpressionCacheSize()}\n\n` +
-          "**\uD83D\uDDBC\uFE0F Image Generation**\n" +
-          `> **Status:** ${!breakerState ? "\u2705 Ready" : `\u23F8\uFE0F Paused - cooling down (${Math.ceil((breakerState.openUntil - Date.now()) / 1000)}s left, will resume automatically)`}\n` +
-          `> **Queue:** ${hasPendingImageQueue(data.chatId) ? "\u23F3 Pending images" : "\u2705 Empty"}\n` +
-          `> **Currently generating:** ${hasActiveImageJob(data.chatId) ? "\u2699\uFE0F Yes" : "-"}\n\n` +
-          "**\uD83D\uDCCA Image Stats** _(since last restart)_\n" +
-          `> \u2705 Succeeded: **${metrics.succeeded}** / \u2728 Total requested: **${metrics.totalRequests}**\n` +
-          `> \u274C Failed: **${metrics.failed}** | \u23F1\uFE0F Timed out: **${metrics.timedOut}** | \uD83D\uDEAB Rate limited: **${metrics.rateLimited}**\n` +
-          `> \uD83D\uDED1 Canceled: **${metrics.canceled}** | \u26A1 Concurrent now: **${metrics.inFlight}** (peak: **${metrics.maxConcurrentInFlight}**)\n` +
-          `> \uD83D\uDD01 Overload trips: **${metrics.breakerTrips}** | \uD83D\uDEA7 Requests blocked during cooldown: **${metrics.breakerRejected}**\n` +
-          lastErrorText;
+        const connStatus =
+          getWs()?.readyState === WebSocket.OPEN
+            ? t("status.online")
+            : t("status.offline");
+
+        const activeDisplay =
+          activeGroup !== "(none)"
+            ? t("status.activeGroup", { name: activeGroup })
+            : activeCharacter !== "(none)"
+              ? t("status.activeChar", { name: activeCharacter })
+              : t("status.activeNone");
+
+        const personaDisplay =
+          activePersona !== "(none)"
+            ? t("status.personaSet", { name: activePersona })
+            : t("status.personaNone");
+
+        const imageStatusDisplay = !breakerState
+          ? t("status.imageReady")
+          : t("status.imagePaused", {
+              seconds: Math.ceil((breakerState.openUntil - Date.now()) / 1000),
+            });
+
+        const lines = [
+          t("status.title"),
+          t("status.connection", { value: connStatus }),
+          t("status.plugins", { value: platformLine }),
+          t("status.active", { value: activeDisplay }),
+          t("status.persona", { value: personaDisplay }),
+          "",
+          t("status.imageGen"),
+          t("status.imageStatus", { value: imageStatusDisplay }),
+          t("status.imageQueue", {
+            value: hasPendingImageQueue(data.chatId)
+              ? t("status.imageQueuePending")
+              : t("status.imageQueueEmpty"),
+          }),
+          t("status.imageGenerating", {
+            value: hasActiveImageJob(data.chatId)
+              ? t("status.imageGeneratingYes")
+              : "-",
+          }),
+          "",
+          t("status.stats"),
+          t("status.statsLine1", {
+            succeeded: metrics.succeeded,
+            total: metrics.totalRequests,
+          }),
+          t("status.statsLine2", {
+            failed: metrics.failed,
+            timedOut: metrics.timedOut,
+            rateLimited: metrics.rateLimited,
+          }),
+          t("status.statsLine3", {
+            canceled: metrics.canceled,
+            inFlight: metrics.inFlight,
+            peak: metrics.maxConcurrentInFlight,
+          }),
+          t("status.statsLine4", {
+            trips: metrics.breakerTrips,
+            blocked: metrics.breakerRejected,
+          }),
+        ];
+        if (lastErrorText) lines.push(lastErrorText);
+        replyText = lines.join("\n");
         break;
       }
 
-      case "sthelp":
-        replyText =
-          "## \uD83D\uDC32 __Bridge Commands:__\n" +
-          "**System & Status**\n" +
-          "> `/sthelp` - Show this menu\n" +
-          "> `/status` - Check connection and image stats\n" +
-          "> `/reaction <mode>` - Set mood display: `off`, `status`, or `full`\n\n" +
-          "**Management**\n" +
-          "> `/listchars` | `/listgroups` - List characters / groups\n" +
-          "> `/switchchar` | `/switchgroup` - Switch character / group\n" +
-          "> `/newchat` - Start a fresh chat\n" +
-          "> `/listchats` | `/switchchat` - List and load saved chats\n" +
-          "> `/history [n]` - Show last n messages (default: 5)\n" +
-          "> *\uD83D\uDCA1 `/switchchar_3`, `/switchgroup_2` etc. work as plain text messages*\n\n" +
-          "**Mood & Persona**\n" +
-          "> `/mood` - Show the character's current expression\n" +
-          "> `/charimage` - Post the character's picture\n" +
-          "> `/note <text>` - Set a hidden story note; omit text to read it\n" +
-          "> `/persona <name>` - Switch your persona\n" +
-          (getSettings().allowUserPersonaSave
-            ? "> `/mypersona <name>` - Save your persona for automatic use; `clear` to remove\n"
-            : "") +
-          "> `/listpersonas` - List your personas\n" +
-          "> `/impersonate [prompt]` - Have the AI write your next message\n" +
-          "> `/continue` - Continue the last AI message\n\n" +
-          "**Image Generation**\n" +
-          "> `/image <prompt or keyword>` - Generate an image (`you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n" +
-          "> `/image cancel` - Cancel active image generation\n\n" +
-          "~~                                                                                                                                          ~~\n" +
-          "*Developed by **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n" +
-          "*Please support my work:* <https://github.com/sponsors/senjinthedragon>";
+      case "sthelp": {
+        const sections = [
+          t("help.title"),
+          t("help.info"),
+          "",
+          t("help.chars"),
+          "",
+          t("help.chats"),
+          "",
+          t("help.persona"),
+          ...(getSettings().allowUserPersonaSave
+            ? [t("help.persona.mypersona")]
+            : []),
+          "",
+          t("help.convo"),
+          "",
+          t("help.expr"),
+          "",
+          t("help.image"),
+          "",
+          t("help.lang"),
+          "",
+          t("help.footer"),
+        ];
+        replyText = sections.join("\n");
         break;
+      }
 
       case "history": {
         const { chat } = SillyTavern.getContext();
@@ -954,11 +1049,17 @@ export async function handleExecuteCommand(data) {
           : 5;
         const entries = buildHistory(chat, n);
         if (!entries) {
-          replyText = "No chat history found.";
+          replyText = t("history.empty");
           break;
         }
-        safeSend({ type: "recap_message", chatId: data.chatId, entries });
-        replyText = `Showing last ${n > 0 ? n : "all"} exchange(s).`;
+        safeSend({
+          type: "recap_message",
+          chatId: data.chatId,
+          entries,
+          ...(data.userId ? { userId: data.userId } : {}),
+          ...(data.userLocale ? { userLocale: data.userLocale } : {}),
+        });
+        replyText = t("history.showing", { n: n > 0 ? n : t("history.all") });
         break;
       }
 
@@ -969,12 +1070,12 @@ export async function handleExecuteCommand(data) {
           const characters = context.characters.filter((c) => c.name?.trim());
           if (index >= 0 && index < characters.length) {
             const target = characters[index];
-            scheduleRecap(data.chatId);
+            safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchchar.success", { name: target.name }) });
+            scheduleRecap(data.chatId, data.userId, data.userLocale);
             await selectCharacterById(context.characters.indexOf(target));
             invalidateChatCache();
-            replyText = `Switched to "${target.name}".`;
           } else {
-            replyText = `Invalid number: ${index + 1}. Use /listchars to see options.`;
+            replyText = t("switchchar.invalidIndex", { n: index + 1 });
           }
           break;
         }
@@ -982,7 +1083,7 @@ export async function handleExecuteCommand(data) {
         const chatMatch = data.command.match(/^switchchat_(\d+)$/);
         if (chatMatch) {
           if (context.characterId === undefined) {
-            replyText = "Please select a character first.";
+            replyText = t("listchats.noChar");
             break;
           }
           const index = parseInt(chatMatch[1]) - 1;
@@ -990,14 +1091,14 @@ export async function handleExecuteCommand(data) {
           if (index >= 0 && index < chatFiles.length) {
             const chatName = chatFiles[index].file_name.replace(".jsonl", "");
             try {
-              scheduleRecap(data.chatId);
+              safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchchat.success", { name: chatName }) });
+              scheduleRecap(data.chatId, data.userId, data.userLocale);
               await openCharacterChat(chatName);
-              replyText = `Loaded chat: ${chatName}`;
             } catch {
-              replyText = "Failed to load chat.";
+              replyText = t("switchchat.failGeneric");
             }
           } else {
-            replyText = `Invalid number: ${index + 1}. Use /listchats to see options.`;
+            replyText = t("switchchat.invalidIndex", { n: index + 1 });
           }
           break;
         }
@@ -1007,27 +1108,31 @@ export async function handleExecuteCommand(data) {
           const index = parseInt(groupMatch[1]) - 1;
           const groups = context.groups || [];
           if (index >= 0 && index < groups.length) {
-            scheduleRecap(data.chatId);
+            safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchgroup.success", { name: groups[index].name }) });
+            scheduleRecap(data.chatId, data.userId, data.userLocale);
             await executeSlashCommandsWithOptions(
               `/go ${sanitizeSlashArg(groups[index].name)}`,
             );
             invalidateChatCache();
-            replyText = `Switched to group "${groups[index].name}".`;
           } else {
-            replyText = `Invalid number: ${index + 1}. Use /listgroups to see options.`;
+            replyText = t("switchgroup.invalidIndex", { n: index + 1 });
           }
           break;
         }
 
-        replyText = `Unknown command: /${data.command}. Try /sthelp for available commands.`;
+        replyText = t("unknown.cmd", { cmd: data.command });
       }
     }
   } catch (error) {
     console.error("[Discord Bridge] Command error:", error);
-    replyText = `Error executing command: ${error.message || "Unknown error"}`;
+    const msg =
+      error instanceof Error
+        ? error.message
+        : String(error ?? "Unknown error");
+    replyText = t("cmd.error", { message: msg });
   }
 
-  safeSend({ type: "ai_reply", chatId: data.chatId, text: replyText });
+  if (replyText) safeSend({ type: "ai_reply", chatId: data.chatId, text: replyText });
 }
 
 // ---------------------------------------------------------------------------
@@ -1171,6 +1276,13 @@ export async function handleGetAutocomplete(data) {
       allNames = Object.values(
         context.powerUserSettings?.personas ?? {},
       ).filter((n) => n?.trim());
+    } else if (data.list === "languages") {
+      // Available languages come from the server via bridge_config.
+      // Return all known names (every translation) so matching works regardless
+      // of which language the user types in.
+      allNames = (sharedState.availableLanguages || []).flatMap((l) =>
+        Array.isArray(l.names) ? l.names : [l.name],
+      );
     } else if (data.list === "group_members") {
       if (!context.groupId) {
         // Solo chat - offer the active character's name as the only option.

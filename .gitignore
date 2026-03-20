@@ -4,10 +4,12 @@ npm-debug.log
 
 # Editor
 .vscode/
+.claude/
 
 # SillyTavern bridge private files
 server/config.js
 server/persona-map.json
+server/lang-map.json
 server/.restart_protection
 
 # Personal notes

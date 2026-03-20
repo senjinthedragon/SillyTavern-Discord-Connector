@@ -32,6 +32,7 @@ const {
   getAutocompleteDebouncers,
 } = require("./discord");
 const { handleBridgePacket } = require("./websocket-router");
+const { loadLocale, makeTranslator } = require("./i18n");
 const {
   load: loadPersonaMap,
   getPersonaForUser,
@@ -41,6 +42,12 @@ const {
   setCrossRelayEnabled,
   isCrossRelayEnabled,
 } = require("./persona-map");
+const {
+  load: loadLangMap,
+  getLangForUser,
+  setLangForUser,
+} = require("./lang-map");
+const { AVAILABLE_LANGUAGES, findLanguage } = require("./locales-manifest");
 
 const version = require("./package.json").version;
 const width = 70;
@@ -64,6 +71,8 @@ ${purple}╔${"═".repeat(width)}╗
 `);
 
 loadPersonaMap();
+loadLangMap();
+loadLocale(config.userLocale || null);
 
 let sillyTavernClient = null;
 const pendingImageMessages = {};
@@ -82,11 +91,109 @@ function sendToSillyTavern(payload) {
   sillyTavernClient.send(JSON.stringify(payload));
 }
 
+function dispatchCommand(platform, chatId, command, args, userId) {
+  const conversationId = resolveConversationId(platform, chatId);
+  addRoute(conversationId, platform, chatId);
+  const userLocale = getLangForUser(platform, userId) || null;
+
+  if (!sillyTavernClient || sillyTavernClient.readyState !== WebSocket.OPEN) {
+    handleOfflineCommand(
+      platform,
+      chatId,
+      conversationId,
+      command,
+      args,
+      userId,
+      userLocale,
+    );
+    return;
+  }
+
+  sendToSillyTavern({
+    type: "execute_command",
+    command,
+    args,
+    chatId: conversationId,
+    userId,
+    platform,
+    ...(userLocale ? { userLocale } : {}),
+  });
+}
+
+async function handleOfflineCommand(
+  platform,
+  chatId,
+  conversationId,
+  command,
+  args,
+  userId,
+  userLocale,
+) {
+  const tl = makeTranslator(userLocale);
+
+  if (command === "sthelp") {
+    const sections = [
+      tl("help.title"),
+      tl("help.offlineNote"),
+      tl("help.offlineInfo"),
+      tl("help.lang"),
+      tl("help.footer"),
+    ];
+    await fanout(conversationId, "sendText", sections.join("\n\n"));
+    return;
+  }
+
+  if (command === "status") {
+    const registeredPlatforms = getRegisteredPlatforms();
+    const platformList =
+      registeredPlatforms.size > 0
+        ? [...registeredPlatforms].join(", ")
+        : "none";
+    const lines = [
+      tl("status.title"),
+      tl("status.connection", { value: tl("status.offline") }),
+      tl("status.plugins", { value: platformList }),
+      tl("status.stOffline"),
+    ];
+    await fanout(conversationId, "sendText", lines.join("\n"));
+    return;
+  }
+
+  if (command === "setlang") {
+    const input = (args?.[0] || "").trim();
+    if (!input || input === "clear") {
+      setLangForUser(platform, userId, null);
+      await fanout(conversationId, "sendText", tl("setlang.reset"));
+      return;
+    }
+    const match = findLanguage(input);
+    if (match) {
+      setLangForUser(platform, userId, match.code);
+      const tAfter = makeTranslator(match.code);
+      await fanout(
+        conversationId,
+        "sendText",
+        tAfter("setlang.success", { name: match.nativeName, code: match.code }),
+      );
+    } else {
+      await fanout(
+        conversationId,
+        "sendText",
+        tl("setlang.unknown", { input }),
+      );
+    }
+    return;
+  }
+
+  await fanout(conversationId, "sendText", tl("cmd.stOffline"));
+}
+
 const pluginLoader = createPluginLoader({
   onUserMessage(platform, chatId, text, userId = "") {
     const conversationId = resolveConversationId(platform, chatId);
     addRoute(conversationId, platform, chatId);
     const mappedPersona = getPersonaForUser(platform, userId);
+    const userLocale = getLangForUser(platform, userId) || null;
     sendToSillyTavern({
       type: "user_message",
       text,
@@ -94,6 +201,7 @@ const pluginLoader = createPluginLoader({
       userId,
       platform,
       ...(mappedPersona ? { mappedPersona } : {}),
+      ...(userLocale ? { userLocale } : {}),
     });
 
     // Cross-relay the user's message to all other platforms in the same
@@ -115,16 +223,7 @@ const pluginLoader = createPluginLoader({
     }
   },
   onCommand(platform, chatId, command, args, userId = "") {
-    const conversationId = resolveConversationId(platform, chatId);
-    addRoute(conversationId, platform, chatId);
-    sendToSillyTavern({
-      type: "execute_command",
-      command,
-      args,
-      chatId: conversationId,
-      userId,
-      platform,
-    });
+    dispatchCommand(platform, chatId, command, args, userId);
   },
 });
 
@@ -167,6 +266,8 @@ wss.on("connection", (ws) => {
       type: "bridge_config",
       timezone: config.timezone || null,
       locale: config.locale || null,
+      userLocale: config.userLocale || null,
+      availableLanguages: AVAILABLE_LANGUAGES,
       plugins: pluginStatus,
       imagePlaceholderTimeoutMs: config.imagePlaceholderTimeoutMs,
     }),
@@ -197,6 +298,7 @@ wss.on("connection", (ws) => {
       setBridgeActivity,
       getPendingAutocompletes,
       setPersonaForUser,
+      setLangForUser,
       setCurrentPersonaName: setDefaultPersonaName,
       setCrossRelayEnabled,
       log,
@@ -238,4 +340,4 @@ wss.on("connection", (ws) => {
   });
 });
 
-module.exports = { getSillyTavernClient };
+module.exports = { getSillyTavernClient, dispatchCommand };

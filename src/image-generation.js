@@ -33,6 +33,7 @@ import { executeSlashCommandsWithOptions } from "../../../../../scripts/slash-co
 import { safeSend } from "./ws.js";
 import { fetchLocalImageAsBase64 } from "./image-relay.js";
 import { sanitizeSlashArg } from "./utils.js";
+import { makeT, getLocaleStrings } from "./i18n.js";
 
 // ---------------------------------------------------------------------------
 // Constants and state
@@ -241,14 +242,11 @@ function enqueueImageGeneration(chatId, fn) {
  * @param {string} prompt
  * @returns {Promise<{status: string, reason?: string|null}>}
  */
-async function generateAndSendImage(chatId, requestId, prompt) {
+async function generateAndSendImage(chatId, requestId, prompt, userLocale) {
+  const tl = makeT(await getLocaleStrings(userLocale));
   const chatEl = document.getElementById("chat");
   if (!chatEl) {
-    sendImageError(
-      chatId,
-      requestId,
-      "Could not find the SillyTavern chat element.",
-    );
+    sendImageError(chatId, requestId, tl("image.noChat"));
     return { status: "failed", reason: "chat_element_missing" };
   }
 
@@ -295,11 +293,7 @@ async function generateAndSendImage(chatId, requestId, prompt) {
     const fetched = await fetchLocalImageAsBase64(src);
     if (!fetched) {
       finish("failed", "image_fetch_failed", () => {
-        sendImageError(
-          chatId,
-          requestId,
-          "Image was generated but could not be fetched from SillyTavern.",
-        );
+        sendImageError(chatId, requestId, tl("image.fetchFailed"));
       });
       return;
     }
@@ -335,12 +329,7 @@ async function generateAndSendImage(chatId, requestId, prompt) {
       console.warn(
         `[Discord Bridge] Image generation timed out after ${imageGenerationTimeoutMs / 1000}s.`,
       );
-      sendImageError(
-        chatId,
-        requestId,
-        "Image generation timed out. Please try again.",
-        "timed_out",
-      );
+      sendImageError(chatId, requestId, tl("image.timedOut"), "timed_out");
     });
   }, imageGenerationTimeoutMs);
 
@@ -349,12 +338,24 @@ async function generateAndSendImage(chatId, requestId, prompt) {
   } catch (err) {
     finish("failed", "sd_command_failed", () => {
       console.error("[Discord Bridge] /sd command failed:", err);
-      sendImageError(
-        chatId,
-        requestId,
-        `Image generation failed: ${err.message || "Unknown error"}`,
-      );
+      sendImageError(chatId, requestId, tl("image.failed", { message: err.message || "Unknown error" }));
     });
+  }
+
+  // /sd resolved without throwing but produced no image (e.g. ComfyUI
+  // unavailable - ST auto-fixes the null result to an empty string).
+  // Give the DOM one tick to settle, then fail fast instead of waiting
+  // for the hard timeout.
+  if (!settled) {
+    await new Promise((r) => setTimeout(r, 1000));
+    if (!settled) {
+      finish("failed", "sd_no_image", () => {
+        console.warn(
+          "[Discord Bridge] /sd completed with no image - ComfyUI may not be running.",
+        );
+        sendImageError(chatId, requestId, tl("image.noImage"));
+      });
+    }
   }
 
   return promise;
@@ -372,8 +373,9 @@ async function generateAndSendImage(chatId, requestId, prompt) {
  * @param {string} chatId
  * @param {string} requestId
  * @param {string} prompt
+ * @param {string|null} [userLocale]
  */
-export function enqueueAndGenerateImage(chatId, requestId, prompt) {
+export function enqueueAndGenerateImage(chatId, requestId, prompt, userLocale) {
   imageMetrics.totalRequests += 1;
   enqueueImageGeneration(chatId, async () => {
     imageMetrics.inFlight += 1;
@@ -382,7 +384,7 @@ export function enqueueAndGenerateImage(chatId, requestId, prompt) {
       imageMetrics.inFlight,
     );
 
-    const result = await generateAndSendImage(chatId, requestId, prompt);
+    const result = await generateAndSendImage(chatId, requestId, prompt, userLocale);
     imageMetrics.inFlight = Math.max(0, imageMetrics.inFlight - 1);
 
     if (result?.status === "success") {

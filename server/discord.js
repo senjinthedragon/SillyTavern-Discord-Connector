@@ -38,6 +38,7 @@ const {
 
 const { log } = require("./logger");
 const { config, token } = require("./config-loader");
+const { t, makeTranslator } = require("./i18n");
 const { client } = require("./client");
 const { sendLong, sendImagesToChannel } = require("./messaging");
 const { splitLongText } = require("./text-chunking");
@@ -55,6 +56,8 @@ const {
   getDefaultPersonaName,
   isCrossRelayEnabled,
 } = require("./persona-map");
+const { getLangForUser } = require("./lang-map");
+const { AVAILABLE_LANGUAGES, LANGUAGE_NAMES } = require("./locales-manifest");
 const version = require("./package.json").version;
 
 const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes(
@@ -84,6 +87,10 @@ function setBridgeActivity(expression, ownerName) {
 // fully initialised and getSillyTavernClient is available.
 function getSillyTavernClient() {
   return require("./websocket").getSillyTavernClient();
+}
+
+function dispatchCommand(platform, chatId, command, args, userId) {
+  require("./websocket").dispatchCommand(platform, chatId, command, args, userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -289,6 +296,19 @@ const SLASH_COMMANDS = [
       },
     ],
   },
+  {
+    name: "setlang",
+    description: "Set your preferred language for bot responses",
+    options: [
+      {
+        name: "language",
+        type: 3,
+        description: "Language name, or 'clear' to reset to server default",
+        required: true,
+        autocomplete: true,
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -314,10 +334,9 @@ function startPlaceholderCountdown(channelId, msg, timeoutMs) {
 
   function formatRemaining(ms) {
     if (ms <= 60_000) {
-      return `${Math.ceil(ms / 1_000)} seconds remaining`;
+      return t("disc.countdownSeconds", { n: Math.ceil(ms / 1_000) });
     }
-    const minutes = Math.ceil(ms / 60_000);
-    return `${minutes} minute${minutes !== 1 ? "s" : ""} remaining`;
+    return t("disc.countdownMinutes", { n: Math.ceil(ms / 60_000) });
   }
 
   function scheduleNext() {
@@ -329,9 +348,7 @@ function startPlaceholderCountdown(channelId, msg, timeoutMs) {
       const rem = endTime - Date.now();
       if (rem <= 0) return;
       try {
-        await msg.edit(
-          `🎨 Generating image… (${formatRemaining(rem)}; use /image cancel to abort)`,
-        );
+        await msg.edit(t("disc.imagePlaceholderUpdate", { remaining: formatRemaining(rem) }));
       } catch {
         // Message was deleted or inaccessible - stop the countdown.
         return;
@@ -356,6 +373,7 @@ const AUTOCOMPLETE_LIST_MAP = {
   mood: "group_members",
   image: "image_prompts",
   mypersona: "personas",
+  setlang: "languages",
 };
 
 function getPendingAutocompletes() {
@@ -393,13 +411,45 @@ if (DISCORD_PLUGIN_ENABLED) {
 
   client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isAutocomplete()) {
+      const command = interaction.commandName;
+
+      // setlang autocomplete is served locally - no ST connection needed.
+      if (command === "setlang") {
+        const query = interaction.options.getFocused().toLowerCase();
+        const userLocale = (
+          getLangForUser("discord", interaction.user.id) ||
+          config.userLocale ||
+          "en"
+        ).toLowerCase();
+        const choices = AVAILABLE_LANGUAGES.filter(
+          (l) =>
+            !query ||
+            l.names.some((n) => n.toLowerCase().includes(query)) ||
+            l.code.includes(query),
+        )
+          .slice(0, 25)
+          .map((l) => {
+            const langNames = LANGUAGE_NAMES[l.code] || {};
+            const localizedName =
+              langNames[userLocale] ||
+              langNames[userLocale.split("-")[0]] ||
+              l.name;
+            const display =
+              l.nativeName === localizedName
+                ? l.nativeName
+                : `${l.nativeName} (${localizedName})`;
+            return { name: display, value: l.code };
+          });
+        await interaction.respond(choices).catch(() => {});
+        return;
+      }
+
       const stClient = getSillyTavernClient();
       if (!stClient) {
         await interaction.respond([]).catch(() => {});
         return;
       }
 
-      const command = interaction.commandName;
       const focusedValue = interaction.options.getFocused();
       const list = AUTOCOMPLETE_LIST_MAP[command];
       if (!list) return;
@@ -449,7 +499,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     ) {
       await interaction
         .reply({
-          content: "You are not authorised to use this bot.",
+          content: t("disc.notAuthorized"),
           flags: [MessageFlags.Ephemeral],
         })
         .catch(() => {});
@@ -462,18 +512,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     ) {
       await interaction
         .reply({
-          content: "This bot is not enabled in this channel.",
-          flags: [MessageFlags.Ephemeral],
-        })
-        .catch(() => {});
-      return;
-    }
-
-    const stClient = getSillyTavernClient();
-    if (!stClient) {
-      await interaction
-        .reply({
-          content: "Bridge is not connected to SillyTavern.",
+          content: t("disc.notAllowedChannel"),
           flags: [MessageFlags.Ephemeral],
         })
         .catch(() => {});
@@ -484,21 +523,13 @@ if (DISCORD_PLUGIN_ENABLED) {
     const args = interaction.options.data
       .filter((opt) => opt.type === 3 || opt.type === 4)
       .map((opt) => String(opt.value));
-    const conversationId = resolveConversationId(
+
+    dispatchCommand(
       "discord",
       interaction.channelId,
-    );
-    addRoute(conversationId, "discord", interaction.channelId);
-
-    stClient.send(
-      JSON.stringify({
-        type: "execute_command",
-        command,
-        args,
-        chatId: conversationId,
-        userId: interaction.user.id,
-        platform: "discord",
-      }),
+      command,
+      args,
+      interaction.user.id,
     );
 
     // Acknowledge immediately (ephemeral) to satisfy Discord's 3-second window.
@@ -528,60 +559,60 @@ if (DISCORD_PLUGIN_ENABLED) {
     )
       return;
 
+    const content = message.content;
+
+    if (content.startsWith("/")) {
+      const [command, ...args] = content.slice(1).split(" ");
+      dispatchCommand(
+        "discord",
+        message.channel.id,
+        command,
+        args,
+        message.author.id,
+      );
+      return;
+    }
+
     const stClient = getSillyTavernClient();
     if (!stClient) {
-      message.reply("Bridge is not connected to SillyTavern.").catch(() => {});
+      message.reply(t("disc.notConnected")).catch(() => {});
       return;
     }
 
     const conversationId = resolveConversationId("discord", message.channel.id);
     addRoute(conversationId, "discord", message.channel.id);
-    const content = message.content;
+    const mappedPersona = getPersonaForUser("discord", message.author.id);
+    const userLocale = getLangForUser("discord", message.author.id) || null;
+    stClient.send(
+      JSON.stringify({
+        type: "user_message",
+        text: content,
+        chatId: conversationId,
+        userId: message.author.id,
+        platform: "discord",
+        ...(mappedPersona ? { mappedPersona } : {}),
+        ...(userLocale ? { userLocale } : {}),
+      }),
+    );
 
-    if (content.startsWith("/")) {
-      const [command, ...args] = content.slice(1).split(" ");
-      stClient.send(
-        JSON.stringify({
-          type: "execute_command",
-          command,
-          args,
-          chatId: conversationId,
-          userId: message.author.id,
-          platform: "discord",
-        }),
-      );
-    } else {
-      const mappedPersona = getPersonaForUser("discord", message.author.id);
-      stClient.send(
-        JSON.stringify({
-          type: "user_message",
-          text: content,
-          chatId: conversationId,
-          userId: message.author.id,
-          platform: "discord",
-          ...(mappedPersona ? { mappedPersona } : {}),
-        }),
-      );
-
-      // Cross-relay to other platforms in the same conversation.
-      if (!isCrossRelayEnabled()) return;
-      const senderLabel =
-        mappedPersona || getDefaultPersonaName() || `[discord]`;
-      const relayText = `${senderLabel}: ${content}`;
-      const originKey = `discord:${message.channel.id}`;
-      for (const route of getRoutes(conversationId)) {
-        if (route === originKey) continue;
-        const { platform: targetPlatform, nativeChatId: targetChatId } =
-          parseRoute(route);
-        const frontend = getFrontend(targetPlatform);
-        if (!frontend?.sendText) continue;
-        frontend.sendText(targetChatId, relayText).catch((err) => {
-          log(
-            "warn",
-            `[Bridge] Cross-relay to ${route} failed: ${err.message}`,
-          );
-        });
-      }
+    // Cross-relay to other platforms in the same conversation.
+    if (!isCrossRelayEnabled()) return;
+    const senderLabel =
+      mappedPersona || getDefaultPersonaName() || `[discord]`;
+    const relayText = `${senderLabel}: ${content}`;
+    const originKey = `discord:${message.channel.id}`;
+    for (const route of getRoutes(conversationId)) {
+      if (route === originKey) continue;
+      const { platform: targetPlatform, nativeChatId: targetChatId } =
+        parseRoute(route);
+      const frontend = getFrontend(targetPlatform);
+      if (!frontend?.sendText) continue;
+      frontend.sendText(targetChatId, relayText).catch((err) => {
+        log(
+          "warn",
+          `[Bridge] Cross-relay to ${route} failed: ${err.message}`,
+        );
+      });
     }
   });
 }
@@ -590,25 +621,32 @@ async function sendText(channelId, text) {
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
   enqueue(channelId, async () => {
-    const msg = await sendLong(channel, text);
-    // Save the message reference so sendGeneratedImage can delete it when the
-    // real image arrives. Keyed by channelId - only one placeholder per channel
-    // at a time since image generation is serialised per channel.
-    if (text.includes("🎨 Generating image")) {
-      const timerId = startPlaceholderCountdown(
-        channelId,
-        msg,
-        config.imagePlaceholderTimeoutMs,
-      );
-      placeholderMessages[channelId] = { msg, timerId };
-    } else if (placeholderMessages[channelId]) {
-      // A non-placeholder text (e.g. a cancel/error message) arrived while a
-      // countdown is running. Stop the timer and delete the stale placeholder
-      // so it doesn't sit in the channel forever.
+    // If a placeholder countdown is still running, clear it before sending any
+    // non-placeholder message (e.g. an error or cancel reply).
+    if (placeholderMessages[channelId]) {
       clearTimeout(placeholderMessages[channelId].timerId);
       await placeholderMessages[channelId].msg.delete().catch(() => {});
       delete placeholderMessages[channelId];
     }
+    await sendLong(channel, text);
+  });
+}
+
+// Dedicated path for image_placeholder packets. Stores the message reference
+// for the countdown timer and for deletion when the real image arrives.
+// Using a separate function avoids text-sniffing to detect placeholders, which
+// would break when bot messages are translated.
+async function sendImagePlaceholder(channelId, text) {
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
+  enqueue(channelId, async () => {
+    const msg = await sendLong(channel, text);
+    const timerId = startPlaceholderCountdown(
+      channelId,
+      msg,
+      config.imagePlaceholderTimeoutMs,
+    );
+    placeholderMessages[channelId] = { msg, timerId };
   });
 }
 async function sendTyping(channelId) {
@@ -642,14 +680,17 @@ async function sendGeneratedImage(channelId, images, caption) {
   });
 }
 
-async function sendExpression(channelId, expression, image, ownerName) {
+async function sendExpression(channelId, expression, image, ownerName, userLocale) {
   if (expression) setBridgeActivity(expression, ownerName);
   if (image) {
     if (ownerName) {
       const channel = client.channels.cache.get(channelId);
       if (channel) {
+        const tl = userLocale ? makeTranslator(userLocale) : t;
+        const exprKey = `expr.${expression}`;
+        const translatedExpr = tl(exprKey) !== exprKey ? tl(exprKey) : expression;
         enqueue(channelId, async () => {
-          await channel.send(`_${ownerName} feels ${expression}_`);
+          await channel.send(tl("disc.expressionMessage", { name: ownerName, expression: translatedExpr }));
         });
       }
     }
@@ -673,10 +714,12 @@ const RECAP_EMBED_MAX = 4000;
  * @param {string} channelId
  * @param {Array<{name: string, text: string, isUser: boolean}>} entries
  */
-async function sendRecap(channelId, entries) {
+async function sendRecap(channelId, entries, userId, userLocale) {
   if (!entries?.length) return;
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
+
+  const tl = userLocale ? makeTranslator(userLocale) : t;
 
   enqueue(channelId, async () => {
     let isFirst = true;
@@ -694,7 +737,7 @@ async function sendRecap(channelId, entries) {
           .setDescription(description);
 
         if (isFirst) {
-          embed.setTitle("📜 Last exchange");
+          embed.setTitle(tl("disc.recapTitle"));
           isFirst = false;
         }
 
@@ -786,6 +829,7 @@ module.exports = {
   getAutocompleteDebouncers,
   setBridgeActivity,
   sendText,
+  sendImagePlaceholder,
   sendTyping,
   sendImages,
   sendGeneratedImage,

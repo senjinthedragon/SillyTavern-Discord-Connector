@@ -11,6 +11,8 @@
 
 "use strict";
 
+const { t } = require("./i18n");
+
 async function handleBridgePacket(data, deps) {
   const {
     ws,
@@ -26,6 +28,7 @@ async function handleBridgePacket(data, deps) {
     setBridgeActivity,
     getPendingAutocompletes,
     setPersonaForUser,
+    setLangForUser,
     setCurrentPersonaName,
     setCrossRelayEnabled,
     log,
@@ -67,7 +70,7 @@ async function handleBridgePacket(data, deps) {
       pendingImageMessages[data.requestId || conversationId] = true;
       await fanout(
         conversationId,
-        "sendText",
+        "sendImagePlaceholder",
         data?.text || "🎨 Generating image…",
       );
       break;
@@ -87,11 +90,7 @@ async function handleBridgePacket(data, deps) {
         // so the user gets their image and the manager knows the timeout is short.
         timedOutImageRequests.delete(key);
         if (data.image) {
-          await fanout(
-            conversationId,
-            "sendText",
-            "_(Image arrived after timeout - consider increasing `imagePlaceholderTimeoutSeconds` in config.js.)_",
-          );
+          await fanout(conversationId, "sendText", t("disc.lateImage"));
           await fanout(conversationId, "sendImages", [data.image], null);
         }
         break;
@@ -206,7 +205,13 @@ async function handleBridgePacket(data, deps) {
       break;
 
     case "recap_message":
-      await fanout(conversationId, "sendRecap", data.entries || []);
+      await fanout(
+        conversationId,
+        "sendRecap",
+        data.entries || [],
+        data.userId || null,
+        data.userLocale || null,
+      );
       break;
 
     case "save_user_persona": {
@@ -214,6 +219,15 @@ async function handleBridgePacket(data, deps) {
         data.platform || "discord",
         data.userId || "",
         data.personaName ?? null,
+      );
+      break;
+    }
+
+    case "save_user_lang": {
+      setLangForUser(
+        data.platform || "discord",
+        data.userId || "",
+        data.localeCode ?? null,
       );
       break;
     }
@@ -237,6 +251,7 @@ async function handleBridgePacket(data, deps) {
         expression,
         data.image || null,
         ownerName,
+        data.userLocale || null,
       );
       break;
     }

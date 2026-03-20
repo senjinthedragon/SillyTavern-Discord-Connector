@@ -29,10 +29,21 @@ test("normalizeExpression trims and lowercases expression names", () => {
 test("formatBridgeActivity uses known expression emoji mapping", () => {
   // Verify the map contains the expected emoji for a known expression,
   // then confirm formatBridgeActivity produces the correct activity string.
-  assert.equal(EXPRESSION_EMOJI_MAP.joy, "😊");
+  assert.equal(EXPRESSION_EMOJI_MAP.joy, "😃");
   assert.equal(
     formatBridgeActivity("SillyTavern Bridge v1.2.5", "joy"),
-    "😊 joy",
+    "😃 joy",
+  );
+});
+
+test("formatBridgeActivity picks one emoji at random for array expressions", () => {
+  // desire has multiple emoji variants - the result should always be one of them.
+  assert.ok(Array.isArray(EXPRESSION_EMOJI_MAP.desire));
+  const result = formatBridgeActivity("SillyTavern Bridge v1.2.5", "desire");
+  const validResults = EXPRESSION_EMOJI_MAP.desire.map((e) => `${e} desire`);
+  assert.ok(
+    validResults.includes(result),
+    `Expected one of ${validResults.join(", ")} but got "${result}"`,
   );
 });
 

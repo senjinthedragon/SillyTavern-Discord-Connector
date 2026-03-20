@@ -56,6 +56,13 @@ module.exports = {
   // Remove this line entirely to use your browser's default locale.
   locale: "en-US",
 
+  // Language for Discord user-facing messages (bot replies, command responses).
+  // Use BCP 47 language tags e.g. "ja-JP", "ko-KR", "zh-CN", "nl-NL", "de-DE".
+  // Defaults to English if not set or if the locale file is not found.
+  // This is separate from locale above - set this to match your community,
+  // and locale to match your own preference for date display.
+  userLocale: "en-US",
+
   // Set to true to enable verbose terminal logging for troubleshooting.
   debug: false,
 
@@ -94,6 +101,27 @@ module.exports = {
     // "+31612345678": "Alice",
   },
 
+  // Map platform user IDs to BCP 47 language codes for bot responses.
+  // When set, the bot replies to that user in their preferred language,
+  // regardless of the global userLocale setting above.
+  // Users can also set their own preference with /setlang, which takes
+  // priority over entries here.
+  // Use the same User ID format as the persona maps above.
+  discordLanguageMap: {
+    // "123456789012345678": "ja-JP",
+    // "987654321098765432": "nl",
+  },
+
+  // Telegram: use the numeric user ID (not the @username).
+  telegramLanguageMap: {
+    // "123456789": "ja-JP",
+  },
+
+  // Signal: use the full phone number in E.164 format (e.g. "+31612345678").
+  signalLanguageMap: {
+    // "+31612345678": "nl",
+  },
+
   // Which frontend plugins to load. "discord" is the built-in free plugin.
   // Add "telegram" or "signal" here only if you have purchased the pro plugins.
   enabledPlugins: ["discord"],
@@ -107,6 +135,7 @@ module.exports = {
     //   module: "external-plugins/telegram-pro/telegram.js",
     //   config: {
     //     botToken: "YOUR_TELEGRAM_BOT_TOKEN",
+    //     // stickerPackName: "YourPackName", // Override the default SillyTavern expression sticker pack
     //   },
     // },
     // {

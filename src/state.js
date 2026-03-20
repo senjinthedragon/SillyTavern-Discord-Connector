@@ -24,7 +24,9 @@
  */
 export const sharedState = {
   lastActiveChatId: null,
+  lastActiveUserLocale: null,
   bridgeTimezone: null,
   bridgeLocale: null,
   bridgePlugins: null,
+  availableLanguages: null,
 };

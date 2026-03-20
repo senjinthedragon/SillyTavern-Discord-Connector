@@ -173,6 +173,7 @@ export async function sendExpressionUpdate(chatIdHint = null) {
     ownerName: ownerName || null,
     chatId,
     image,
+    userLocale: sharedState.lastActiveUserLocale || null,
   });
 }
 

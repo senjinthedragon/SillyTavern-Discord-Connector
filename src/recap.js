@@ -33,6 +33,14 @@ import { clearExpressionCache } from "./expression-relay.js";
 // Cap on AI messages included in a single recap to avoid flooding in large groups.
 const RECAP_MAX_AI_MESSAGES = 10;
 
+// Returns true for system/meta annotation messages that should not appear in
+// recaps or history. Image generation prompt messages inserted by ST's image
+// extension always start with "[" (e.g. "[Finn sends a picture that contains:
+// ...]"). RP messages rarely if ever open with a bare "[".
+function isMetaMessage(text) {
+  return text.trim().startsWith("[");
+}
+
 // ---------------------------------------------------------------------------
 // Chat history builders
 // ---------------------------------------------------------------------------
@@ -54,12 +62,9 @@ export function buildLastExchange(chat) {
   let i = chat.length - 1;
   while (i >= 0 && !chat[i].is_user) {
     const msg = chat[i];
-    if (msg.mes?.trim())
-      aiMessages.unshift({
-        name: msg.name || "",
-        text: msg.mes.trim(),
-        isUser: false,
-      });
+    const text = msg.mes?.trim();
+    if (text && !isMetaMessage(text))
+      aiMessages.unshift({ name: msg.name || "", text, isUser: false });
     i--;
   }
 
@@ -75,8 +80,10 @@ export function buildLastExchange(chat) {
   const cappedAi = aiMessages.slice(-RECAP_MAX_AI_MESSAGES);
   const truncated = aiMessages.length > RECAP_MAX_AI_MESSAGES;
 
+  // Don't include command invocations (e.g. /charimage) in the recap entries.
+  const isCommand = userMsg.mes.trim().startsWith("/");
   const entries = [
-    { name: userLabel, text: userMsg.mes.trim(), isUser: true },
+    ...(!isCommand ? [{ name: userLabel, text: userMsg.mes.trim(), isUser: true }] : []),
     ...cappedAi,
   ];
 
@@ -113,12 +120,9 @@ export function buildHistory(chat, n) {
     const aiMessages = [];
     while (i >= 0 && !chat[i].is_user) {
       const msg = chat[i];
-      if (msg.mes?.trim())
-        aiMessages.unshift({
-          name: msg.name || "",
-          text: msg.mes.trim(),
-          isUser: false,
-        });
+      const text = msg.mes?.trim();
+      if (text && !isMetaMessage(text))
+        aiMessages.unshift({ name: msg.name || "", text, isUser: false });
       i--;
     }
 
@@ -161,7 +165,7 @@ let _pendingRecapListener = null;
  *
  * @param {string} chatId
  */
-export function scheduleRecap(chatId) {
+export function scheduleRecap(chatId, userId, userLocale) {
   clearExpressionCache();
   if (_pendingRecapListener) {
     eventSource.removeListener(event_types.CHAT_LOADED, _pendingRecapListener);
@@ -171,7 +175,13 @@ export function scheduleRecap(chatId) {
     const { chat } = SillyTavern.getContext();
     const result = buildLastExchange(chat);
     if (!result) return;
-    safeSend({ type: "recap_message", chatId, entries: result.entries });
+    safeSend({
+      type: "recap_message",
+      chatId,
+      entries: result.entries,
+      ...(userId ? { userId } : {}),
+      ...(userLocale ? { userLocale } : {}),
+    });
   };
   eventSource.once(event_types.CHAT_LOADED, _pendingRecapListener);
 }

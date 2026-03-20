@@ -21,6 +21,7 @@ function createDeps(overrides = {}) {
   const calls = [];
   const routes = ["discord:chan1", "telegram:chat2"];
   const personaSaves = [];
+  const langSaves = [];
   const frontends = {
     discord: {
       async sendText(chatId, text) {
@@ -70,12 +71,16 @@ function createDeps(overrides = {}) {
     setPersonaForUser: (platform, userId, personaName) => {
       personaSaves.push({ platform, userId, personaName });
     },
+    setLangForUser: (platform, userId, localeCode) => {
+      langSaves.push({ platform, userId, localeCode });
+    },
     setCurrentPersonaName: () => {},
     setCrossRelayEnabled: () => {},
     log: () => {},
     __calls: calls,
     __wsSent: sentByWs,
     __personaSaves: personaSaves,
+    __langSaves: langSaves,
     ...overrides,
   };
 }
@@ -263,6 +268,59 @@ test("handleBridgePacket generate_image_result sends late image with note for ti
   );
   assert.ok(fanoutCalls.some((c) => c[0] === "sendImages"));
   assert.equal(deps.timedOutImageRequests.has("req1"), false);
+});
+
+test("handleBridgePacket save_user_lang calls setLangForUser with correct args", async () => {
+  const deps = createDeps();
+  await handleBridgePacket(
+    {
+      type: "save_user_lang",
+      chatId: "conv1",
+      platform: "discord",
+      userId: "user123",
+      localeCode: "ja",
+    },
+    deps,
+  );
+
+  assert.equal(deps.__langSaves.length, 1);
+  assert.deepEqual(deps.__langSaves[0], {
+    platform: "discord",
+    userId: "user123",
+    localeCode: "ja",
+  });
+});
+
+test("handleBridgePacket save_user_lang null clears the locale", async () => {
+  const deps = createDeps();
+  await handleBridgePacket(
+    {
+      type: "save_user_lang",
+      chatId: "conv1",
+      platform: "telegram",
+      userId: "tguser",
+      localeCode: null,
+    },
+    deps,
+  );
+
+  assert.equal(deps.__langSaves.length, 1);
+  assert.equal(deps.__langSaves[0].localeCode, null);
+});
+
+test("handleBridgePacket save_user_lang defaults platform to discord", async () => {
+  const deps = createDeps();
+  await handleBridgePacket(
+    {
+      type: "save_user_lang",
+      chatId: "conv1",
+      userId: "user123",
+      localeCode: "nl",
+    },
+    deps,
+  );
+
+  assert.equal(deps.__langSaves[0].platform, "discord");
 });
 
 test("handleBridgePacket send_images fans out full images array", async () => {

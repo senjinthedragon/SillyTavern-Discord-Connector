@@ -34,12 +34,16 @@ function createDiscordPlugin() {
       await discord.sendImages(chatId, images, caption);
     },
 
+    async sendImagePlaceholder(chatId, text) {
+      await discord.sendImagePlaceholder(chatId, text);
+    },
+
     async sendGeneratedImage(chatId, images, caption) {
       await discord.sendGeneratedImage(chatId, images, caption);
     },
 
-    async sendExpression(chatId, expression, image, ownerName) {
-      await discord.sendExpression(chatId, expression, image, ownerName);
+    async sendExpression(chatId, expression, image, ownerName, userLocale) {
+      await discord.sendExpression(chatId, expression, image, ownerName, userLocale);
     },
 
     async streamChunk(chatId, payload) {
@@ -50,8 +54,8 @@ function createDiscordPlugin() {
       return discord.streamEnd(chatId, payload);
     },
 
-    async sendRecap(chatId, entries) {
-      await discord.sendRecap(chatId, entries);
+    async sendRecap(chatId, entries, userId, userLocale) {
+      await discord.sendRecap(chatId, entries, userId, userLocale);
     },
   };
 }
