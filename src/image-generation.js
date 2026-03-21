@@ -338,7 +338,11 @@ async function generateAndSendImage(chatId, requestId, prompt, userLocale) {
   } catch (err) {
     finish("failed", "sd_command_failed", () => {
       console.error("[Discord Bridge] /sd command failed:", err);
-      sendImageError(chatId, requestId, tl("image.failed", { message: err.message || "Unknown error" }));
+      sendImageError(
+        chatId,
+        requestId,
+        tl("image.failed", { message: err.message || "Unknown error" }),
+      );
     });
   }
 
@@ -384,7 +388,12 @@ export function enqueueAndGenerateImage(chatId, requestId, prompt, userLocale) {
       imageMetrics.inFlight,
     );
 
-    const result = await generateAndSendImage(chatId, requestId, prompt, userLocale);
+    const result = await generateAndSendImage(
+      chatId,
+      requestId,
+      prompt,
+      userLocale,
+    );
     imageMetrics.inFlight = Math.max(0, imageMetrics.inFlight - 1);
 
     if (result?.status === "success") {

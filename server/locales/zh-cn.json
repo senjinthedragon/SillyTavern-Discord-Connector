@@ -121,7 +121,7 @@
   "help.lang": "**语言**\n> `/setlang <语言>` - 设置机器人回复所用的偏好语言\n> `/setlang clear` - 重置为服务器默认语言",
   "help.expr": "**表情与外观**\n> `/charimage` - 发送角色图片\n> `/mood` - 显示角色当前表情\n> `/reaction <mode>` - 设置心情显示：`off`、`status` 或 `full`",
   "help.image": "**图片生成**\n> `/image <prompt or keyword>` - 生成图片（`you`、`face`、`me`、`scene`、`last`、`raw_last`、`background`）\n> `/image cancel` - 取消正在进行的图片生成",
-  "help.footer": "~~                                                                                                                                          ~~\n*由 **Senjin the Dragon** 开发 - <https://github.com/senjinthedragon>*\n*请支持我的工作：* <https://github.com/sponsors/senjinthedragon>",
+  "help.footer": "~~                                                                                                                                          ~~\n*由 **Senjin the Dragon** 开发 - <https://github.com/senjinthedragon>*\n*请支持我的工作：* <https://github.com/sponsors/senjinthedragon>\n*Bitcoin:* `bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`",
   "disc.notAuthorized": "您无权使用此机器人。",
   "disc.notAllowedChannel": "此机器人在该频道中未启用。",
   "disc.notConnected": "桥接未连接到 SillyTavern。",

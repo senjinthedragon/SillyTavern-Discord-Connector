@@ -153,7 +153,10 @@ function createConfig(rawConfig) {
     }
   }
 
-  if (config.userLocale !== undefined && typeof config.userLocale !== "string") {
+  if (
+    config.userLocale !== undefined &&
+    typeof config.userLocale !== "string"
+  ) {
     warnings.push(
       `[Config] config.userLocale must be a BCP 47 string (e.g. "ja-JP") - ignoring`,
     );

@@ -90,7 +90,13 @@ function getSillyTavernClient() {
 }
 
 function dispatchCommand(platform, chatId, command, args, userId) {
-  require("./websocket").dispatchCommand(platform, chatId, command, args, userId);
+  require("./websocket").dispatchCommand(
+    platform,
+    chatId,
+    command,
+    args,
+    userId,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -348,7 +354,9 @@ function startPlaceholderCountdown(channelId, msg, timeoutMs) {
       const rem = endTime - Date.now();
       if (rem <= 0) return;
       try {
-        await msg.edit(t("disc.imagePlaceholderUpdate", { remaining: formatRemaining(rem) }));
+        await msg.edit(
+          t("disc.imagePlaceholderUpdate", { remaining: formatRemaining(rem) }),
+        );
       } catch {
         // Message was deleted or inaccessible - stop the countdown.
         return;
@@ -597,8 +605,7 @@ if (DISCORD_PLUGIN_ENABLED) {
 
     // Cross-relay to other platforms in the same conversation.
     if (!isCrossRelayEnabled()) return;
-    const senderLabel =
-      mappedPersona || getDefaultPersonaName() || `[discord]`;
+    const senderLabel = mappedPersona || getDefaultPersonaName() || `[discord]`;
     const relayText = `${senderLabel}: ${content}`;
     const originKey = `discord:${message.channel.id}`;
     for (const route of getRoutes(conversationId)) {
@@ -608,10 +615,7 @@ if (DISCORD_PLUGIN_ENABLED) {
       const frontend = getFrontend(targetPlatform);
       if (!frontend?.sendText) continue;
       frontend.sendText(targetChatId, relayText).catch((err) => {
-        log(
-          "warn",
-          `[Bridge] Cross-relay to ${route} failed: ${err.message}`,
-        );
+        log("warn", `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
       });
     }
   });
@@ -680,7 +684,13 @@ async function sendGeneratedImage(channelId, images, caption) {
   });
 }
 
-async function sendExpression(channelId, expression, image, ownerName, userLocale) {
+async function sendExpression(
+  channelId,
+  expression,
+  image,
+  ownerName,
+  userLocale,
+) {
   if (expression) setBridgeActivity(expression, ownerName);
   if (image) {
     if (ownerName) {
@@ -688,9 +698,15 @@ async function sendExpression(channelId, expression, image, ownerName, userLocal
       if (channel) {
         const tl = userLocale ? makeTranslator(userLocale) : t;
         const exprKey = `expr.${expression}`;
-        const translatedExpr = tl(exprKey) !== exprKey ? tl(exprKey) : expression;
+        const translatedExpr =
+          tl(exprKey) !== exprKey ? tl(exprKey) : expression;
         enqueue(channelId, async () => {
-          await channel.send(tl("disc.expressionMessage", { name: ownerName, expression: translatedExpr }));
+          await channel.send(
+            tl("disc.expressionMessage", {
+              name: ownerName,
+              expression: translatedExpr,
+            }),
+          );
         });
       }
     }

@@ -121,7 +121,7 @@
   "help.lang": "**Sprache**\n> `/setlang <Sprache>` - Lege deine bevorzugte Sprache für Bot-Antworten fest\n> `/setlang clear` - Auf die Standardsprache des Servers zurücksetzen",
   "help.expr": "**Ausdrücke & Erscheinungsbild**\n> `/charimage` - Das Bild des Charakters posten\n> `/mood` - Den aktuellen Ausdruck des Charakters anzeigen\n> `/reaction <Modus>` - Stimmungsanzeige einstellen: `off`, `status`, oder `full`",
   "help.image": "**Bildgenerierung**\n> `/image <Prompt oder Schlüsselwort>` - Ein Bild generieren (`you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n> `/image cancel` - Aktive Bildgenerierung abbrechen",
-  "help.footer": "~~                                                                                                                                          ~~\n*Entwickelt von **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*Bitte unterstützen Sie meine Arbeit:* <https://github.com/sponsors/senjinthedragon>",
+  "help.footer": "~~                                                                                                                                          ~~\n*Entwickelt von **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*Bitte unterstützen Sie meine Arbeit:* <https://github.com/sponsors/senjinthedragon>\n*Bitcoin:* `bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`",
   "disc.notAuthorized": "Sie sind nicht berechtigt, diesen Bot zu verwenden.",
   "disc.notAllowedChannel": "Dieser Bot ist in diesem Kanal nicht aktiviert.",
   "disc.notConnected": "Bridge ist nicht mit SillyTavern verbunden.",

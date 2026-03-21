@@ -58,7 +58,10 @@ function createPluginI18n(localesDir) {
       const file = path.join(localesDir, `${id}.json`);
       if (fs.existsSync(file)) {
         try {
-          strings = { ...fallback, ...JSON.parse(fs.readFileSync(file, "utf8")) };
+          strings = {
+            ...fallback,
+            ...JSON.parse(fs.readFileSync(file, "utf8")),
+          };
         } catch {
           strings = fallback;
         }

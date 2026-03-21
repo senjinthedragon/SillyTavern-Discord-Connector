@@ -121,7 +121,7 @@
   "help.lang": "**言語**\n> `/setlang <言語>` - ボットの応答に使う言語を設定する\n> `/setlang clear` - サーバーのデフォルト言語にリセットする",
   "help.expr": "**表情と外見**\n> `/charimage` - キャラクターの画像を投稿します\n> `/mood` - キャラクターの現在の表情を表示します\n> `/reaction <モード>` - ムード表示を設定します: `off`、`status`、または `full`",
   "help.image": "**画像生成**\n> `/image <プロンプトまたはキーワード>` - 画像を生成します (`you`、`face`、`me`、`scene`、`last`、`raw_last`、`background`)\n> `/image cancel` - アクティブな画像生成をキャンセルします",
-  "help.footer": "~~                                                                                                                                          ~~\n*開発者: **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*ご支援をお願いします:* <https://github.com/sponsors/senjinthedragon>",
+  "help.footer": "~~                                                                                                                                          ~~\n*開発者: **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*ご支援をお願いします:* <https://github.com/sponsors/senjinthedragon>\n*Bitcoin:* `bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`",
   "disc.notAuthorized": "このボットを使用する権限がありません。",
   "disc.notAllowedChannel": "このチャンネルではボットが有効になっていません。",
   "disc.notConnected": "ブリッジが SillyTavern に接続されていません。",

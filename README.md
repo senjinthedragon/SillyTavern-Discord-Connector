@@ -23,6 +23,7 @@ If this extension adds value to your roleplay experience, please consider:
 
 * **[Sponsoring me on GitHub](https://github.com/sponsors/senjinthedragon)**
 * **[Buying me a coffee on Ko-fi](https://ko-fi.com/senjinthedragon)**
+* **Bitcoin:** `bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`
 * **Starring this repository** to help others find it.
 
 ## Requirements

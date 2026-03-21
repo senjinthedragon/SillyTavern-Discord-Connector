@@ -121,7 +121,7 @@
   "help.lang": "**Język**\n> `/setlang <język>` - Ustaw preferowany język dla odpowiedzi bota\n> `/setlang clear` - Przywróć domyślny język serwera",
   "help.expr": "**Wyrażenia i wygląd**\n> `/charimage` - Opublikuj obraz postaci\n> `/mood` - Pokaż aktualny wyraz twarzy postaci\n> `/reaction <tryb>` - Ustaw wyświetlanie nastroju: `off`, `status` lub `full`",
   "help.image": "**Generowanie obrazów**\n> `/image <prompt lub słowo kluczowe>` - Wygeneruj obraz (`you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n> `/image cancel` - Anuluj aktywne generowanie obrazu",
-  "help.footer": "~~                                                                                                                                          ~~\n*Stworzone przez **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*Proszę wspierać moją pracę:* <https://github.com/sponsors/senjinthedragon>",
+  "help.footer": "~~                                                                                                                                          ~~\n*Stworzone przez **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*Proszę wspierać moją pracę:* <https://github.com/sponsors/senjinthedragon>\n*Bitcoin:* `bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`",
   "disc.notAuthorized": "Nie masz uprawnień do korzystania z tego bota.",
   "disc.notAllowedChannel": "Ten bot nie jest włączony na tym kanale.",
   "disc.notConnected": "Most nie jest podłączony do SillyTavern.",

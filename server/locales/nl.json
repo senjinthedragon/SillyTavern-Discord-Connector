@@ -121,7 +121,7 @@
   "help.lang": "**Taal**\n> `/setlang <taal>` - Stel jouw voorkeurstaal in voor botantwoorden\n> `/setlang clear` - Herstel naar de standaardtaal van de server",
   "help.expr": "**Expressies & Uiterlijk**\n> `/charimage` - De afbeelding van het personage plaatsen\n> `/mood` - De huidige expressie van het personage tonen\n> `/reaction <modus>` - Stemmingsweergave instellen: `off`, `status`, of `full`",
   "help.image": "**Afbeeldingsgeneratie**\n> `/image <prompt of sleutelwoord>` - Een afbeelding genereren (`you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n> `/image cancel` - Actieve afbeeldingsgeneratie annuleren",
-  "help.footer": "~~                                                                                                                                          ~~\n*Ontwikkeld door **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*Ondersteun mijn werk:* <https://github.com/sponsors/senjinthedragon>",
+  "help.footer": "~~                                                                                                                                          ~~\n*Ontwikkeld door **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*Ondersteun mijn werk:* <https://github.com/sponsors/senjinthedragon>\n*Bitcoin:* `bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`",
   "disc.notAuthorized": "Je bent niet bevoegd om deze bot te gebruiken.",
   "disc.notAllowedChannel": "Deze bot is niet ingeschakeld in dit kanaal.",
   "disc.notConnected": "Bridge is niet verbonden met SillyTavern.",

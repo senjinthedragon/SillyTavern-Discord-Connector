@@ -121,7 +121,7 @@
   "help.lang": "**언어**\n> `/setlang <언어>` - 봇 응답에 사용할 언어를 설정합니다\n> `/setlang clear` - 서버 기본 언어로 재설정합니다",
   "help.expr": "**표정 및 외모**\n> `/charimage` - 캐릭터 사진을 게시합니다\n> `/mood` - 캐릭터의 현재 표정을 표시합니다\n> `/reaction <모드>` - 기분 표시를 설정합니다: `off`, `status`, 또는 `full`",
   "help.image": "**이미지 생성**\n> `/image <프롬프트 또는 키워드>` - 이미지를 생성합니다 (`you`, `face`, `me`, `scene`, `last`, `raw_last`, `background`)\n> `/image cancel` - 활성화된 이미지 생성을 취소합니다",
-  "help.footer": "~~                                                                                                                                          ~~\n*개발자: **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*제 작업을 지원해 주세요:* <https://github.com/sponsors/senjinthedragon>",
+  "help.footer": "~~                                                                                                                                          ~~\n*개발자: **Senjin the Dragon** - <https://github.com/senjinthedragon>*\n*제 작업을 지원해 주세요:* <https://github.com/sponsors/senjinthedragon>\n*Bitcoin:* `bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`",
   "disc.notAuthorized": "이 봇을 사용할 권한이 없습니다.",
   "disc.notAllowedChannel": "이 채널에서는 봇이 활성화되어 있지 않습니다.",
   "disc.notConnected": "브리지가 SillyTavern에 연결되어 있지 않습니다.",

@@ -249,9 +249,7 @@ function findLanguage(input) {
   if (!input) return undefined;
   const lower = input.toLowerCase();
   return AVAILABLE_LANGUAGES.find(
-    (l) =>
-      l.code === lower ||
-      l.names.some((n) => n.toLowerCase() === lower),
+    (l) => l.code === lower || l.names.some((n) => n.toLowerCase() === lower),
   );
 }
 

@@ -244,7 +244,11 @@ export async function handleUserMessage(data) {
     }
   }
 
-  const messageState = { chatId: data.chatId, isStreaming: false, streamedAny: false };
+  const messageState = {
+    chatId: data.chatId,
+    isStreaming: false,
+    streamedAny: false,
+  };
 
   safeSend({ type: "typing_action", chatId: messageState.chatId });
 
@@ -415,7 +419,9 @@ export async function handleUserMessage(data) {
     safeSend({
       type: "error_message",
       chatId: messageState.chatId,
-      text: t("reply.generationFailed", { message: error.message || "Unknown" }),
+      text: t("reply.generationFailed", {
+        message: error.message || "Unknown",
+      }),
     });
     removeAllListeners();
     sendStreamEnd();
@@ -473,7 +479,11 @@ export async function handleExecuteCommand(data) {
         const targetName = data.args.join(" ");
         const target = context.characters.find((c) => c.name === targetName);
         if (target) {
-          safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchchar.success", { name: targetName }) });
+          safeSend({
+            type: "ai_reply",
+            chatId: data.chatId,
+            text: t("switchchar.success", { name: targetName }),
+          });
           scheduleRecap(data.chatId, data.userId, data.userLocale);
           await selectCharacterById(context.characters.indexOf(target));
           invalidateChatCache();
@@ -506,7 +516,11 @@ export async function handleExecuteCommand(data) {
           (g) => g.name === targetName,
         );
         if (target) {
-          safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchgroup.success", { name: targetName }) });
+          safeSend({
+            type: "ai_reply",
+            chatId: data.chatId,
+            text: t("switchgroup.success", { name: targetName }),
+          });
           scheduleRecap(data.chatId, data.userId, data.userLocale);
           await executeSlashCommandsWithOptions(
             `/go ${sanitizeSlashArg(target.name)}`,
@@ -545,7 +559,11 @@ export async function handleExecuteCommand(data) {
         }
         const targetChatFile = data.args.join(" ");
         try {
-          safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchchat.success", { name: targetChatFile }) });
+          safeSend({
+            type: "ai_reply",
+            chatId: data.chatId,
+            text: t("switchchat.success", { name: targetChatFile }),
+          });
           scheduleRecap(data.chatId, data.userId, data.userLocale);
           await openCharacterChat(targetChatFile);
         } catch {
@@ -742,7 +760,12 @@ export async function handleExecuteCommand(data) {
         });
 
         // Queue and return early - generate_image_result/error sends its own packets.
-        enqueueAndGenerateImage(data.chatId, requestId, prompt, data.userLocale || null);
+        enqueueAndGenerateImage(
+          data.chatId,
+          requestId,
+          prompt,
+          data.userLocale || null,
+        );
         return;
       }
 
@@ -1074,7 +1097,11 @@ export async function handleExecuteCommand(data) {
           const characters = context.characters.filter((c) => c.name?.trim());
           if (index >= 0 && index < characters.length) {
             const target = characters[index];
-            safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchchar.success", { name: target.name }) });
+            safeSend({
+              type: "ai_reply",
+              chatId: data.chatId,
+              text: t("switchchar.success", { name: target.name }),
+            });
             scheduleRecap(data.chatId, data.userId, data.userLocale);
             await selectCharacterById(context.characters.indexOf(target));
             invalidateChatCache();
@@ -1095,7 +1122,11 @@ export async function handleExecuteCommand(data) {
           if (index >= 0 && index < chatFiles.length) {
             const chatName = chatFiles[index].file_name.replace(".jsonl", "");
             try {
-              safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchchat.success", { name: chatName }) });
+              safeSend({
+                type: "ai_reply",
+                chatId: data.chatId,
+                text: t("switchchat.success", { name: chatName }),
+              });
               scheduleRecap(data.chatId, data.userId, data.userLocale);
               await openCharacterChat(chatName);
             } catch {
@@ -1112,7 +1143,11 @@ export async function handleExecuteCommand(data) {
           const index = parseInt(groupMatch[1]) - 1;
           const groups = context.groups || [];
           if (index >= 0 && index < groups.length) {
-            safeSend({ type: "ai_reply", chatId: data.chatId, text: t("switchgroup.success", { name: groups[index].name }) });
+            safeSend({
+              type: "ai_reply",
+              chatId: data.chatId,
+              text: t("switchgroup.success", { name: groups[index].name }),
+            });
             scheduleRecap(data.chatId, data.userId, data.userLocale);
             await executeSlashCommandsWithOptions(
               `/go ${sanitizeSlashArg(groups[index].name)}`,
@@ -1130,13 +1165,12 @@ export async function handleExecuteCommand(data) {
   } catch (error) {
     console.error("[Discord Bridge] Command error:", error);
     const msg =
-      error instanceof Error
-        ? error.message
-        : String(error ?? "Unknown error");
+      error instanceof Error ? error.message : String(error ?? "Unknown error");
     replyText = t("cmd.error", { message: msg });
   }
 
-  if (replyText) safeSend({ type: "ai_reply", chatId: data.chatId, text: replyText });
+  if (replyText)
+    safeSend({ type: "ai_reply", chatId: data.chatId, text: replyText });
 }
 
 // ---------------------------------------------------------------------------

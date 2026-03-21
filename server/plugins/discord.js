@@ -43,7 +43,13 @@ function createDiscordPlugin() {
     },
 
     async sendExpression(chatId, expression, image, ownerName, userLocale) {
-      await discord.sendExpression(chatId, expression, image, ownerName, userLocale);
+      await discord.sendExpression(
+        chatId,
+        expression,
+        image,
+        ownerName,
+        userLocale,
+      );
     },
 
     async streamChunk(chatId, payload) {

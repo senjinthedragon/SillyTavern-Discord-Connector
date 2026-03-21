@@ -9,13 +9,13 @@
  * to any enabled frontend plugins using frontend-manager.js.
  */
 
-"use strict";
+'use strict';
 
-const WebSocket = require("ws");
-const { log } = require("./logger");
-const { config, wssPort } = require("./config-loader");
-const { streamSessions } = require("./streaming");
-const { createPluginLoader } = require("./plugin-loader");
+const WebSocket = require('ws');
+const { log } = require('./logger');
+const { config, wssPort } = require('./config-loader');
+const { streamSessions } = require('./streaming');
+const { createPluginLoader } = require('./plugin-loader');
 const {
   fanout,
   addRoute,
@@ -25,14 +25,14 @@ const {
   getFrontend,
   parseRoute,
   getRegisteredPlatforms,
-} = require("./frontend-manager");
+} = require('./frontend-manager');
 const {
   setBridgeActivity,
   getPendingAutocompletes,
   getAutocompleteDebouncers,
-} = require("./discord");
-const { handleBridgePacket } = require("./websocket-router");
-const { loadLocale, makeTranslator } = require("./i18n");
+} = require('./discord');
+const { handleBridgePacket } = require('./websocket-router');
+const { loadLocale, makeTranslator } = require('./i18n');
 const {
   load: loadPersonaMap,
   getPersonaForUser,
@@ -41,33 +41,35 @@ const {
   getDefaultPersonaName,
   setCrossRelayEnabled,
   isCrossRelayEnabled,
-} = require("./persona-map");
+} = require('./persona-map');
 const {
   load: loadLangMap,
   getLangForUser,
   setLangForUser,
-} = require("./lang-map");
-const { AVAILABLE_LANGUAGES, findLanguage } = require("./locales-manifest");
+} = require('./lang-map');
+const { AVAILABLE_LANGUAGES, findLanguage } = require('./locales-manifest');
 
-const version = require("./package.json").version;
+const version = require('./package.json').version;
 const width = 70;
 
-const canColor = process.stdout.isTTY && process.env.TERM !== "dumb";
+const canColor = process.stdout.isTTY && process.env.TERM !== 'dumb';
 
-const purple = canColor ? "[38;5;93m" : "";
-const gold = canColor ? "[38;5;220m" : "";
-const reset = canColor ? "[0m" : "";
+const purple = canColor ? '[38;5;93m' : '';
+const gold = canColor ? '[38;5;220m' : '';
+const reset = canColor ? '[0m' : '';
 
 const title = ` SILLYTAVERN DISCORD CONNECTOR - v${version}`;
 const credit = ` Developed by Senjin the Dragon https://github.com/senjinthedragon`;
 const support = ` Please support my work: https://github.com/sponsors/senjinthedragon`;
+const btc = ` Bitcoin: bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`;
 
 console.log(`
-${purple}╔${"═".repeat(width)}╗
+${purple}╔${'═'.repeat(width)}╗
 ║${gold}${title.padEnd(width)}${purple}║
 ║${gold}${credit.padEnd(width)}${purple}║
 ║${gold}${support.padEnd(width)}${purple}║
-╚${"═".repeat(width)}╝${reset}
+║${gold}${btc.padEnd(width)}${purple}║
+╚${'═'.repeat(width)}╝${reset}
 `);
 
 loadPersonaMap();
@@ -110,7 +112,7 @@ function dispatchCommand(platform, chatId, command, args, userId) {
   }
 
   sendToSillyTavern({
-    type: "execute_command",
+    type: 'execute_command',
     command,
     args,
     chatId: conversationId,
@@ -131,39 +133,39 @@ async function handleOfflineCommand(
 ) {
   const tl = makeTranslator(userLocale);
 
-  if (command === "sthelp") {
+  if (command === 'sthelp') {
     const sections = [
-      tl("help.title"),
-      tl("help.offlineNote"),
-      tl("help.offlineInfo"),
-      tl("help.lang"),
-      tl("help.footer"),
+      tl('help.title'),
+      tl('help.offlineNote'),
+      tl('help.offlineInfo'),
+      tl('help.lang'),
+      tl('help.footer'),
     ];
-    await fanout(conversationId, "sendText", sections.join("\n\n"));
+    await fanout(conversationId, 'sendText', sections.join('\n\n'));
     return;
   }
 
-  if (command === "status") {
+  if (command === 'status') {
     const registeredPlatforms = getRegisteredPlatforms();
     const platformList =
       registeredPlatforms.size > 0
-        ? [...registeredPlatforms].join(", ")
-        : "none";
+        ? [...registeredPlatforms].join(', ')
+        : 'none';
     const lines = [
-      tl("status.title"),
-      tl("status.connection", { value: tl("status.offline") }),
-      tl("status.plugins", { value: platformList }),
-      tl("status.stOffline"),
+      tl('status.title'),
+      tl('status.connection', { value: tl('status.offline') }),
+      tl('status.plugins', { value: platformList }),
+      tl('status.stOffline'),
     ];
-    await fanout(conversationId, "sendText", lines.join("\n"));
+    await fanout(conversationId, 'sendText', lines.join('\n'));
     return;
   }
 
-  if (command === "setlang") {
-    const input = (args?.[0] || "").trim();
-    if (!input || input === "clear") {
+  if (command === 'setlang') {
+    const input = (args?.[0] || '').trim();
+    if (!input || input === 'clear') {
       setLangForUser(platform, userId, null);
-      await fanout(conversationId, "sendText", tl("setlang.reset"));
+      await fanout(conversationId, 'sendText', tl('setlang.reset'));
       return;
     }
     const match = findLanguage(input);
@@ -172,30 +174,30 @@ async function handleOfflineCommand(
       const tAfter = makeTranslator(match.code);
       await fanout(
         conversationId,
-        "sendText",
-        tAfter("setlang.success", { name: match.nativeName, code: match.code }),
+        'sendText',
+        tAfter('setlang.success', { name: match.nativeName, code: match.code }),
       );
     } else {
       await fanout(
         conversationId,
-        "sendText",
-        tl("setlang.unknown", { input }),
+        'sendText',
+        tl('setlang.unknown', { input }),
       );
     }
     return;
   }
 
-  await fanout(conversationId, "sendText", tl("cmd.stOffline"));
+  await fanout(conversationId, 'sendText', tl('cmd.stOffline'));
 }
 
 const pluginLoader = createPluginLoader({
-  onUserMessage(platform, chatId, text, userId = "") {
+  onUserMessage(platform, chatId, text, userId = '') {
     const conversationId = resolveConversationId(platform, chatId);
     addRoute(conversationId, platform, chatId);
     const mappedPersona = getPersonaForUser(platform, userId);
     const userLocale = getLangForUser(platform, userId) || null;
     sendToSillyTavern({
-      type: "user_message",
+      type: 'user_message',
       text,
       chatId: conversationId,
       userId,
@@ -218,52 +220,52 @@ const pluginLoader = createPluginLoader({
       const frontend = getFrontend(targetPlatform);
       if (!frontend?.sendText) continue;
       frontend.sendText(targetChatId, relayText).catch((err) => {
-        log("warn", `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
+        log('warn', `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
       });
     }
   },
-  onCommand(platform, chatId, command, args, userId = "") {
+  onCommand(platform, chatId, command, args, userId = '') {
     dispatchCommand(platform, chatId, command, args, userId);
   },
 });
 
 pluginLoader.start().catch((err) => {
-  log("error", `[Plugins] Failed to start plugin: ${err.message}`);
+  log('error', `[Plugins] Failed to start plugin: ${err.message}`);
 });
 
 const wss = new WebSocket.Server({
   port: wssPort,
   maxPayload: 50 * 1024 * 1024,
 });
-log("log", `[Bridge] WebSocket server listening on port ${wssPort}`);
+log('log', `[Bridge] WebSocket server listening on port ${wssPort}`);
 
-wss.on("connection", (ws) => {
+wss.on('connection', (ws) => {
   if (sillyTavernClient && sillyTavernClient.readyState === WebSocket.OPEN) {
     log(
-      "warn",
-      "[Bridge] New SillyTavern connection received while one is already active - closing previous.",
+      'warn',
+      '[Bridge] New SillyTavern connection received while one is already active - closing previous.',
     );
-    sillyTavernClient.close(1008, "Replaced by new connection");
+    sillyTavernClient.close(1008, 'Replaced by new connection');
   }
   sillyTavernClient = ws;
-  log("log", "[Bridge] SillyTavern connected");
+  log('log', '[Bridge] SillyTavern connected');
 
   // Build plugin status map for all known platforms. Only platforms that
   // successfully registered via registerFrontend() are marked "active".
   // Others show as "not_loaded" so the extension can tease pro platforms
   // to free version users.
-  const KNOWN_PLATFORMS = ["discord", "telegram", "signal"];
+  const KNOWN_PLATFORMS = ['discord', 'telegram', 'signal'];
   const registeredPlatforms = getRegisteredPlatforms();
   const pluginStatus = Object.fromEntries(
     KNOWN_PLATFORMS.map((p) => [
       p,
-      registeredPlatforms.has(p) ? "active" : "not_loaded",
+      registeredPlatforms.has(p) ? 'active' : 'not_loaded',
     ]),
   );
 
   ws.send(
     JSON.stringify({
-      type: "bridge_config",
+      type: 'bridge_config',
       timezone: config.timezone || null,
       locale: config.locale || null,
       userLocale: config.userLocale || null,
@@ -273,14 +275,14 @@ wss.on("connection", (ws) => {
     }),
   );
 
-  ws.on("message", async (message) => {
+  ws.on('message', async (message) => {
     let data;
     try {
       data = JSON.parse(
-        typeof message === "string" ? message : message.toString("utf8"),
+        typeof message === 'string' ? message : message.toString('utf8'),
       );
     } catch (err) {
-      log("warn", `[Bridge] Dropping invalid JSON packet: ${err.message}`);
+      log('warn', `[Bridge] Dropping invalid JSON packet: ${err.message}`);
       return;
     }
 
@@ -305,7 +307,7 @@ wss.on("connection", (ws) => {
     });
   });
 
-  ws.on("close", () => {
+  ws.on('close', () => {
     sillyTavernClient = null;
     setDefaultPersonaName(null);
     setCrossRelayEnabled(true);

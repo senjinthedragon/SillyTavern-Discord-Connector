@@ -64,45 +64,45 @@ test("t() returns the raw key when en.json is missing", () => {
 });
 
 test("t() returns English string for a known key before load() is called", () => {
-  const dir = makeLocalesDir({ en: { "greet": "Hello" } });
+  const dir = makeLocalesDir({ en: { greet: "Hello" } });
   const { t } = createPluginI18n(dir);
   assert.equal(t("greet"), "Hello");
 });
 
 test("t() interpolates {{variable}} placeholders", () => {
-  const dir = makeLocalesDir({ en: { "msg": "Hi {{name}}!" } });
+  const dir = makeLocalesDir({ en: { msg: "Hi {{name}}!" } });
   const { t } = createPluginI18n(dir);
   assert.equal(t("msg", { name: "Alice" }), "Hi Alice!");
 });
 
 test("t() leaves unresolved {{placeholders}} intact when var is not supplied", () => {
-  const dir = makeLocalesDir({ en: { "msg": "Hi {{name}}!" } });
+  const dir = makeLocalesDir({ en: { msg: "Hi {{name}}!" } });
   const { t } = createPluginI18n(dir);
   assert.equal(t("msg"), "Hi {{name}}!");
 });
 
 test("t() returns raw key for key not in any locale", () => {
-  const dir = makeLocalesDir({ en: { "known": "value" } });
+  const dir = makeLocalesDir({ en: { known: "value" } });
   const { t } = createPluginI18n(dir);
   assert.equal(t("unknown.key"), "unknown.key");
 });
 
 test("load() with English locale keeps English strings", () => {
-  const dir = makeLocalesDir({ en: { "greet": "Hello" } });
+  const dir = makeLocalesDir({ en: { greet: "Hello" } });
   const { load, t } = createPluginI18n(dir);
   load("en");
   assert.equal(t("greet"), "Hello");
 });
 
 test("load() with undefined locale keeps English strings", () => {
-  const dir = makeLocalesDir({ en: { "greet": "Hello" } });
+  const dir = makeLocalesDir({ en: { greet: "Hello" } });
   const { load, t } = createPluginI18n(dir);
   load(undefined);
   assert.equal(t("greet"), "Hello");
 });
 
 test("load() with unknown locale falls back to English", () => {
-  const dir = makeLocalesDir({ en: { "greet": "Hello" } });
+  const dir = makeLocalesDir({ en: { greet: "Hello" } });
   const { load, t } = createPluginI18n(dir);
   load("xx-FAKEFAKE");
   assert.equal(t("greet"), "Hello");
@@ -110,8 +110,8 @@ test("load() with unknown locale falls back to English", () => {
 
 test("load() loads a non-English locale and overrides English strings", () => {
   const dir = makeLocalesDir({
-    en: { "greet": "Hello" },
-    ja: { "greet": "こんにちは" },
+    en: { greet: "Hello" },
+    ja: { greet: "こんにちは" },
   });
   const { load, t } = createPluginI18n(dir);
   load("ja");
@@ -120,8 +120,8 @@ test("load() loads a non-English locale and overrides English strings", () => {
 
 test("load() merges non-English locale on top of English (fallback for missing keys)", () => {
   const dir = makeLocalesDir({
-    en: { "greet": "Hello", "farewell": "Goodbye" },
-    ja: { "greet": "こんにちは" }, // farewell not translated
+    en: { greet: "Hello", farewell: "Goodbye" },
+    ja: { greet: "こんにちは" }, // farewell not translated
   });
   const { load, t } = createPluginI18n(dir);
   load("ja");
@@ -131,8 +131,8 @@ test("load() merges non-English locale on top of English (fallback for missing k
 
 test("load() resolves BCP 47 tags to language-only file (pt-BR -> pt.json)", () => {
   const dir = makeLocalesDir({
-    en: { "greet": "Hello" },
-    pt: { "greet": "Olá" },
+    en: { greet: "Hello" },
+    pt: { greet: "Olá" },
   });
   const { load, t } = createPluginI18n(dir);
   load("pt-BR");
@@ -141,8 +141,8 @@ test("load() resolves BCP 47 tags to language-only file (pt-BR -> pt.json)", () 
 
 test("load() can switch locale after initial load", () => {
   const dir = makeLocalesDir({
-    en: { "greet": "Hello" },
-    de: { "greet": "Hallo" },
+    en: { greet: "Hello" },
+    de: { greet: "Hallo" },
   });
   const { load, t } = createPluginI18n(dir);
   load("de");
@@ -152,8 +152,8 @@ test("load() can switch locale after initial load", () => {
 });
 
 test("two instances from different dirs are independent", () => {
-  const dirA = makeLocalesDir({ en: { "key": "A-value" } });
-  const dirB = makeLocalesDir({ en: { "key": "B-value" } });
+  const dirA = makeLocalesDir({ en: { key: "A-value" } });
+  const dirB = makeLocalesDir({ en: { key: "B-value" } });
   const { t: tA } = createPluginI18n(dirA);
   const { t: tB } = createPluginI18n(dirB);
   assert.equal(tA("key"), "A-value");
@@ -162,9 +162,9 @@ test("two instances from different dirs are independent", () => {
 
 test("two instances with same dir but different loaded locales are independent", () => {
   const dir = makeLocalesDir({
-    en: { "greet": "Hello" },
-    de: { "greet": "Hallo" },
-    fr: { "greet": "Bonjour" },
+    en: { greet: "Hello" },
+    de: { greet: "Hallo" },
+    fr: { greet: "Bonjour" },
   });
   const instanceDe = createPluginI18n(dir);
   const instanceFr = createPluginI18n(dir);

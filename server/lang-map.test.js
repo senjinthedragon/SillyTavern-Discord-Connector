@@ -84,7 +84,7 @@ test("runtime entry takes priority over config map entry", () => {
 
 test("config map lookup is platform-generic", () => {
   const store = makeStore({
-    telegramLanguageMap: { "123456789": "fr" },
+    telegramLanguageMap: { 123456789: "fr" },
     signalLanguageMap: { "+31612345678": "nl" },
   });
   assert.equal(store.getLangForUser("telegram", "123456789"), "fr");

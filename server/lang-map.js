@@ -49,10 +49,7 @@ function createLangMapStore(options = {}) {
       runtimeMap = {};
       if (err.code !== "ENOENT") {
         // ENOENT is expected on first run - no file yet, nothing to warn about.
-        log(
-          "warn",
-          `[LangMap] Could not read lang-map.json: ${err.message}`,
-        );
+        log("warn", `[LangMap] Could not read lang-map.json: ${err.message}`);
       }
     }
 

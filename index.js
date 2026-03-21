@@ -281,9 +281,8 @@ jQuery(async () => {
     // Falls back to English if the i18n module is unavailable (older ST builds).
     let stLocale = "en";
     try {
-      const { getCurrentLocale } = await import(
-        "../../../../../scripts/i18n.js"
-      );
+      const { getCurrentLocale } =
+        await import("../../../../../scripts/i18n.js");
       stLocale = getCurrentLocale() || "en";
     } catch {
       // Older ST build without getCurrentLocale - stay with English.

@@ -121,7 +121,7 @@
   "help.lang": "**語言**\n> `/setlang <語言>` - 設定機器人回覆所使用的偏好語言\n> `/setlang clear` - 重設為伺服器預設語言",
   "help.expr": "**表情與外觀**\n> `/charimage` - 傳送角色圖片\n> `/mood` - 顯示角色目前表情\n> `/reaction <mode>` - 設置心情顯示：`off`、`status` 或 `full`",
   "help.image": "**圖片生成**\n> `/image <prompt or keyword>` - 生成圖片（`you`、`face`、`me`、`scene`、`last`、`raw_last`、`background`）\n> `/image cancel` - 取消正在進行的圖片生成",
-  "help.footer": "~~                                                                                                                                          ~~\n*由 **Senjin the Dragon** 開發 - <https://github.com/senjinthedragon>*\n*請支持我的工作：* <https://github.com/sponsors/senjinthedragon>",
+  "help.footer": "~~                                                                                                                                          ~~\n*由 **Senjin the Dragon** 開發 - <https://github.com/senjinthedragon>*\n*請支持我的工作：* <https://github.com/sponsors/senjinthedragon>\n*Bitcoin:* `bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9`",
   "disc.notAuthorized": "您無權使用此機器人。",
   "disc.notAllowedChannel": "此機器人在該頻道中未啟用。",
   "disc.notConnected": "橋接未連線到 SillyTavern。",

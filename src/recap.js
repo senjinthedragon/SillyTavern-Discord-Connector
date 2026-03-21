@@ -83,7 +83,9 @@ export function buildLastExchange(chat) {
   // Don't include command invocations (e.g. /charimage) in the recap entries.
   const isCommand = userMsg.mes.trim().startsWith("/");
   const entries = [
-    ...(!isCommand ? [{ name: userLabel, text: userMsg.mes.trim(), isUser: true }] : []),
+    ...(!isCommand
+      ? [{ name: userLabel, text: userMsg.mes.trim(), isUser: true }]
+      : []),
     ...cappedAi,
   ];
 
