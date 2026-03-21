@@ -224,7 +224,7 @@ export function captureAndSendIntroMessage(chatId) {
  */
 export async function handleUserMessage(data) {
   sharedState.lastActiveChatId = data.chatId || sharedState.lastActiveChatId;
-  sharedState.lastActiveUserLocale = data.userLocale || sharedState.lastActiveUserLocale;
+  sharedState.lastActiveUserLocale = data.userLocale ?? null;
 
   // Resolve per-user locale so error messages reach the user in their language.
   // eslint-disable-next-line no-shadow
@@ -244,7 +244,7 @@ export async function handleUserMessage(data) {
     }
   }
 
-  const messageState = { chatId: data.chatId, isStreaming: false };
+  const messageState = { chatId: data.chatId, isStreaming: false, streamedAny: false };
 
   safeSend({ type: "typing_action", chatId: messageState.chatId });
 
@@ -256,6 +256,7 @@ export async function handleUserMessage(data) {
   const streamCallback = (cumulativeText) => {
     if (!currentStreamId) return;
     messageState.isStreaming = true;
+    messageState.streamedAny = true;
     safeSend({
       type: "stream_chunk",
       chatId: messageState.chatId,
@@ -336,7 +337,10 @@ export async function handleUserMessage(data) {
         chatId: messageState.chatId,
         messages: aiMessages,
       });
-    } else {
+    } else if (!messageState.streamedAny) {
+      // Only send the no-response error if streaming never delivered any text.
+      // If streaming ran, the text already reached Discord - an empty chat array
+      // just means ST hadn't flushed chat[last].mes yet when GENERATION_ENDED fired.
       safeSend({
         type: "error_message",
         chatId: messageState.chatId,
@@ -428,7 +432,7 @@ export async function handleUserMessage(data) {
  */
 export async function handleExecuteCommand(data) {
   sharedState.lastActiveChatId = data.chatId || sharedState.lastActiveChatId;
-  sharedState.lastActiveUserLocale = data.userLocale || sharedState.lastActiveUserLocale;
+  sharedState.lastActiveUserLocale = data.userLocale ?? null;
   safeSend({ type: "typing_action", chatId: data.chatId });
 
   // Resolve per-user locale so command replies reach the user in their language.

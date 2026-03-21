@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.7.1] - 2026-03-21
+
+### Fixed
+
+- Fixed expression mode set to "Discord activity only" never updating the Discord activity. The `expression_update` packet was sent with a null `chatId` in activity-only mode, which caused it to be dropped by the server before the activity update could run. `chatId` is now always included regardless of mode - no image is posted since the image field remains null in activity-only mode.
+- Fixed expression messages and image generation errors appearing in the wrong language after a user clears their language preference with `/setlang clear`. When a user has no language preference, the server omits `userLocale` from the packet entirely. The bridge was treating the missing key as "keep the previous locale" rather than "use the server default". The locale is now reset to null (server default) when the key is absent.
+- Fixed a spurious "Something went wrong and no response was found. Try again?" error appearing in Discord after an AI reply was already delivered via streaming. SillyTavern fires `GENERATION_ENDED` before the final message is committed to the chat array (`message_received` follows after). When the chat array appeared empty at that moment, the bridge sent a no-response error even though the streamed text had already reached Discord. The error is now suppressed whenever streaming delivered at least one token.
+
 ## [1.7.0] - 2026-03-20
 
 ### Added
@@ -35,25 +43,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed external plugins that omit `sendGeneratedImage` loading silently and then dropping all generated images. The method is now included in the expected plugin interface check, so any plugin missing it logs a warning at load time.
 - Fixed Discord token validation not catching a missing, empty, or whitespace-only `discordToken` when the Discord plugin is enabled. Only the literal placeholder string was rejected before; `undefined`, `null`, `""`, and `" "` would pass validation and cause a runtime authentication failure on startup. Also fixed `enabledPlugins` being read before it was validated as an array, which could produce a raw `TypeError` instead of the intended config error message.
 - Fixed redirect handling in `fetchImageBuffer` not resolving relative redirect URLs. A redirect to a path like `/cdn/image.png` was used as-is, making it an invalid fetch target. Redirects are now resolved against the original URL before following.
+- Fixed `/sthelp`, `/status`, and `/setlang` returning no response when SillyTavern is not connected. Commands were forwarded to ST via WebSocket and silently dropped when the socket was closed. These three commands are now handled server-side when ST is offline: `/sthelp` returns a reduced command list showing only what is available without ST, `/status` shows platform connection state and an offline note, and `/setlang` reads and writes the lang-map directly without requiring ST.
+- Fixed `/image` waiting the full configured timeout (up to 5 minutes) when the image backend is unavailable. SillyTavern's `/sd` command does not throw when the backend is unreachable - it auto-corrects the null result to an empty string and returns normally. The bridge now checks whether an image appeared within 1 second of the command returning and sends an immediate error if not, instead of waiting for the hard timeout to fire.
+- Fixed `/note` and `/impersonate` argument text being silently truncated at 200 characters. Both commands now use a dedicated `sanitizeNoteArg` that allows up to 4096 characters and preserves newlines (only the pipe character `|` is stripped as a command injection guard). The 200-character `sanitizeSlashArg` limit remains in place for short arguments such as persona names and language codes where a hard limit is appropriate.
 
 **(Pro Plugins)**
 
 - Fixed image placeholder messages ("🎨 Generating image…") never being sent on Telegram or Signal. The `image_placeholder` packet routes to `sendImagePlaceholder()`, which Telegram and Signal did not implement, causing the message to be silently dropped. Both plugins now implement `sendImagePlaceholder()` as an alias to `sendText`.
 - Fixed Telegram rendering transparent PNG images (expression emoji and character mood images) with a white background. PNG images sent to Telegram are now composited onto a neutral gray (`#808080`) background before upload. Non-PNG images are unaffected. If the compositing step fails for any reason, the original image is sent as a fallback.
-
-- Fixed `/sthelp`, `/status`, and `/setlang` returning no response when SillyTavern is not connected. Commands were forwarded to ST via WebSocket and silently dropped when the socket was closed. These three commands are now handled server-side when ST is offline: `/sthelp` returns a reduced command list showing only what is available without ST, `/status` shows platform connection state and an offline note, and `/setlang` reads and writes the lang-map directly without requiring ST.
-- Fixed `/setlang` autocomplete returning an empty list when SillyTavern was offline. The autocomplete is now served locally from the locales manifest and is available regardless of ST's connection state.
-- Fixed `disc.recapTitle` ("Last exchange") always appearing in the server's configured locale. The recap title is now rendered in the locale of the user who triggered the switch command.
-- Fixed the switch success confirmation ("Switched to 'X'.") arriving in Discord after the recap embed instead of before it. The confirmation is now sent immediately before `scheduleRecap` registers its listener, guaranteeing it appears first.
-- Fixed command invocations (user messages starting with `/`) and system annotation messages (AI messages whose entire content is wrapped in `[...]`, such as image generation prompt annotations) appearing in auto-recap and `/history` output. Command messages are excluded from the user entry; bracket-wrapped messages are excluded from all AI entries in both `buildLastExchange` and `buildHistory`.
-- Fixed the "Finn feels X" expression message always appearing in the server's configured locale regardless of the user's `/setlang` preference. Expression updates now carry `lastActiveUserLocale` (the locale of the most recent user interaction) and use it to render the mood message, matching the same per-user locale behaviour as command replies and recap titles.
-- Fixed `/mood` posting a redundant "X feels Y" text reply alongside the expression image. When a character image is available the image is sent without a separate text reply; the text reply is only sent when there is no image.
-- Fixed `/continue` producing a cryptic `cmd.error` reply when SillyTavern is already generating. SillyTavern's slash command executor can throw synchronously in this state; the error is now caught and silently discarded so the in-progress generation can complete and deliver its result normally.
-- Fixed the image generation placeholder ("🎨 Generating image…") never appearing on Discord. `sendImagePlaceholder` was added to `server/discord.js` during the 1.7.0 localisation work but was not added to the `server/plugins/discord.js` wrapper. The `fanout` call in `websocket-router.js` silently skips methods that are absent from a plugin, so every placeholder was silently dropped from the moment localisation shipped.
-- Fixed `/image` waiting the full configured timeout (up to 5 minutes) when ComfyUI is unavailable. SillyTavern's `/sd` command does not throw when the image backend is unreachable - it auto-corrects the null result to an empty string and returns normally. The bridge now checks whether an image appeared within 1 second of the command returning and sends an immediate error if not, instead of waiting for the hard timeout to fire.
-- Fixed `/note` and `/impersonate` argument text being silently truncated at 200 characters. Both commands now use a dedicated `sanitizeNoteArg` that allows up to 4096 characters and preserves newlines (only the pipe character `|` is stripped as a command injection guard). The 200-character `sanitizeSlashArg` limit remains in place for short arguments such as persona names and language codes where a hard limit is appropriate.
-- Fixed image generation error messages appearing in English regardless of the user's configured locale. The error keys (`image.noImage`, `image.noChat`, `image.fetchFailed`, `image.timedOut`, `image.failed`) were missing from all 13 locale files and have now been added. The per-user locale is also threaded from the `execute_command` packet through to `generateAndSendImage`, where `makeT(await getLocaleStrings(userLocale))` builds a per-request translator so each user sees errors in their own language.
-- Fixed `t()` returning raw locale key strings when no `userLocale` is configured. The fallback chain now checks `_userStrings[key] ?? _fallback[key] ?? key`, and the English locale is always loaded on `bridge_config` receipt even when `userLocale` is not set, ensuring the fallback is always populated.
 
 ## [1.6.0] - 2026-03-19
 
@@ -331,6 +328,7 @@ To better support the project's growth and maintain compatibility with SillyTave
 
 ---
 
+[1.7.1]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/senjinthedragon/SillyTavern-Discord-Connector/compare/v1.4.0...v1.5.0

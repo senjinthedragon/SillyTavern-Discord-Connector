@@ -162,10 +162,9 @@ export async function sendExpressionUpdate(chatIdHint = null) {
   if (signature === lastExpressionSignature) return;
   lastExpressionSignature = signature;
 
-  let chatId = null;
-  if (settings.expressionMode === "full") {
-    chatId = chatIdHint || sharedState.lastActiveChatId || null;
-  }
+  // Always include chatId so the server can update the Discord activity even in
+  // status-only mode. The image field is null in status mode so no image is posted.
+  const chatId = chatIdHint || sharedState.lastActiveChatId || null;
 
   safeSend({
     type: "expression_update",
