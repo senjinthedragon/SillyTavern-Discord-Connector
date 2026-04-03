@@ -39,21 +39,21 @@ import {
   setExternalAbortController,
   deleteLastMessage,
   saveChatConditional,
-} from "../../../../../script.js";
+} from '../../../../../script.js';
 
-import { executeSlashCommandsWithOptions } from "../../../../../scripts/slash-commands.js";
+import { executeSlashCommandsWithOptions } from '../../../../../scripts/slash-commands.js';
 
-import { safeSend, getWs } from "./ws.js";
-import { getSettings } from "./settings.js";
-import { sharedState } from "./state.js";
-import { sanitizeSlashArg, sanitizeNoteArg } from "./utils.js";
-import { t, makeT, getLocaleStrings } from "./i18n.js";
+import { safeSend, getWs } from './ws.js';
+import { getSettings } from './settings.js';
+import { sharedState } from './state.js';
+import { sanitizeSlashArg, sanitizeNoteArg } from './utils.js';
+import { t, makeT, getLocaleStrings } from './i18n.js';
 import {
   sendImagesFromMesText,
   sendLastMessageImages,
   sendCharacterAvatar,
   extractTextFromMesText,
-} from "./image-relay.js";
+} from './image-relay.js';
 import {
   EXPRESSION_MODE_VALUES,
   getCurrentExpressionSnapshot,
@@ -61,7 +61,7 @@ import {
   clearExpressionCache,
   resetExpressionSignature,
   scheduleExpressionUpdate,
-} from "./expression-relay.js";
+} from './expression-relay.js';
 import {
   getBreakerState,
   hasActiveImageJob,
@@ -73,12 +73,12 @@ import {
   cancelActiveImageJob,
   recordBreakerRejected,
   enqueueAndGenerateImage,
-} from "./image-generation.js";
-import { buildLastExchange, buildHistory, scheduleRecap } from "./recap.js";
+} from './image-generation.js';
+import { buildLastExchange, buildHistory, scheduleRecap } from './recap.js';
 
 // String fallback covers older ST versions that don't export this event type.
 const GROUP_WRAPPER_FINISHED =
-  event_types.GROUP_WRAPPER_FINISHED ?? "group_wrapper_finished";
+  event_types.GROUP_WRAPPER_FINISHED ?? 'group_wrapper_finished';
 
 // ---------------------------------------------------------------------------
 // Autocomplete cache
@@ -139,7 +139,7 @@ export function invalidateChatCache() {
  * @param {string} chatId
  */
 export function captureAndSendIntroMessage(chatId) {
-  const chatEl = document.getElementById("chat");
+  const chatEl = document.getElementById('chat');
   if (!chatEl || !chatId) return;
 
   const ctx = SillyTavern.getContext();
@@ -152,11 +152,11 @@ export function captureAndSendIntroMessage(chatId) {
   const INTRO_SETTLE_MS = 600;
 
   const isIntroMessage = (el) =>
-    el.classList.contains("mes") && el.getAttribute("is_user") !== "true";
+    el.classList.contains('mes') && el.getAttribute('is_user') !== 'true';
 
   const collectNew = () => {
     const fresh = [];
-    for (const el of chatEl.querySelectorAll(".mes")) {
+    for (const el of chatEl.querySelectorAll('.mes')) {
       if (isIntroMessage(el) && !seen.has(el)) {
         seen.add(el);
         fresh.push(el);
@@ -166,10 +166,10 @@ export function captureAndSendIntroMessage(chatId) {
   };
 
   const sendOne = async (mesEl) => {
-    const mesText = mesEl.querySelector(".mes_text");
+    const mesText = mesEl.querySelector('.mes_text');
     if (!mesText) return;
     const text = extractTextFromMesText(mesText);
-    if (text) safeSend({ type: "intro_message", chatId, text });
+    if (text) safeSend({ type: 'intro_message', chatId, text });
     await sendImagesFromMesText(chatId, mesText);
   };
 
@@ -205,7 +205,7 @@ export function captureAndSendIntroMessage(chatId) {
   hardTimeoutId = setTimeout(() => {
     observer.disconnect();
     clearTimeout(settleTimeoutId);
-    console.warn("[Discord Bridge] Intro message capture timed out");
+    console.warn('[Discord Bridge] Intro message capture timed out');
   }, 10_000);
 
   // Run immediately in case doNewChat populated the DOM synchronously.
@@ -251,7 +251,7 @@ export async function handleUserMessage(data) {
     streamedAny: false,
   };
 
-  safeSend({ type: "typing_action", chatId: messageState.chatId });
+  safeSend({ type: 'typing_action', chatId: messageState.chatId });
 
   await sendMessageAsUser(data.text);
 
@@ -263,7 +263,7 @@ export async function handleUserMessage(data) {
     messageState.isStreaming = true;
     messageState.streamedAny = true;
     safeSend({
-      type: "stream_chunk",
+      type: 'stream_chunk',
       chatId: messageState.chatId,
       streamId: currentStreamId,
       characterName: currentCharacterName,
@@ -302,13 +302,13 @@ export async function handleUserMessage(data) {
         }
       } catch (err) {
         console.warn(
-          "[Discord Bridge] Could not read final text from chat array:",
+          '[Discord Bridge] Could not read final text from chat array:',
           err,
         );
       }
 
       safeSend({
-        type: "stream_end",
+        type: 'stream_end',
         chatId: messageState.chatId,
         streamId: currentStreamId,
         characterName: isGroup ? currentCharacterName : null,
@@ -333,12 +333,12 @@ export async function handleUserMessage(data) {
       const msg = chat[i];
       if (msg.is_user) break;
       if (msg.mes?.trim())
-        aiMessages.unshift({ name: msg.name || "", text: msg.mes.trim() });
+        aiMessages.unshift({ name: msg.name || '', text: msg.mes.trim() });
     }
 
     if (aiMessages.length > 0) {
       safeSend({
-        type: "ai_reply",
+        type: 'ai_reply',
         chatId: messageState.chatId,
         messages: aiMessages,
       });
@@ -347,14 +347,14 @@ export async function handleUserMessage(data) {
       // If streaming ran, the text already reached Discord - an empty chat array
       // just means ST hadn't flushed chat[last].mes yet when GENERATION_ENDED fired.
       safeSend({
-        type: "error_message",
+        type: 'error_message',
         chatId: messageState.chatId,
-        text: t("reply.noResponse"),
+        text: t('reply.noResponse'),
       });
     }
 
     sendLastMessageImages(messageState.chatId).catch((err) =>
-      console.warn("[Discord Bridge] sendLastMessageImages failed:", err),
+      console.warn('[Discord Bridge] sendLastMessageImages failed:', err),
     );
   };
 
@@ -413,15 +413,15 @@ export async function handleUserMessage(data) {
   try {
     const abortController = new AbortController();
     setExternalAbortController(abortController);
-    await Generate("normal", { signal: abortController.signal });
+    await Generate('normal', { signal: abortController.signal });
   } catch (error) {
-    console.error("[Discord Bridge] Generation error:", error);
+    console.error('[Discord Bridge] Generation error:', error);
     await deleteLastMessage();
     safeSend({
-      type: "error_message",
+      type: 'error_message',
       chatId: messageState.chatId,
-      text: t("reply.generationFailed", {
-        message: error.message || "Unknown",
+      text: t('reply.generationFailed', {
+        message: error.message || 'Unknown',
       }),
     });
     removeAllListeners();
@@ -440,7 +440,7 @@ export async function handleUserMessage(data) {
 export async function handleExecuteCommand(data) {
   sharedState.lastActiveChatId = data.chatId || sharedState.lastActiveChatId;
   sharedState.lastActiveUserLocale = data.userLocale ?? null;
-  safeSend({ type: "typing_action", chatId: data.chatId });
+  safeSend({ type: 'typing_action', chatId: data.chatId });
 
   // Resolve per-user locale so command replies reach the user in their language.
   // eslint-disable-next-line no-shadow
@@ -451,76 +451,76 @@ export async function handleExecuteCommand(data) {
 
   try {
     switch (data.command) {
-      case "newchat":
+      case 'newchat':
         await doNewChat({ deleteCurrentChat: false });
         clearExpressionCache();
         invalidateChatCache();
         captureAndSendIntroMessage(data.chatId);
-        replyText = t("newchat.success");
+        replyText = t('newchat.success');
         break;
 
-      case "listchars": {
+      case 'listchars': {
         const characters = context.characters.filter((c) => c.name?.trim());
         replyText =
           characters.length === 0
-            ? t("listchars.empty")
-            : t("listchars.list", {
+            ? t('listchars.empty')
+            : t('listchars.list', {
                 list: characters
                   .map((c, i) => `${i + 1}. /switchchar_${i + 1} - ${c.name}`)
-                  .join("\n"),
+                  .join('\n'),
               });
         break;
       }
 
-      case "switchchar": {
+      case 'switchchar': {
         if (!data.args?.length) {
-          replyText = t("switchchar.usage");
+          replyText = t('switchchar.usage');
           break;
         }
-        const targetName = data.args.join(" ");
+        const targetName = data.args.join(' ');
         const target = context.characters.find((c) => c.name === targetName);
         if (target) {
           safeSend({
-            type: "ai_reply",
+            type: 'ai_reply',
             chatId: data.chatId,
-            text: t("switchchar.success", { name: targetName }),
+            text: t('switchchar.success', { name: targetName }),
           });
           scheduleRecap(data.chatId, data.userId, data.userLocale);
           await selectCharacterById(context.characters.indexOf(target));
           invalidateChatCache();
         } else {
-          replyText = t("switchchar.notFound", { name: targetName });
+          replyText = t('switchchar.notFound', { name: targetName });
         }
         break;
       }
 
-      case "listgroups": {
+      case 'listgroups': {
         const allGroups = context.groups || [];
         replyText =
           allGroups.length === 0
-            ? t("listgroups.empty")
-            : t("listgroups.list", {
+            ? t('listgroups.empty')
+            : t('listgroups.list', {
                 list: allGroups
                   .map((g, i) => `${i + 1}. /switchgroup_${i + 1} - ${g.name}`)
-                  .join("\n"),
+                  .join('\n'),
               });
         break;
       }
 
-      case "switchgroup": {
+      case 'switchgroup': {
         if (!data.args?.length) {
-          replyText = t("switchgroup.usage");
+          replyText = t('switchgroup.usage');
           break;
         }
-        const targetName = data.args.join(" ");
+        const targetName = data.args.join(' ');
         const target = (context.groups || []).find(
           (g) => g.name === targetName,
         );
         if (target) {
           safeSend({
-            type: "ai_reply",
+            type: 'ai_reply',
             chatId: data.chatId,
-            text: t("switchgroup.success", { name: targetName }),
+            text: t('switchgroup.success', { name: targetName }),
           });
           scheduleRecap(data.chatId, data.userId, data.userLocale);
           await executeSlashCommandsWithOptions(
@@ -528,69 +528,69 @@ export async function handleExecuteCommand(data) {
           );
           invalidateChatCache();
         } else {
-          replyText = t("switchgroup.notFound", { name: targetName });
+          replyText = t('switchgroup.notFound', { name: targetName });
         }
         break;
       }
 
-      case "listchats": {
+      case 'listchats': {
         if (context.characterId === undefined) {
-          replyText = t("listchats.noChar");
+          replyText = t('listchats.noChar');
           break;
         }
         const chatFiles = await getPastCharacterChats(context.characterId);
         replyText =
           chatFiles.length === 0
-            ? t("listchats.empty")
-            : t("listchats.list", {
+            ? t('listchats.empty')
+            : t('listchats.list', {
                 list: chatFiles
                   .map(
                     (c, i) =>
-                      `${i + 1}. /switchchat_${i + 1} - ${c.file_name.replace(".jsonl", "")}`,
+                      `${i + 1}. /switchchat_${i + 1} - ${c.file_name.replace('.jsonl', '')}`,
                   )
-                  .join("\n"),
+                  .join('\n'),
               });
         break;
       }
 
-      case "switchchat": {
+      case 'switchchat': {
         if (!data.args?.length) {
-          replyText = t("switchchat.usage");
+          replyText = t('switchchat.usage');
           break;
         }
-        const targetChatFile = data.args.join(" ");
+        const targetChatFile = data.args.join(' ');
         try {
           safeSend({
-            type: "ai_reply",
+            type: 'ai_reply',
             chatId: data.chatId,
-            text: t("switchchat.success", { name: targetChatFile }),
+            text: t('switchchat.success', { name: targetChatFile }),
           });
           scheduleRecap(data.chatId, data.userId, data.userLocale);
           await openCharacterChat(targetChatFile);
         } catch {
-          replyText = t("switchchat.fail", { name: targetChatFile });
+          replyText = t('switchchat.fail', { name: targetChatFile });
         }
         break;
       }
 
-      case "charimage": {
+      case 'charimage': {
         // In solo chat, no argument needed - active character's avatar is sent.
         // In group chat, an argument selects which member to show; if omitted,
         // lists the group members instead.
         const ctx = SillyTavern.getContext();
         const isGroup = !!ctx.groupId;
-        const targetName = data.args?.join(" ").trim() || null;
+        const targetName = data.args?.join(' ').trim() || null;
 
         if (targetName) {
           const target = ctx.characters.find(
             (c) => c.name?.toLowerCase() === targetName.toLowerCase(),
           );
           if (!target) {
-            replyText = t("charimage.notFound", { name: targetName });
+            replyText = t('charimage.notFound', { name: targetName });
             break;
           }
           sendCharacterAvatar(data.chatId, target); // async, not awaited
-          replyText = t("charimage.sending", { name: target.name });
+          replyText = t('charimage.sending', { name: target.name });
         } else if (isGroup) {
           const activeGroup = (ctx.groups || []).find(
             (g) => g.id === ctx.groupId,
@@ -602,47 +602,47 @@ export async function handleExecuteCommand(data) {
             )
             .filter(Boolean);
           replyText = memberNames.length
-            ? t("charimage.groupList", {
-                list: memberNames.map((n) => `\u2022 ${n}`).join("\n"),
+            ? t('charimage.groupList', {
+                list: memberNames.map((n) => `\u2022 ${n}`).join('\n'),
               })
-            : t("charimage.groupEmpty");
+            : t('charimage.groupEmpty');
         } else {
           if (
             ctx.characterId === undefined ||
             !ctx.characters?.[ctx.characterId]
           ) {
-            replyText = t("charimage.noChar");
+            replyText = t('charimage.noChar');
             break;
           }
           sendCharacterAvatar(data.chatId, ctx.characters[ctx.characterId]); // async, not awaited
-          replyText = t("charimage.sending", {
+          replyText = t('charimage.sending', {
             name: ctx.characters[ctx.characterId].name,
           });
         }
         break;
       }
 
-      case "mood": {
-        const requestedName = data.args?.join(" ").trim() || null;
+      case 'mood': {
+        const requestedName = data.args?.join(' ').trim() || null;
         let snapshot = await getCurrentExpressionSnapshot(true);
         let usedCachedSnapshot = false;
         if (!snapshot) {
           if (requestedName) {
             const cached = getCachedExpressionSnapshot(requestedName);
             if (!cached) {
-              replyText = t("mood.noExprCached");
+              replyText = t('mood.noExprCached');
               break;
             }
             snapshot = cached;
             usedCachedSnapshot = true;
           } else {
-            replyText = t("mood.noExpr");
+            replyText = t('mood.noExpr');
             break;
           }
         }
 
         if (requestedName) {
-          const owner = snapshot.ownerName || "(unknown)";
+          const owner = snapshot.ownerName || '(unknown)';
 
           if (
             !snapshot.ownerName ||
@@ -650,7 +650,7 @@ export async function handleExecuteCommand(data) {
           ) {
             const cached = getCachedExpressionSnapshot(requestedName);
             if (!cached) {
-              replyText = t("mood.wrongChar", {
+              replyText = t('mood.wrongChar', {
                 owner,
                 expression: snapshot.expression,
                 name: requestedName,
@@ -663,7 +663,7 @@ export async function handleExecuteCommand(data) {
         }
 
         safeSend({
-          type: "expression_update",
+          type: 'expression_update',
           expression: snapshot.expression,
           ownerName: snapshot.ownerName || null,
           chatId: data.chatId,
@@ -675,11 +675,11 @@ export async function handleExecuteCommand(data) {
         const translatedExpr =
           t(exprKey) !== exprKey ? t(exprKey) : snapshot.expression;
         const ownerPrefix = snapshot.ownerName
-          ? t("mood.ownerPrefix", { name: snapshot.ownerName })
-          : "";
-        const cachedNote = usedCachedSnapshot ? t("mood.cachedNote") : "";
+          ? t('mood.ownerPrefix', { name: snapshot.ownerName })
+          : '';
+        const cachedNote = usedCachedSnapshot ? t('mood.cachedNote') : '';
         if (!snapshot.image) {
-          replyText = t("mood.noImage", {
+          replyText = t('mood.noImage', {
             ownerPrefix,
             expression: translatedExpr,
             cachedNote,
@@ -688,17 +688,17 @@ export async function handleExecuteCommand(data) {
         break;
       }
 
-      case "reaction": {
+      case 'reaction': {
         if (!data.args?.length) {
-          replyText = t("reaction.usage");
+          replyText = t('reaction.usage');
           break;
         }
 
-        const mode = String(data.args[0] || "")
+        const mode = String(data.args[0] || '')
           .trim()
           .toLowerCase();
         if (!EXPRESSION_MODE_VALUES.has(mode)) {
-          replyText = t("reaction.invalid");
+          replyText = t('reaction.invalid');
           break;
         }
 
@@ -708,29 +708,29 @@ export async function handleExecuteCommand(data) {
         scheduleExpressionUpdate(data.chatId);
 
         const modeLabel =
-          mode === "off"
-            ? t("reaction.modeOff")
-            : mode === "status"
-              ? t("reaction.modeStatus")
-              : t("reaction.modeFull");
-        replyText = t("reaction.success", { mode: modeLabel });
+          mode === 'off'
+            ? t('reaction.modeOff')
+            : mode === 'status'
+              ? t('reaction.modeStatus')
+              : t('reaction.modeFull');
+        replyText = t('reaction.success', { mode: modeLabel });
         break;
       }
 
-      case "image": {
+      case 'image': {
         if (!data.args?.length) {
-          replyText = t("image.usage");
+          replyText = t('image.usage');
           break;
         }
 
-        const prompt = data.args.join(" ").trim();
+        const prompt = data.args.join(' ').trim();
         const lowerPrompt = prompt.toLowerCase();
 
-        if (lowerPrompt === "cancel") {
+        if (lowerPrompt === 'cancel') {
           const cancelled = cancelActiveImageJob(data.chatId);
           replyText = cancelled
-            ? t("image.cancelled")
-            : t("image.nothingToCancel");
+            ? t('image.cancelled')
+            : t('image.nothingToCancel');
           break;
         }
 
@@ -740,13 +740,13 @@ export async function handleExecuteCommand(data) {
           const seconds = Math.ceil(
             (breakerState.openUntil - Date.now()) / 1000,
           );
-          replyText = t("image.breakerOpen", { seconds });
+          replyText = t('image.breakerOpen', { seconds });
           break;
         }
 
         const rateCheck = checkAndRecordRateLimit(data.chatId);
         if (!rateCheck.allowed) {
-          replyText = t("image.rateLimited");
+          replyText = t('image.rateLimited');
           break;
         }
 
@@ -754,10 +754,10 @@ export async function handleExecuteCommand(data) {
         const timeoutMinutes = getImageGenerationTimeoutMs() / 60_000;
 
         safeSend({
-          type: "image_placeholder",
+          type: 'image_placeholder',
           chatId: data.chatId,
           requestId,
-          text: t("image.placeholder", { minutes: timeoutMinutes }),
+          text: t('image.placeholder', { minutes: timeoutMinutes }),
         });
 
         // Queue and return early - generate_image_result/error sends its own packets.
@@ -770,106 +770,106 @@ export async function handleExecuteCommand(data) {
         return;
       }
 
-      case "continue": {
+      case 'continue': {
         // Fire the continuation and let the normal generation event handlers
         // (collectAndSendReplies, streaming) deliver the result. Sending a
         // separate replyText would duplicate or race against that output.
         // Guard against synchronous throws (e.g. ST already generating).
         try {
-          executeSlashCommandsWithOptions("/continue").catch(() => {});
+          executeSlashCommandsWithOptions('/continue').catch(() => {});
         } catch (_) {}
         break;
       }
 
-      case "impersonate": {
-        const impPrompt = sanitizeNoteArg(data.args?.[0] ?? "");
+      case 'impersonate': {
+        const impPrompt = sanitizeNoteArg(data.args?.[0] ?? '');
         await executeSlashCommandsWithOptions(
           impPrompt
             ? `/impersonate await=true ${impPrompt}`
-            : "/impersonate await=true",
+            : '/impersonate await=true',
         );
-        const impersonatedText = String($("#send_textarea").val()).trim();
+        const impersonatedText = String($('#send_textarea').val()).trim();
         if (impersonatedText) {
-          $("#send_textarea").val("").trigger("input");
-          replyText = t("impersonate.suggestion", { text: impersonatedText });
+          $('#send_textarea').val('').trigger('input');
+          replyText = t('impersonate.suggestion', { text: impersonatedText });
         } else {
-          replyText = t("impersonate.empty");
+          replyText = t('impersonate.empty');
         }
         break;
       }
 
-      case "listpersonas": {
+      case 'listpersonas': {
         const personas = Object.values(
           SillyTavern.getContext().powerUserSettings?.personas ?? {},
         ).filter((n) => n?.trim());
         replyText =
           personas.length > 0
-            ? t("listpersonas.list", {
-                list: personas.map((n, i) => `${i + 1}. ${n}`).join("\n"),
+            ? t('listpersonas.list', {
+                list: personas.map((n, i) => `${i + 1}. ${n}`).join('\n'),
               })
-            : t("listpersonas.empty");
+            : t('listpersonas.empty');
         break;
       }
 
-      case "persona": {
-        const personaName = sanitizeSlashArg(data.args?.[0] ?? "");
+      case 'persona': {
+        const personaName = sanitizeSlashArg(data.args?.[0] ?? '');
         if (!personaName) {
-          replyText = t("persona.usage");
+          replyText = t('persona.usage');
           break;
         }
         await executeSlashCommandsWithOptions(`/persona-set ${personaName}`);
-        replyText = t("persona.success", { name: personaName });
+        replyText = t('persona.success', { name: personaName });
         break;
       }
 
-      case "mypersona": {
+      case 'mypersona': {
         if (!getSettings().allowUserPersonaSave) {
-          replyText = t("mypersona.disabled");
+          replyText = t('mypersona.disabled');
           break;
         }
-        const personaArg = sanitizeSlashArg(data.args?.[0] ?? "");
+        const personaArg = sanitizeSlashArg(data.args?.[0] ?? '');
         if (!personaArg) {
-          replyText = t("mypersona.usage");
+          replyText = t('mypersona.usage');
           break;
         }
-        if (personaArg.toLowerCase() === "clear") {
+        if (personaArg.toLowerCase() === 'clear') {
           safeSend({
-            type: "save_user_persona",
+            type: 'save_user_persona',
             chatId: data.chatId,
-            platform: data.platform || "discord",
-            userId: data.userId || "",
+            platform: data.platform || 'discord',
+            userId: data.userId || '',
             personaName: null,
           });
-          replyText = t("mypersona.cleared");
+          replyText = t('mypersona.cleared');
           break;
         }
         await executeSlashCommandsWithOptions(`/persona-set ${personaArg}`);
         safeSend({
-          type: "save_user_persona",
+          type: 'save_user_persona',
           chatId: data.chatId,
-          platform: data.platform || "discord",
-          userId: data.userId || "",
+          platform: data.platform || 'discord',
+          userId: data.userId || '',
           personaName: personaArg,
         });
-        replyText = t("mypersona.saved", { name: personaArg });
+        replyText = t('mypersona.saved', { name: personaArg });
         break;
       }
 
-      case "setlang": {
-        const langArg = sanitizeSlashArg(data.args?.[0] ?? "");
+      case 'setlang': {
+        const langArg = sanitizeSlashArg(data.args?.[0] ?? '');
         if (!langArg) {
-          replyText = t("setlang.usage");
+          replyText = t('setlang.usage');
           break;
         }
-        if (langArg.toLowerCase() === "clear") {
+        if (langArg.toLowerCase() === 'clear') {
           safeSend({
-            type: "save_user_lang",
+            type: 'save_user_lang',
             chatId: data.chatId,
-            platform: data.platform || "discord",
-            userId: data.userId || "",
+            platform: data.platform || 'discord',
+            userId: data.userId || '',
             localeCode: null,
           });
-          replyText = t("setlang.reset");
+          replyText = t('setlang.reset');
           break;
         }
         const langs = sharedState.availableLanguages || [];
@@ -883,56 +883,56 @@ export async function handleExecuteCommand(data) {
               l.names.some((n) => n.toLowerCase() === lower)),
         );
         if (!match) {
-          replyText = t("setlang.unknown", { input: langArg });
+          replyText = t('setlang.unknown', { input: langArg });
           break;
         }
         safeSend({
-          type: "save_user_lang",
+          type: 'save_user_lang',
           chatId: data.chatId,
-          platform: data.platform || "discord",
-          userId: data.userId || "",
+          platform: data.platform || 'discord',
+          userId: data.userId || '',
           localeCode: match.code,
         });
-        replyText = t("setlang.success", {
+        replyText = t('setlang.success', {
           name: match.nativeName || match.name,
           code: match.code,
         });
         break;
       }
 
-      case "note": {
-        const noteText = sanitizeNoteArg(data.args?.[0] ?? "");
+      case 'note': {
+        const noteText = sanitizeNoteArg(data.args?.[0] ?? '');
         if (noteText) {
           await executeSlashCommandsWithOptions(`/note ${noteText}`);
-          replyText = t("note.success", { text: noteText });
+          replyText = t('note.success', { text: noteText });
         } else {
           const current =
-            SillyTavern.getContext().chatMetadata?.note_prompt ?? "";
+            SillyTavern.getContext().chatMetadata?.note_prompt ?? '';
           replyText = current
-            ? t("note.current", { text: current })
-            : t("note.none");
+            ? t('note.current', { text: current })
+            : t('note.none');
         }
         break;
       }
 
-      case "status": {
+      case 'status': {
         const breakerState = getBreakerState(data.chatId);
         const metrics = getImageMetrics();
         const activeCharacter =
           context.characterId !== undefined
-            ? context.characters?.[context.characterId]?.name || "(unknown)"
-            : "(none)";
+            ? context.characters?.[context.characterId]?.name || '(unknown)'
+            : '(none)';
         const activeGroup = context.groupId
           ? (context.groups || []).find((g) => g.id === context.groupId)
-              ?.name || "(unknown)"
-          : "(none)";
+              ?.name || '(unknown)'
+          : '(none)';
         const pSettings = context.powerUserSettings;
         const personaId = pSettings?.default_persona || pSettings?.persona;
         const activePersona = personaId
           ? pSettings?.personas?.[personaId] || personaId
-          : "(none)";
+          : '(none)';
 
-        let lastErrorText = "";
+        let lastErrorText = '';
         if (metrics.lastError) {
           const minutesAgo = Math.floor(
             (Date.now() - metrics.lastErrorAt) / 60000,
@@ -940,168 +940,168 @@ export async function handleExecuteCommand(data) {
           const errorTime = new Date(metrics.lastErrorAt);
           const timeString =
             minutesAgo < 1
-              ? t("status.timeNow")
+              ? t('status.timeNow')
               : minutesAgo < 60
-                ? t("status.timeMinutes", { m: minutesAgo })
+                ? t('status.timeMinutes', { m: minutesAgo })
                 : minutesAgo < 1440
-                  ? t("status.timeHours", {
+                  ? t('status.timeHours', {
                       h: Math.floor(minutesAgo / 60),
                       m: minutesAgo % 60,
                     })
                   : errorTime.toLocaleString();
-          lastErrorText = t("status.lastError", {
+          lastErrorText = t('status.lastError', {
             error: metrics.lastError,
             time: timeString,
           });
         }
 
         const PLATFORM_LABELS = {
-          discord: "Discord",
-          telegram: "Telegram",
-          signal: "Signal",
+          discord: 'Discord',
+          telegram: 'Telegram',
+          signal: 'Signal',
         };
         const PLATFORM_ICONS = {
-          active: "\uD83D\uDFE2",
-          not_loaded: "\u26AB",
-          inactive: "\uD83D\uDD34",
+          active: '\uD83D\uDFE2',
+          not_loaded: '\u26AB',
+          inactive: '\uD83D\uDD34',
         };
         const platformLine = sharedState.bridgePlugins
           ? Object.entries(sharedState.bridgePlugins)
               .map(
                 ([p, s]) =>
-                  `${PLATFORM_LABELS[p] || p} ${PLATFORM_ICONS[s] || "\u26AB"}`,
+                  `${PLATFORM_LABELS[p] || p} ${PLATFORM_ICONS[s] || '\u26AB'}`,
               )
-              .join(" | ")
-          : "Unknown";
+              .join(' | ')
+          : 'Unknown';
 
         const connStatus =
           getWs()?.readyState === WebSocket.OPEN
-            ? t("status.online")
-            : t("status.offline");
+            ? t('status.online')
+            : t('status.offline');
 
         const activeDisplay =
-          activeGroup !== "(none)"
-            ? t("status.activeGroup", { name: activeGroup })
-            : activeCharacter !== "(none)"
-              ? t("status.activeChar", { name: activeCharacter })
-              : t("status.activeNone");
+          activeGroup !== '(none)'
+            ? t('status.activeGroup', { name: activeGroup })
+            : activeCharacter !== '(none)'
+              ? t('status.activeChar', { name: activeCharacter })
+              : t('status.activeNone');
 
         const personaDisplay =
-          activePersona !== "(none)"
-            ? t("status.personaSet", { name: activePersona })
-            : t("status.personaNone");
+          activePersona !== '(none)'
+            ? t('status.personaSet', { name: activePersona })
+            : t('status.personaNone');
 
         const imageStatusDisplay = !breakerState
-          ? t("status.imageReady")
-          : t("status.imagePaused", {
+          ? t('status.imageReady')
+          : t('status.imagePaused', {
               seconds: Math.ceil((breakerState.openUntil - Date.now()) / 1000),
             });
 
         const lines = [
-          t("status.title"),
-          t("status.connection", { value: connStatus }),
-          t("status.plugins", { value: platformLine }),
-          t("status.active", { value: activeDisplay }),
-          t("status.persona", { value: personaDisplay }),
-          "",
-          t("status.imageGen"),
-          t("status.imageStatus", { value: imageStatusDisplay }),
-          t("status.imageQueue", {
+          t('status.title'),
+          t('status.connection', { value: connStatus }),
+          t('status.plugins', { value: platformLine }),
+          t('status.active', { value: activeDisplay }),
+          t('status.persona', { value: personaDisplay }),
+          '',
+          t('status.imageGen'),
+          t('status.imageStatus', { value: imageStatusDisplay }),
+          t('status.imageQueue', {
             value: hasPendingImageQueue(data.chatId)
-              ? t("status.imageQueuePending")
-              : t("status.imageQueueEmpty"),
+              ? t('status.imageQueuePending')
+              : t('status.imageQueueEmpty'),
           }),
-          t("status.imageGenerating", {
+          t('status.imageGenerating', {
             value: hasActiveImageJob(data.chatId)
-              ? t("status.imageGeneratingYes")
-              : "-",
+              ? t('status.imageGeneratingYes')
+              : '-',
           }),
-          "",
-          t("status.stats"),
-          t("status.statsLine1", {
+          '',
+          t('status.stats'),
+          t('status.statsLine1', {
             succeeded: metrics.succeeded,
             total: metrics.totalRequests,
           }),
-          t("status.statsLine2", {
+          t('status.statsLine2', {
             failed: metrics.failed,
             timedOut: metrics.timedOut,
             rateLimited: metrics.rateLimited,
           }),
-          t("status.statsLine3", {
+          t('status.statsLine3', {
             canceled: metrics.canceled,
             inFlight: metrics.inFlight,
             peak: metrics.maxConcurrentInFlight,
           }),
-          t("status.statsLine4", {
+          t('status.statsLine4', {
             trips: metrics.breakerTrips,
             blocked: metrics.breakerRejected,
           }),
         ];
         if (lastErrorText) lines.push(lastErrorText);
-        replyText = lines.join("\n");
+        replyText = lines.join('\n');
         break;
       }
 
-      case "sthelp": {
+      case 'sthelp': {
         const sections = [
-          t("help.title"),
-          t("help.info"),
-          "",
-          t("help.chars"),
-          "",
-          t("help.chats"),
-          "",
-          t("help.persona"),
+          t('help.title'),
+          t('help.info'),
+          '',
+          t('help.chars'),
+          '',
+          t('help.chats'),
+          '',
+          t('help.persona'),
           ...(getSettings().allowUserPersonaSave
-            ? [t("help.persona.mypersona")]
+            ? [t('help.persona.mypersona')]
             : []),
-          "",
-          t("help.convo"),
-          "",
-          t("help.delete"),
-          "",
-          t("help.expr"),
-          "",
-          t("help.image"),
-          "",
-          t("help.lang"),
-          "",
-          t("help.footer"),
+          '',
+          t('help.convo'),
+          '',
+          t('help.delete'),
+          '',
+          t('help.expr'),
+          '',
+          t('help.image'),
+          '',
+          t('help.lang'),
+          '',
+          t('help.footer'),
         ];
-        replyText = sections.join("\n");
+        replyText = sections.join('\n');
         break;
       }
 
-      case "history": {
+      case 'history': {
         const { chat } = SillyTavern.getContext();
         const n = data.args?.length
           ? Math.max(0, parseInt(data.args[0]) || 0)
           : 5;
         const entries = buildHistory(chat, n);
         if (!entries) {
-          replyText = t("history.empty");
+          replyText = t('history.empty');
           break;
         }
         safeSend({
-          type: "recap_message",
+          type: 'recap_message',
           chatId: data.chatId,
           entries,
           ...(data.userId ? { userId: data.userId } : {}),
           ...(data.userLocale ? { userLocale: data.userLocale } : {}),
         });
-        replyText = t("history.showing", { n: n > 0 ? n : t("history.all") });
+        replyText = t('history.showing', { n: n > 0 ? n : t('history.all') });
         break;
       }
 
-      case "delete": {
+      case 'delete': {
         const { chat } = SillyTavern.getContext();
         if (!chat || chat.length === 0) {
-          replyText = t("delete.empty");
+          replyText = t('delete.empty');
           break;
         }
         const rawN = parseInt(data.args?.[0]) || 1;
         if (rawN > 5) {
-          replyText = t("delete.tooMany");
+          replyText = t('delete.tooMany');
           break;
         }
         const n = Math.min(Math.max(1, rawN), chat.length);
@@ -1109,23 +1109,23 @@ export async function handleExecuteCommand(data) {
           await deleteLastMessage();
         }
         await saveChatConditional();
-        safeSend({ type: "messages_deleted", chatId: data.chatId, count: n });
+        safeSend({ type: 'messages_deleted', chatId: data.chatId, count: n });
         return;
       }
 
-      case "swipe": {
+      case 'swipe': {
         const { chat } = SillyTavern.getContext();
         if (!chat || chat.length === 0) {
-          replyText = t("swipe.empty");
+          replyText = t('swipe.empty');
           break;
         }
         const lastMsg = chat[chat.length - 1];
         if (lastMsg?.is_user) {
-          replyText = t("swipe.noAiMessage");
+          replyText = t('swipe.noAiMessage');
           break;
         }
         if (SillyTavern.getContext().groupId) {
-          replyText = t("swipe.groupNotSupported");
+          replyText = t('swipe.groupNotSupported');
           break;
         }
 
@@ -1134,20 +1134,21 @@ export async function handleExecuteCommand(data) {
 
         // Tell the server to delete the corresponding platform message before
         // the new response arrives so the old one disappears cleanly.
-        safeSend({ type: "messages_deleted", chatId: data.chatId, count: 1 });
+        safeSend({ type: 'messages_deleted', chatId: data.chatId, count: 1 });
 
         // Set up streaming for the regenerated response, mirroring the core
         // of handleUserMessage but without injecting a new user message.
-        let swipeStreamId = null;
-
-        const onSwipeGenStart = () => {
-          swipeStreamId = `${data.chatId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-        };
+        //
+        // Important: initialise streamId immediately. Depending on ST internals,
+        // a swipe-triggered Generate() can emit token events without firing
+        // GENERATION_STARTED in the same path, which would otherwise drop all
+        // stream_chunk packets for Discord.
+        const swipeStreamId = `${data.chatId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
         const onSwipeToken = (cumulativeText) => {
           if (!swipeStreamId) return;
           safeSend({
-            type: "stream_chunk",
+            type: 'stream_chunk',
             chatId: data.chatId,
             streamId: swipeStreamId,
             characterName: null,
@@ -1157,17 +1158,10 @@ export async function handleExecuteCommand(data) {
 
         const removeSwipeListeners = () => {
           eventSource.removeListener(
-            event_types.GENERATION_STARTED,
-            onSwipeGenStart,
-          );
-          eventSource.removeListener(
             event_types.STREAM_TOKEN_RECEIVED,
             onSwipeToken,
           );
-          eventSource.removeListener(
-            event_types.GENERATION_ENDED,
-            onSwipeDone,
-          );
+          eventSource.removeListener(event_types.GENERATION_ENDED, onSwipeDone);
           eventSource.removeListener(
             event_types.GENERATION_STOPPED,
             onSwipeStopped,
@@ -1189,7 +1183,7 @@ export async function handleExecuteCommand(data) {
             }
           }
           safeSend({
-            type: "stream_end",
+            type: 'stream_end',
             chatId: data.chatId,
             streamId: swipeStreamId,
             characterName: null,
@@ -1201,7 +1195,7 @@ export async function handleExecuteCommand(data) {
           removeSwipeListeners();
           if (swipeStreamId) {
             safeSend({
-              type: "stream_end",
+              type: 'stream_end',
               chatId: data.chatId,
               streamId: swipeStreamId,
               finalText: null,
@@ -1209,25 +1203,24 @@ export async function handleExecuteCommand(data) {
           }
         };
 
-        eventSource.on(event_types.GENERATION_STARTED, onSwipeGenStart);
         eventSource.on(event_types.STREAM_TOKEN_RECEIVED, onSwipeToken);
         eventSource.on(event_types.GENERATION_ENDED, onSwipeDone);
         eventSource.once(event_types.GENERATION_STOPPED, onSwipeStopped);
 
-        safeSend({ type: "typing_action", chatId: data.chatId });
+        safeSend({ type: 'typing_action', chatId: data.chatId });
 
         try {
           const abortController = new AbortController();
           setExternalAbortController(abortController);
-          await Generate("normal", { signal: abortController.signal });
+          await Generate('normal', { signal: abortController.signal });
         } catch (err) {
-          console.error("[Discord Bridge] Swipe generation error:", err);
+          console.error('[Discord Bridge] Swipe generation error:', err);
           removeSwipeListeners();
           safeSend({
-            type: "error_message",
+            type: 'error_message',
             chatId: data.chatId,
-            text: t("reply.generationFailed", {
-              message: err.message || "Unknown",
+            text: t('reply.generationFailed', {
+              message: err.message || 'Unknown',
             }),
           });
         }
@@ -1242,15 +1235,15 @@ export async function handleExecuteCommand(data) {
           if (index >= 0 && index < characters.length) {
             const target = characters[index];
             safeSend({
-              type: "ai_reply",
+              type: 'ai_reply',
               chatId: data.chatId,
-              text: t("switchchar.success", { name: target.name }),
+              text: t('switchchar.success', { name: target.name }),
             });
             scheduleRecap(data.chatId, data.userId, data.userLocale);
             await selectCharacterById(context.characters.indexOf(target));
             invalidateChatCache();
           } else {
-            replyText = t("switchchar.invalidIndex", { n: index + 1 });
+            replyText = t('switchchar.invalidIndex', { n: index + 1 });
           }
           break;
         }
@@ -1258,26 +1251,26 @@ export async function handleExecuteCommand(data) {
         const chatMatch = data.command.match(/^switchchat_(\d+)$/);
         if (chatMatch) {
           if (context.characterId === undefined) {
-            replyText = t("listchats.noChar");
+            replyText = t('listchats.noChar');
             break;
           }
           const index = parseInt(chatMatch[1]) - 1;
           const chatFiles = await getPastCharacterChats(context.characterId);
           if (index >= 0 && index < chatFiles.length) {
-            const chatName = chatFiles[index].file_name.replace(".jsonl", "");
+            const chatName = chatFiles[index].file_name.replace('.jsonl', '');
             try {
               safeSend({
-                type: "ai_reply",
+                type: 'ai_reply',
                 chatId: data.chatId,
-                text: t("switchchat.success", { name: chatName }),
+                text: t('switchchat.success', { name: chatName }),
               });
               scheduleRecap(data.chatId, data.userId, data.userLocale);
               await openCharacterChat(chatName);
             } catch {
-              replyText = t("switchchat.failGeneric");
+              replyText = t('switchchat.failGeneric');
             }
           } else {
-            replyText = t("switchchat.invalidIndex", { n: index + 1 });
+            replyText = t('switchchat.invalidIndex', { n: index + 1 });
           }
           break;
         }
@@ -1288,9 +1281,9 @@ export async function handleExecuteCommand(data) {
           const groups = context.groups || [];
           if (index >= 0 && index < groups.length) {
             safeSend({
-              type: "ai_reply",
+              type: 'ai_reply',
               chatId: data.chatId,
-              text: t("switchgroup.success", { name: groups[index].name }),
+              text: t('switchgroup.success', { name: groups[index].name }),
             });
             scheduleRecap(data.chatId, data.userId, data.userLocale);
             await executeSlashCommandsWithOptions(
@@ -1298,23 +1291,23 @@ export async function handleExecuteCommand(data) {
             );
             invalidateChatCache();
           } else {
-            replyText = t("switchgroup.invalidIndex", { n: index + 1 });
+            replyText = t('switchgroup.invalidIndex', { n: index + 1 });
           }
           break;
         }
 
-        replyText = t("unknown.cmd", { cmd: data.command });
+        replyText = t('unknown.cmd', { cmd: data.command });
       }
     }
   } catch (error) {
-    console.error("[Discord Bridge] Command error:", error);
+    console.error('[Discord Bridge] Command error:', error);
     const msg =
-      error instanceof Error ? error.message : String(error ?? "Unknown error");
-    replyText = t("cmd.error", { message: msg });
+      error instanceof Error ? error.message : String(error ?? 'Unknown error');
+    replyText = t('cmd.error', { message: msg });
   }
 
   if (replyText)
-    safeSend({ type: "ai_reply", chatId: data.chatId, text: replyText });
+    safeSend({ type: 'ai_reply', chatId: data.chatId, text: replyText });
 }
 
 // ---------------------------------------------------------------------------
@@ -1340,13 +1333,13 @@ export async function handleGetAutocomplete(data) {
     const sortAlpha = (names) =>
       [...names].sort((a, b) =>
         a
-          .replace(/^[^\p{L}]+/u, "")
-          .localeCompare(b.replace(/^[^\p{L}]+/u, ""), undefined, {
-            sensitivity: "base",
+          .replace(/^[^\p{L}]+/u, '')
+          .localeCompare(b.replace(/^[^\p{L}]+/u, ''), undefined, {
+            sensitivity: 'base',
           }),
       );
 
-    if (data.list === "characters") {
+    if (data.list === 'characters') {
       if (
         autocompleteCache.characters &&
         now - autocompleteCache.characters.cachedAt < AUTOCOMPLETE_CACHE_TTL_MS
@@ -1358,7 +1351,7 @@ export async function handleGetAutocomplete(data) {
           .filter((n) => n?.trim());
         autocompleteCache.characters = { names: allNames, cachedAt: now };
       }
-    } else if (data.list === "groups") {
+    } else if (data.list === 'groups') {
       if (
         autocompleteCache.groups &&
         now - autocompleteCache.groups.cachedAt < AUTOCOMPLETE_CACHE_TTL_MS
@@ -1370,7 +1363,7 @@ export async function handleGetAutocomplete(data) {
           .filter((n) => n?.trim());
         autocompleteCache.groups = { names: allNames, cachedAt: now };
       }
-    } else if (data.list === "chats") {
+    } else if (data.list === 'chats') {
       // Only meaningful when a character is selected; empty list otherwise.
       // Sorted newest-first using the raw filename (which is lexicographically
       // ordered by timestamp), then reformatted for display using the timezone
@@ -1395,12 +1388,12 @@ export async function handleGetAutocomplete(data) {
           const fmt = (() => {
             const tz = sharedState.bridgeTimezone;
             const opts = {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
               hour12: false,
               ...(tz ? { timeZone: tz } : {}),
             };
@@ -1421,7 +1414,7 @@ export async function handleGetAutocomplete(data) {
           // shown in Discord's dropdown; value is the raw filename that ST
           // uses to actually load the chat.
           allNames = chatFiles
-            .map((c) => c.file_name.replace(".jsonl", ""))
+            .map((c) => c.file_name.replace('.jsonl', ''))
             .filter((n) => n?.trim())
             // Sort newest-first by raw filename - the timestamp suffix is
             // lexicographically ordered so no date parsing is needed here.
@@ -1433,7 +1426,7 @@ export async function handleGetAutocomplete(data) {
               // keeping the raw filename as the value ST receives on selection.
               const prefix = raw.replace(
                 / - \d{4}-\d{2}-\d{2}@\d{2}h\d{2}m\d{2}s\d+ms$/,
-                "",
+                '',
               );
               return { name: `${prefix} - ${fmt.format(date)}`, value: raw };
             });
@@ -1441,31 +1434,31 @@ export async function handleGetAutocomplete(data) {
           chatCache[context.characterId] = { names: allNames };
         }
       }
-    } else if (data.list === "image_prompts") {
+    } else if (data.list === 'image_prompts') {
       // Static keyword list - no caching needed.
       allNames = [
-        "you",
-        "face",
-        "me",
-        "scene",
-        "last",
-        "raw_last",
-        "background",
-        "cancel",
+        'you',
+        'face',
+        'me',
+        'scene',
+        'last',
+        'raw_last',
+        'background',
+        'cancel',
       ];
-    } else if (data.list === "personas") {
+    } else if (data.list === 'personas') {
       // Always fresh - persona list is small and changes rarely.
       allNames = Object.values(
         context.powerUserSettings?.personas ?? {},
       ).filter((n) => n?.trim());
-    } else if (data.list === "languages") {
+    } else if (data.list === 'languages') {
       // Available languages come from the server via bridge_config.
       // Return all known names (every translation) so matching works regardless
       // of which language the user types in.
       allNames = (sharedState.availableLanguages || []).flatMap((l) =>
         Array.isArray(l.names) ? l.names : [l.name],
       );
-    } else if (data.list === "group_members") {
+    } else if (data.list === 'group_members') {
       if (!context.groupId) {
         // Solo chat - offer the active character's name as the only option.
         const soloChar =
@@ -1475,7 +1468,7 @@ export async function handleGetAutocomplete(data) {
         // Read directly from the rendered group members panel and sort
         // alphabetically, consistent with the other name lists.
         const memberEls = document.querySelectorAll(
-          "#rm_group_members .group_member .ch_name",
+          '#rm_group_members .group_member .ch_name',
         );
         allNames = sortAlpha(
           Array.from(memberEls)
@@ -1486,26 +1479,26 @@ export async function handleGetAutocomplete(data) {
     }
   } catch (err) {
     // Fall through with empty choices rather than leaving Discord's dropdown on a spinner.
-    console.error("[Discord Bridge] Autocomplete error:", err);
+    console.error('[Discord Bridge] Autocomplete error:', err);
   }
 
-  const query = (data.query || "").toLowerCase();
+  const query = (data.query || '').toLowerCase();
   // allNames entries are either plain strings (all lists except chats) or
   // {name, value} objects (chats, where the display label differs from the
   // raw filename that SillyTavern needs to load the chat). Normalise here so
   // websocket.js always receives a consistent {name, value} array.
   const choices = allNames
     .filter((entry) => {
-      const label = typeof entry === "string" ? entry : entry.name;
+      const label = typeof entry === 'string' ? entry : entry.name;
       return label.toLowerCase().includes(query);
     })
     .slice(0, 25)
     .map((entry) =>
-      typeof entry === "string" ? { name: entry, value: entry } : entry,
+      typeof entry === 'string' ? { name: entry, value: entry } : entry,
     );
 
   safeSend({
-    type: "autocomplete_response",
+    type: 'autocomplete_response',
     requestId: data.requestId,
     choices,
   });
