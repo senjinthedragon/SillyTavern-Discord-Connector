@@ -345,3 +345,35 @@ test("handleBridgePacket send_images fans out full images array", async () => {
 
   assert.deepEqual(seen, [["sendImages", 2]]);
 });
+
+test("handleBridgePacket messages_deleted fans out deleteRoleplayMessages with count", async () => {
+  const deps = createDeps();
+  const seen = [];
+  deps.fanout = async (_conv, fnName, count) => {
+    seen.push([fnName, count]);
+    return [];
+  };
+
+  await handleBridgePacket(
+    { type: "messages_deleted", chatId: "conv1", count: 3 },
+    deps,
+  );
+
+  assert.deepEqual(seen, [["deleteRoleplayMessages", 3]]);
+});
+
+test("handleBridgePacket messages_deleted defaults count to 1 when missing", async () => {
+  const deps = createDeps();
+  const seen = [];
+  deps.fanout = async (_conv, fnName, count) => {
+    seen.push([fnName, count]);
+    return [];
+  };
+
+  await handleBridgePacket(
+    { type: "messages_deleted", chatId: "conv1" },
+    deps,
+  );
+
+  assert.deepEqual(seen, [["deleteRoleplayMessages", 1]]);
+});

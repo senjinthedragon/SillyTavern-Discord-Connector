@@ -232,6 +232,12 @@ async function handleBridgePacket(data, deps) {
       break;
     }
 
+    case "messages_deleted": {
+      const count = Math.max(1, parseInt(data.count) || 1);
+      await fanout(conversationId, "deleteRoleplayMessages", count);
+      break;
+    }
+
     case "send_images":
       await fanout(
         conversationId,

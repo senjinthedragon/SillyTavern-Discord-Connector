@@ -315,6 +315,24 @@ const SLASH_COMMANDS = [
       },
     ],
   },
+  {
+    name: "delete",
+    description: "Delete the last message(s) from the chat",
+    options: [
+      {
+        name: "count",
+        type: 4,
+        description: "Number of messages to delete (1-5, default: 1)",
+        required: false,
+        min_value: 1,
+        max_value: 5,
+      },
+    ],
+  },
+  {
+    name: "swipe",
+    description: "Delete the last AI response and generate a new one",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -325,6 +343,59 @@ const AUTOCOMPLETE_DEBOUNCE_MS = 250;
 const AUTOCOMPLETE_TIMEOUT_MS = 2800;
 const autocompleteDebouncers = {};
 const pendingAutocompletes = {};
+
+// ---------------------------------------------------------------------------
+// Roleplay message tracking
+//
+// Tracks Discord message IDs that are real roleplay messages (AI replies or
+// streamed responses), keyed by channelId. Used to:
+//   1. Delete corresponding Discord messages when /delete or /swipe is used.
+//   2. Detect when a user manually deletes a Discord message and mirror that
+//      deletion into SillyTavern (only the most recent tracked message).
+//
+// Ring buffer capped at ROLEPLAY_MESSAGE_LIMIT per channel to bound memory use.
+// ---------------------------------------------------------------------------
+
+const ROLEPLAY_MESSAGE_LIMIT = 50;
+// messageId -> channelId (fast lookup for MessageDelete events)
+const recentRoleplayMessages = new Map();
+// channelId -> messageId[] (ordered oldest→newest, for deleteRoleplayMessages)
+const channelMessageHistory = new Map();
+
+function trackRoleplayMessage(channelId, msg) {
+  if (!msg?.id) return;
+  recentRoleplayMessages.set(msg.id, channelId);
+  if (!channelMessageHistory.has(channelId)) {
+    channelMessageHistory.set(channelId, []);
+  }
+  const history = channelMessageHistory.get(channelId);
+  history.push(msg.id);
+  if (history.length > ROLEPLAY_MESSAGE_LIMIT) {
+    const evicted = history.shift();
+    recentRoleplayMessages.delete(evicted);
+  }
+}
+
+async function deleteRoleplayMessages(channelId, count) {
+  const history = channelMessageHistory.get(channelId);
+  if (!history?.length) return;
+  const n = Math.min(Math.max(1, count), history.length);
+  const toDelete = history.splice(-n);
+  for (const msgId of toDelete) {
+    recentRoleplayMessages.delete(msgId);
+  }
+  if (!history.length) channelMessageHistory.delete(channelId);
+  const channel = client.channels.cache.get(channelId);
+  if (!channel) return;
+  for (const msgId of toDelete) {
+    try {
+      const msg = await channel.messages.fetch(msgId);
+      await msg.delete();
+    } catch {
+      // Already deleted or inaccessible - skip silently.
+    }
+  }
+}
 
 // Tracks the Discord message sent as an image placeholder ("🎨 Generating image…")
 // keyed by channelId. Each entry is { msg, timerId } - msg is the Discord Message
@@ -554,6 +625,24 @@ if (DISCORD_PLUGIN_ENABLED) {
   // Incoming Discord messages → SillyTavern
   // ---------------------------------------------------------------------------
 
+  // Mirror manual Discord message deletions into SillyTavern.
+  // Only the most recently tracked roleplay message per channel triggers a
+  // delete command - deleting older messages out of order is ambiguous.
+  client.on(Events.MessageDelete, (message) => {
+    const channelId = message.channelId;
+    const history = channelMessageHistory.get(channelId);
+    if (!history?.length) return;
+    const isNewest = history[history.length - 1] === message.id;
+    const idx = isNewest ? history.length - 1 : history.indexOf(message.id);
+    if (idx === -1) return;
+    // Remove from tracking regardless.
+    history.splice(idx, 1);
+    if (!history.length) channelMessageHistory.delete(channelId);
+    recentRoleplayMessages.delete(message.id);
+    // Only dispatch to ST when the deleted message was the most recent one.
+    if (isNewest) dispatchCommand("discord", channelId, "delete", ["1"], null);
+  });
+
   client.on("messageCreate", (message) => {
     if (message.author.bot) return;
     if (
@@ -632,7 +721,8 @@ async function sendText(channelId, text) {
       await placeholderMessages[channelId].msg.delete().catch(() => {});
       delete placeholderMessages[channelId];
     }
-    await sendLong(channel, text);
+    const msg = await sendLong(channel, text);
+    trackRoleplayMessage(channelId, msg);
   });
 }
 
@@ -833,7 +923,8 @@ async function streamEnd(channelId, payload) {
     if (s.streamMessage) {
       await s.streamMessage.delete().catch(() => {});
     }
-    await sendLong(channel, finalText);
+    const msg = await sendLong(channel, finalText);
+    trackRoleplayMessage(channelId, msg);
   }
 
   delete streamSessions[streamId];
@@ -853,4 +944,5 @@ module.exports = {
   sendRecap,
   streamChunk,
   streamEnd,
+  deleteRoleplayMessages,
 };

@@ -38,6 +38,7 @@ import {
   Generate,
   setExternalAbortController,
   deleteLastMessage,
+  saveChatConditional,
 } from "../../../../../script.js";
 
 import { executeSlashCommandsWithOptions } from "../../../../../scripts/slash-commands.js";
@@ -1057,6 +1058,8 @@ export async function handleExecuteCommand(data) {
           "",
           t("help.convo"),
           "",
+          t("help.delete"),
+          "",
           t("help.expr"),
           "",
           t("help.image"),
@@ -1088,6 +1091,147 @@ export async function handleExecuteCommand(data) {
         });
         replyText = t("history.showing", { n: n > 0 ? n : t("history.all") });
         break;
+      }
+
+      case "delete": {
+        const { chat } = SillyTavern.getContext();
+        if (!chat || chat.length === 0) {
+          replyText = t("delete.empty");
+          break;
+        }
+        const rawN = parseInt(data.args?.[0]) || 1;
+        if (rawN > 5) {
+          replyText = t("delete.tooMany");
+          break;
+        }
+        const n = Math.min(Math.max(1, rawN), chat.length);
+        for (let i = 0; i < n; i++) {
+          await deleteLastMessage();
+        }
+        await saveChatConditional();
+        safeSend({ type: "messages_deleted", chatId: data.chatId, count: n });
+        return;
+      }
+
+      case "swipe": {
+        const { chat } = SillyTavern.getContext();
+        if (!chat || chat.length === 0) {
+          replyText = t("swipe.empty");
+          break;
+        }
+        const lastMsg = chat[chat.length - 1];
+        if (lastMsg?.is_user) {
+          replyText = t("swipe.noAiMessage");
+          break;
+        }
+        if (SillyTavern.getContext().groupId) {
+          replyText = t("swipe.groupNotSupported");
+          break;
+        }
+
+        await deleteLastMessage();
+        await saveChatConditional();
+
+        // Tell the server to delete the corresponding platform message before
+        // the new response arrives so the old one disappears cleanly.
+        safeSend({ type: "messages_deleted", chatId: data.chatId, count: 1 });
+
+        // Set up streaming for the regenerated response, mirroring the core
+        // of handleUserMessage but without injecting a new user message.
+        let swipeStreamId = null;
+
+        const onSwipeGenStart = () => {
+          swipeStreamId = `${data.chatId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        };
+
+        const onSwipeToken = (cumulativeText) => {
+          if (!swipeStreamId) return;
+          safeSend({
+            type: "stream_chunk",
+            chatId: data.chatId,
+            streamId: swipeStreamId,
+            characterName: null,
+            text: cumulativeText,
+          });
+        };
+
+        const removeSwipeListeners = () => {
+          eventSource.removeListener(
+            event_types.GENERATION_STARTED,
+            onSwipeGenStart,
+          );
+          eventSource.removeListener(
+            event_types.STREAM_TOKEN_RECEIVED,
+            onSwipeToken,
+          );
+          eventSource.removeListener(
+            event_types.GENERATION_ENDED,
+            onSwipeDone,
+          );
+          eventSource.removeListener(
+            event_types.GENERATION_STOPPED,
+            onSwipeStopped,
+          );
+        };
+
+        const onSwipeDone = () => {
+          removeSwipeListeners();
+          const { chat: currentChat } = SillyTavern.getContext();
+          let finalText = null;
+          if (currentChat?.length) {
+            for (let i = currentChat.length - 1; i >= 0; i--) {
+              const msg = currentChat[i];
+              if (msg.is_user) break;
+              if (msg.mes?.trim()) {
+                finalText = msg.mes.trim();
+                break;
+              }
+            }
+          }
+          safeSend({
+            type: "stream_end",
+            chatId: data.chatId,
+            streamId: swipeStreamId,
+            characterName: null,
+            finalText,
+          });
+        };
+
+        const onSwipeStopped = () => {
+          removeSwipeListeners();
+          if (swipeStreamId) {
+            safeSend({
+              type: "stream_end",
+              chatId: data.chatId,
+              streamId: swipeStreamId,
+              finalText: null,
+            });
+          }
+        };
+
+        eventSource.on(event_types.GENERATION_STARTED, onSwipeGenStart);
+        eventSource.on(event_types.STREAM_TOKEN_RECEIVED, onSwipeToken);
+        eventSource.on(event_types.GENERATION_ENDED, onSwipeDone);
+        eventSource.once(event_types.GENERATION_STOPPED, onSwipeStopped);
+
+        safeSend({ type: "typing_action", chatId: data.chatId });
+
+        try {
+          const abortController = new AbortController();
+          setExternalAbortController(abortController);
+          await Generate("normal", { signal: abortController.signal });
+        } catch (err) {
+          console.error("[Discord Bridge] Swipe generation error:", err);
+          removeSwipeListeners();
+          safeSend({
+            type: "error_message",
+            chatId: data.chatId,
+            text: t("reply.generationFailed", {
+              message: err.message || "Unknown",
+            }),
+          });
+        }
+        return;
       }
 
       default: {

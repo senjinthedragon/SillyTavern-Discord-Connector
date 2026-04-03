@@ -52,6 +52,19 @@ Use these slash commands in Discord to control the session.
 | **`/impersonate`** | *Have the AI write your next message for you, as your character would say it. Add an optional prompt to guide it* |
 | **`/note <text>`** | *Set SillyTavern's Author's Note to shape the story or the character's behavior. Leave out the text to read what's currently set* |
 
+## Delete & Swipe
+
+| Command | Description |
+| --- | --- |
+| **`/delete`** | *Delete the last message from the chat (both from SillyTavern and from Discord)* |
+| **`/delete <1-5>`** | *Delete the last N messages, including any user messages before them so no AI response is left without context* |
+| **`/swipe`** | *Delete the last AI response and generate a new one - useful when the output has formatting issues or just isn't quite right* |
+
+> [!NOTE]
+> `/delete` and `/swipe` mirror their changes to Discord automatically - the affected messages disappear from the channel. In solo chat only; `/swipe` is not supported in group chats.
+>
+> Deleting a Discord message manually (selecting "Delete Message" in Discord) will also delete the corresponding last message from SillyTavern, as long as it was the most recent AI response in that channel.
+
 ## Expressions & appearance
 
 | Command | Description |

@@ -63,6 +63,10 @@ function createDiscordPlugin() {
     async sendRecap(chatId, entries, userId, userLocale) {
       await discord.sendRecap(chatId, entries, userId, userLocale);
     },
+
+    async deleteRoleplayMessages(chatId, count) {
+      await discord.deleteRoleplayMessages(chatId, count);
+    },
   };
 }
 
