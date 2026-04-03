@@ -1146,7 +1146,6 @@ export async function handleExecuteCommand(data) {
         const swipeStreamId = `${data.chatId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
         const onSwipeToken = (cumulativeText) => {
-          if (!swipeStreamId) return;
           safeSend({
             type: 'stream_chunk',
             chatId: data.chatId,
@@ -1193,14 +1192,12 @@ export async function handleExecuteCommand(data) {
 
         const onSwipeStopped = () => {
           removeSwipeListeners();
-          if (swipeStreamId) {
-            safeSend({
-              type: 'stream_end',
-              chatId: data.chatId,
-              streamId: swipeStreamId,
-              finalText: null,
-            });
-          }
+          safeSend({
+            type: 'stream_end',
+            chatId: data.chatId,
+            streamId: swipeStreamId,
+            finalText: null,
+          });
         };
 
         eventSource.on(event_types.STREAM_TOKEN_RECEIVED, onSwipeToken);
