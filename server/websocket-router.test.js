@@ -116,6 +116,28 @@ test("handleBridgePacket stream_end falls back sendText for non-streaming fronte
   );
 });
 
+test("handleBridgePacket stream_end passes null finalText through to streamEnd (pendingText fallback)", async () => {
+  const deps = createDeps();
+  const streamEndPayloads = [];
+  deps.fanout = async (_conv, fnName, payload) => {
+    if (fnName === "streamEnd") streamEndPayloads.push(payload);
+    return [];
+  };
+
+  await handleBridgePacket(
+    {
+      type: "stream_end",
+      chatId: "conv1",
+      streamId: "s1",
+      finalText: null,
+    },
+    deps,
+  );
+
+  assert.equal(streamEndPayloads.length, 1);
+  assert.equal(streamEndPayloads[0].finalText, null);
+});
+
 test("handleBridgePacket ai_reply is skipped once after stream_end", async () => {
   const deps = createDeps();
   deps.streamHandled.add("conv1");

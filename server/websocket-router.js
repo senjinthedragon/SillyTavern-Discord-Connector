@@ -146,7 +146,11 @@ async function handleBridgePacket(data, deps) {
 
     case "stream_end": {
       const streamId = data.streamId || conversationId;
-      const finalText = data.finalText ?? "";
+      // Keep null as null so discord.streamEnd can fall back to s.pendingText
+      // (the last streamed token) when the chat array hasn't flushed yet.
+      // Converting null to "" here would cause "" != null to be true inside
+      // streamEnd, bypassing the pendingText fallback and losing the message.
+      const finalText = data.finalText ?? null;
 
       const streamPayload = {
         streamId,
@@ -158,7 +162,7 @@ async function handleBridgePacket(data, deps) {
         await fanout(conversationId, "streamEnd", streamPayload),
       );
 
-      if (finalText.trim()) {
+      if (finalText?.trim()) {
         const text = data.characterName
           ? `**${data.characterName}**\n${finalText}`
           : finalText;
