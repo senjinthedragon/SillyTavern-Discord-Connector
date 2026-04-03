@@ -603,11 +603,16 @@ if (DISCORD_PLUGIN_ENABLED) {
       .filter((opt) => opt.type === 3 || opt.type === 4)
       .map((opt) => String(opt.value));
 
+    const cappedArgs =
+      command === "delete" && config.triggerPrefix
+        ? [String(Math.min(1, parseInt(args[0]) || 1))]
+        : args;
+
     dispatchCommand(
       "discord",
       interaction.channelId,
       command,
-      args,
+      cappedArgs,
       interaction.user.id,
     );
 
@@ -656,15 +661,24 @@ if (DISCORD_PLUGIN_ENABLED) {
     )
       return;
 
-    const content = message.content;
+    let content = message.content;
+
+    if (config.triggerPrefix) {
+      if (!content.startsWith(config.triggerPrefix)) return;
+      content = content.slice(config.triggerPrefix.length).trimStart();
+    }
 
     if (content.startsWith("/")) {
       const [command, ...args] = content.slice(1).split(" ");
+      const cappedArgs =
+        command === "delete" && config.triggerPrefix
+          ? [String(Math.min(1, parseInt(args[0]) || 1))]
+          : args;
       dispatchCommand(
         "discord",
         message.channel.id,
         command,
-        args,
+        cappedArgs,
         message.author.id,
       );
       return;

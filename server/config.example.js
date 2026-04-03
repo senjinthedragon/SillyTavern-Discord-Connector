@@ -66,6 +66,15 @@ module.exports = {
   // Set to true to enable verbose terminal logging for troubleshooting.
   debug: false,
 
+  // When set, the bot only responds to messages that begin with this prefix.
+  // Useful for group chats where players talk amongst themselves and only want
+  // the bot to respond to prefixed messages (e.g. "! hello" or "！こんにちは").
+  // Any non-empty string works, including multi-byte unicode characters.
+  // When active, /delete is capped at 1 message to avoid deleting non-prefixed
+  // banter that was never tracked by the bot.
+  // Remove or comment out this line entirely to disable the prefix requirement.
+  // triggerPrefix: "!",
+
   // =========================================================================
   // ADVANCED SETTINGS - no need to touch these unless you know what you're
   // doing. Defaults are sensible for most setups.

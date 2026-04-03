@@ -163,6 +163,16 @@ function createConfig(rawConfig) {
     config.userLocale = null;
   }
 
+  if (
+    config.triggerPrefix !== undefined &&
+    (typeof config.triggerPrefix !== "string" || config.triggerPrefix === "")
+  ) {
+    warnings.push(
+      '[Config] config.triggerPrefix must be a non-empty string (e.g. "!") - ignoring',
+    );
+    config.triggerPrefix = undefined;
+  }
+
   for (const platform of ["discord", "telegram", "signal"]) {
     const mapKey = `${platform}LanguageMap`;
     if (config[mapKey] !== undefined) {
