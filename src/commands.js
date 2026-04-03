@@ -1145,7 +1145,12 @@ export async function handleExecuteCommand(data) {
         // stream_chunk packets for Discord.
         const swipeStreamId = `${data.chatId}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+        let swipeGenerationStarted = false;
+        let swipeStreamedAny = false;
+        let swipeFinished = false;
+
         const onSwipeToken = (cumulativeText) => {
+          swipeStreamedAny = true;
           safeSend({
             type: 'stream_chunk',
             chatId: data.chatId,
@@ -1155,10 +1160,18 @@ export async function handleExecuteCommand(data) {
           });
         };
 
+        const onSwipeGenerationStarted = () => {
+          swipeGenerationStarted = true;
+        };
+
         const removeSwipeListeners = () => {
           eventSource.removeListener(
             event_types.STREAM_TOKEN_RECEIVED,
             onSwipeToken,
+          );
+          eventSource.removeListener(
+            event_types.GENERATION_STARTED,
+            onSwipeGenerationStarted,
           );
           eventSource.removeListener(event_types.GENERATION_ENDED, onSwipeDone);
           eventSource.removeListener(
@@ -1168,6 +1181,8 @@ export async function handleExecuteCommand(data) {
         };
 
         const onSwipeDone = () => {
+          if (swipeFinished) return;
+          swipeFinished = true;
           removeSwipeListeners();
           const { chat: currentChat } = SillyTavern.getContext();
           let finalText = null;
@@ -1191,6 +1206,11 @@ export async function handleExecuteCommand(data) {
         };
 
         const onSwipeStopped = () => {
+          // GENERATION_STOPPED may be emitted by unrelated cleanup paths.
+          // Ignore it unless this swipe actually started or already streamed.
+          if (!swipeGenerationStarted && !swipeStreamedAny) return;
+          if (swipeFinished) return;
+          swipeFinished = true;
           removeSwipeListeners();
           safeSend({
             type: 'stream_end',
@@ -1201,6 +1221,10 @@ export async function handleExecuteCommand(data) {
         };
 
         eventSource.on(event_types.STREAM_TOKEN_RECEIVED, onSwipeToken);
+        eventSource.on(
+          event_types.GENERATION_STARTED,
+          onSwipeGenerationStarted,
+        );
         eventSource.on(event_types.GENERATION_ENDED, onSwipeDone);
         eventSource.once(event_types.GENERATION_STOPPED, onSwipeStopped);
 
