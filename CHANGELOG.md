@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.8.0] - 2026-04-03
+
+### Added
+
+- Added `/delete [1-5]` slash command. Removes the last 1 to 5 messages from the SillyTavern chat and mirrors the deletion to Discord by removing the corresponding bot messages from the channel. Defaults to 1 if no count is given. The count is capped at the number of messages actually in the chat. Not available in group chats for `/swipe`; see below.
+- Added `/swipe` slash command. Deletes the last AI response from the SillyTavern chat and triggers a new generation. The Discord message is removed before the new reply arrives as a normal streamed response. Only available in solo chats.
+- Manual Discord message deletion now mirrors back to SillyTavern. When the most recently tracked bot message in a channel is deleted by a user (right-click > Delete Message), the corresponding message is automatically removed from the ST chat. Deleting older messages out of order has no effect on the ST side. A ring buffer (50 messages per channel) tracks posted bot message IDs to enable the match.
+- Added `triggerPrefix` config option. When set to a non-empty string, the bot ignores any Discord message that does not begin with that prefix, and strips it before forwarding to SillyTavern. Supports any string including multi-byte unicode characters. When active, `/delete` is capped at 1 message to avoid removing non-prefixed banter that was never tracked by the bot. Commented out in `config.example.js`; no prefix is required by default.
+- Added `messages_deleted` WebSocket packet type (`extension → server`). Carries a `count` field indicating how many messages were removed. `websocket-router.js` fans this out to all platform frontends via `deleteRoleplayMessages(chatId, count)`.
+
+### Fixed
+
+- Updated `@discordjs/rest` to resolve an undici advisory in `discord.js`. Separately ran `npm audit fix` to patch lodash (code injection via `_.template`) and undici (unbounded decompression / WebSocket parsing) advisories in server dependencies. The remaining moderate-severity advisories are confined to `jimp`'s `file-type` dependency; no upstream fix is available without a breaking jimp downgrade.
+
+**(Pro Plugins)**
+
+- Telegram plugin now supports `deleteRoleplayMessages`. A 50-message ring buffer per chat tracks the `message_id` of every bot-sent text message. When a deletion is requested, the last N entries are removed from the buffer and deleted via the Telegram Bot API `deleteMessage` method. `sendText` now captures and stores the returned `message_id` from the API response.
+- Signal plugin does not implement `deleteRoleplayMessages`. The fanout silently skips missing methods, so the SillyTavern chat is still updated but no Signal-side deletion occurs. Signal message deletion requires tracking API-returned timestamps which varies across signal-cli-rest-api versions.
+
 ## [1.7.2] - 2026-03-21
 
 ### Added
