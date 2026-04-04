@@ -25,7 +25,7 @@
  * starting with "/", which messageCreate forwards as execute_command.
  */
 
-"use strict";
+'use strict';
 
 const {
   Events,
@@ -34,40 +34,40 @@ const {
   MessageFlags,
   ActivityType,
   EmbedBuilder,
-} = require("discord.js");
+} = require('discord.js');
 
-const { log } = require("./logger");
-const { config, token } = require("./config-loader");
-const { t, makeTranslator } = require("./i18n");
-const { client } = require("./client");
-const { sendLong, sendImagesToChannel } = require("./messaging");
-const { splitLongText } = require("./text-chunking");
-const { enqueue } = require("./queue");
+const { log } = require('./logger');
+const { config, token } = require('./config-loader');
+const { t, makeTranslator } = require('./i18n');
+const { client } = require('./client');
+const { sendLong, sendImagesToChannel } = require('./messaging');
+const { splitLongText } = require('./text-chunking');
+const { enqueue } = require('./queue');
 const {
   addRoute,
   resolveConversationId,
   getRoutes,
   getFrontend,
   parseRoute,
-} = require("./frontend-manager");
-const { streamSessions, scheduleEdit } = require("./streaming");
+} = require('./frontend-manager');
+const { streamSessions, scheduleEdit } = require('./streaming');
 const {
   getPersonaForUser,
   getDefaultPersonaName,
   isCrossRelayEnabled,
-} = require("./persona-map");
-const { getLangForUser } = require("./lang-map");
-const { AVAILABLE_LANGUAGES, LANGUAGE_NAMES } = require("./locales-manifest");
-const version = require("./package.json").version;
+} = require('./persona-map');
+const { getLangForUser } = require('./lang-map');
+const { AVAILABLE_LANGUAGES, LANGUAGE_NAMES } = require('./locales-manifest');
+const version = require('./package.json').version;
 
-const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ["discord"]).includes(
-  "discord",
+const DISCORD_PLUGIN_ENABLED = (config.enabledPlugins || ['discord']).includes(
+  'discord',
 );
 
 const ACTIVITY_BASE = `SillyTavern Bridge v${version}`;
-const { formatBridgeActivity } = require("./activity-format");
+const { formatBridgeActivity } = require('./activity-format');
 
-let lastActivityText = "";
+let lastActivityText = '';
 
 function setBridgeActivity(expression, ownerName) {
   if (!client?.user) return;
@@ -86,11 +86,11 @@ function setBridgeActivity(expression, ownerName) {
 // circular dependency. By the time any handler fires, both modules are
 // fully initialised and getSillyTavernClient is available.
 function getSillyTavernClient() {
-  return require("./websocket").getSillyTavernClient();
+  return require('./websocket').getSillyTavernClient();
 }
 
 function dispatchCommand(platform, chatId, command, args, userId) {
-  require("./websocket").dispatchCommand(
+  require('./websocket').dispatchCommand(
     platform,
     chatId,
     command,
@@ -111,11 +111,11 @@ function dispatchCommand(platform, chatId, command, args, userId) {
 
 const SLASH_COMMANDS = [
   {
-    name: "image",
-    description: "Generate or cancel an AI image task.",
+    name: 'image',
+    description: 'Generate or cancel an AI image task.',
     options: [
       {
-        name: "prompt",
+        name: 'prompt',
         type: 3,
         description: "Prompt, keyword, or 'cancel'",
         required: true,
@@ -124,58 +124,58 @@ const SLASH_COMMANDS = [
     ],
   },
   {
-    name: "mood",
-    description: "Show the current expression for this character",
+    name: 'mood',
+    description: 'Show the current expression for this character',
     options: [
       {
-        name: "name",
+        name: 'name',
         type: 3,
         description:
-          "Character name (optional in solo chat; autocompletes group members in group chat)",
+          'Character name (optional in solo chat; autocompletes group members in group chat)',
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: "reaction",
-    description: "Set how expressions are shown on Discord",
+    name: 'reaction',
+    description: 'Set how expressions are shown on Discord',
     options: [
       {
-        name: "mode",
+        name: 'mode',
         type: 3,
-        description: "off, status, or full",
+        description: 'off, status, or full',
         required: true,
         choices: [
-          { name: "Off", value: "off" },
-          { name: "Status only", value: "status" },
+          { name: 'Off', value: 'off' },
+          { name: 'Status only', value: 'status' },
           {
-            name: "Status and image updates",
-            value: "full",
+            name: 'Status and image updates',
+            value: 'full',
           },
         ],
       },
     ],
   },
   {
-    name: "status",
-    description: "Show bridge health and image pipeline stats",
+    name: 'status',
+    description: 'Show bridge health and image pipeline stats',
   },
-  { name: "sthelp", description: "Show all available bridge commands" },
+  { name: 'sthelp', description: 'Show all available bridge commands' },
   {
-    name: "newchat",
-    description: "Start a fresh chat with the current character",
-  },
-  {
-    name: "listchars",
-    description: "List all characters (includes numbered shortcuts)",
+    name: 'newchat',
+    description: 'Start a fresh chat with the current character',
   },
   {
-    name: "note",
+    name: 'listchars',
+    description: 'List all characters (includes numbered shortcuts)',
+  },
+  {
+    name: 'note',
     description: "Set or read the author's note for the current chat",
     options: [
       {
-        name: "text",
+        name: 'text',
         type: 3,
         description: "The author's note text (omit to read the current note)",
         required: false,
@@ -183,44 +183,44 @@ const SLASH_COMMANDS = [
     ],
   },
   {
-    name: "continue",
-    description: "Continue the last AI message",
+    name: 'continue',
+    description: 'Continue the last AI message',
   },
   {
-    name: "impersonate",
-    description: "Have the AI write your next response in character",
+    name: 'impersonate',
+    description: 'Have the AI write your next response in character',
     options: [
       {
-        name: "prompt",
+        name: 'prompt',
         type: 3,
-        description: "Optional prompt to guide the impersonation",
+        description: 'Optional prompt to guide the impersonation',
         required: false,
       },
     ],
   },
   {
-    name: "persona",
-    description: "Switch your active persona by name",
+    name: 'persona',
+    description: 'Switch your active persona by name',
     options: [
       {
-        name: "name",
+        name: 'name',
         type: 3,
-        description: "The name of the persona to switch to",
+        description: 'The name of the persona to switch to',
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: "listpersonas",
-    description: "List your available personas",
+    name: 'listpersonas',
+    description: 'List your available personas',
   },
   {
-    name: "mypersona",
-    description: "Save your persona so it switches automatically when you chat",
+    name: 'mypersona',
+    description: 'Save your persona so it switches automatically when you chat',
     options: [
       {
-        name: "name",
+        name: 'name',
         type: 3,
         description:
           "Persona name to save, or 'clear' to remove your saved preference",
@@ -230,84 +230,84 @@ const SLASH_COMMANDS = [
     ],
   },
   {
-    name: "switchchar",
-    description: "Switch to a character by exact name",
+    name: 'switchchar',
+    description: 'Switch to a character by exact name',
     options: [
       {
-        name: "name",
+        name: 'name',
         type: 3,
-        description: "Character name",
+        description: 'Character name',
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: "listgroups",
-    description: "List all groups (includes numbered shortcuts)",
+    name: 'listgroups',
+    description: 'List all groups (includes numbered shortcuts)',
   },
   {
-    name: "switchgroup",
-    description: "Switch to a group by exact name",
+    name: 'switchgroup',
+    description: 'Switch to a group by exact name',
     options: [
       {
-        name: "name",
+        name: 'name',
         type: 3,
-        description: "Group name",
+        description: 'Group name',
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: "listchats",
-    description: "List chat history for the current character",
+    name: 'listchats',
+    description: 'List chat history for the current character',
   },
   {
-    name: "history",
-    description: "Show past chat exchanges in this channel",
+    name: 'history',
+    description: 'Show past chat exchanges in this channel',
     options: [
       {
-        name: "exchanges",
+        name: 'exchanges',
         type: 4,
-        description: "Number of exchanges to show (default: 5)",
+        description: 'Number of exchanges to show (default: 5)',
         required: false,
       },
     ],
   },
   {
-    name: "switchchat",
-    description: "Load a past chat by name (omit .jsonl)",
+    name: 'switchchat',
+    description: 'Load a past chat by name (omit .jsonl)',
     options: [
       {
-        name: "name",
+        name: 'name',
         type: 3,
-        description: "Chat filename (omit .jsonl)",
+        description: 'Chat filename (omit .jsonl)',
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: "charimage",
+    name: 'charimage',
     description: "Show a character's avatar",
     options: [
       {
-        name: "name",
+        name: 'name',
         type: 3,
         description:
-          "Character name (optional in solo chat; autocompletes group members in group chat)",
+          'Character name (optional in solo chat; autocompletes group members in group chat)',
         required: true,
         autocomplete: true,
       },
     ],
   },
   {
-    name: "setlang",
-    description: "Set your preferred language for bot responses",
+    name: 'setlang',
+    description: 'Set your preferred language for bot responses',
     options: [
       {
-        name: "language",
+        name: 'language',
         type: 3,
         description: "Language name, or 'clear' to reset to server default",
         required: true,
@@ -316,13 +316,13 @@ const SLASH_COMMANDS = [
     ],
   },
   {
-    name: "delete",
-    description: "Delete the last message(s) from the chat",
+    name: 'delete',
+    description: 'Delete the last message(s) from the chat',
     options: [
       {
-        name: "count",
+        name: 'count',
         type: 4,
-        description: "Number of messages to delete (1-5, default: 1)",
+        description: 'Number of messages to delete (1-5, default: 1)',
         required: false,
         min_value: 1,
         max_value: 5,
@@ -330,8 +330,8 @@ const SLASH_COMMANDS = [
     ],
   },
   {
-    name: "swipe",
-    description: "Delete the last AI response and generate a new one",
+    name: 'swipe',
+    description: 'Delete the last AI response and generate a new one',
   },
 ];
 
@@ -347,8 +347,9 @@ const pendingAutocompletes = {};
 // ---------------------------------------------------------------------------
 // Roleplay message tracking
 //
-// Tracks Discord message IDs that are real roleplay messages (AI replies or
-// streamed responses), keyed by channelId. Used to:
+// Tracks Discord message IDs that are part of the mirrored roleplay timeline
+// (user prompts from Discord plus bot replies/streamed responses), keyed by
+// channelId. Used to:
 //   1. Delete corresponding Discord messages when /delete or /swipe is used.
 //   2. Detect when a user manually deletes a Discord message and mirror that
 //      deletion into SillyTavern (only the most recent tracked message).
@@ -361,6 +362,15 @@ const ROLEPLAY_MESSAGE_LIMIT = 50;
 const recentRoleplayMessages = new Map();
 // channelId -> messageId[] (ordered oldest→newest, for deleteRoleplayMessages)
 const channelMessageHistory = new Map();
+
+function clearTrackedRoleplayHistory(channelId) {
+  const history = channelMessageHistory.get(channelId);
+  if (!history?.length) return;
+  for (const msgId of history) {
+    recentRoleplayMessages.delete(msgId);
+  }
+  channelMessageHistory.delete(channelId);
+}
 
 function trackRoleplayMessage(channelId, msg) {
   if (!msg?.id) return;
@@ -411,9 +421,9 @@ function startPlaceholderCountdown(channelId, msg, timeoutMs) {
 
   function formatRemaining(ms) {
     if (ms <= 60_000) {
-      return t("disc.countdownSeconds", { n: Math.ceil(ms / 1_000) });
+      return t('disc.countdownSeconds', { n: Math.ceil(ms / 1_000) });
     }
-    return t("disc.countdownMinutes", { n: Math.ceil(ms / 60_000) });
+    return t('disc.countdownMinutes', { n: Math.ceil(ms / 60_000) });
   }
 
   function scheduleNext() {
@@ -426,7 +436,7 @@ function startPlaceholderCountdown(channelId, msg, timeoutMs) {
       if (rem <= 0) return;
       try {
         await msg.edit(
-          t("disc.imagePlaceholderUpdate", { remaining: formatRemaining(rem) }),
+          t('disc.imagePlaceholderUpdate', { remaining: formatRemaining(rem) }),
         );
       } catch {
         // Message was deleted or inaccessible - stop the countdown.
@@ -444,15 +454,15 @@ function startPlaceholderCountdown(channelId, msg, timeoutMs) {
 // charimage uses "group_members" (active group only, not the full library).
 // image uses "image_prompts" (a static keyword list built inline by the extension).
 const AUTOCOMPLETE_LIST_MAP = {
-  persona: "personas",
-  switchchar: "characters",
-  switchgroup: "groups",
-  switchchat: "chats",
-  charimage: "group_members",
-  mood: "group_members",
-  image: "image_prompts",
-  mypersona: "personas",
-  setlang: "languages",
+  persona: 'personas',
+  switchchar: 'characters',
+  switchgroup: 'groups',
+  switchchat: 'chats',
+  charimage: 'group_members',
+  mood: 'group_members',
+  image: 'image_prompts',
+  mypersona: 'personas',
+  setlang: 'languages',
 };
 
 function getPendingAutocompletes() {
@@ -469,20 +479,20 @@ if (DISCORD_PLUGIN_ENABLED) {
   client.on(Events.ClientReady, async (c) => {
     setBridgeActivity(null);
 
-    log("log", `[Discord] Ready! Logged in as ${c.user.tag}`);
-    const rest = new REST({ version: "10" }).setToken(token);
+    log('log', `[Discord] Ready! Logged in as ${c.user.tag}`);
+    const rest = new REST({ version: '10' }).setToken(token);
     try {
-      log("log", "[Discord] Registering slash commands...");
+      log('log', '[Discord] Registering slash commands...');
       await rest.put(Routes.applicationCommands(c.user.id), {
         body: SLASH_COMMANDS,
       });
-      log("log", "[Discord] Slash commands registered.");
+      log('log', '[Discord] Slash commands registered.');
     } catch (err) {
-      log("error", "[Discord] Failed to register slash commands:", err);
+      log('error', '[Discord] Failed to register slash commands:', err);
     }
   });
 
-  client.on("error", (err) => log("error", "[Discord] Client error:", err));
+  client.on('error', (err) => log('error', '[Discord] Client error:', err));
 
   // ---------------------------------------------------------------------------
   // Interaction handler (autocomplete + slash commands)
@@ -493,12 +503,12 @@ if (DISCORD_PLUGIN_ENABLED) {
       const command = interaction.commandName;
 
       // setlang autocomplete is served locally - no ST connection needed.
-      if (command === "setlang") {
+      if (command === 'setlang') {
         const query = interaction.options.getFocused().toLowerCase();
         const userLocale = (
-          getLangForUser("discord", interaction.user.id) ||
+          getLangForUser('discord', interaction.user.id) ||
           config.userLocale ||
-          "en"
+          'en'
         ).toLowerCase();
         const choices = AVAILABLE_LANGUAGES.filter(
           (l) =>
@@ -511,7 +521,7 @@ if (DISCORD_PLUGIN_ENABLED) {
             const langNames = LANGUAGE_NAMES[l.code] || {};
             const localizedName =
               langNames[userLocale] ||
-              langNames[userLocale.split("-")[0]] ||
+              langNames[userLocale.split('-')[0]] ||
               l.name;
             const display =
               l.nativeName === localizedName
@@ -551,7 +561,7 @@ if (DISCORD_PLUGIN_ENABLED) {
           const timeout = setTimeout(async () => {
             if (!pendingAutocompletes[requestId]) return;
             delete pendingAutocompletes[requestId];
-            log("warn", `[Autocomplete] Request ${requestId} timed out`);
+            log('warn', `[Autocomplete] Request ${requestId} timed out`);
             await interaction.respond([]).catch(() => {});
           }, AUTOCOMPLETE_TIMEOUT_MS);
 
@@ -559,7 +569,7 @@ if (DISCORD_PLUGIN_ENABLED) {
 
           stClient.send(
             JSON.stringify({
-              type: "get_autocomplete",
+              type: 'get_autocomplete',
               requestId,
               list,
               query: focusedValue,
@@ -578,7 +588,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     ) {
       await interaction
         .reply({
-          content: t("disc.notAuthorized"),
+          content: t('disc.notAuthorized'),
           flags: [MessageFlags.Ephemeral],
         })
         .catch(() => {});
@@ -591,7 +601,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     ) {
       await interaction
         .reply({
-          content: t("disc.notAllowedChannel"),
+          content: t('disc.notAllowedChannel'),
           flags: [MessageFlags.Ephemeral],
         })
         .catch(() => {});
@@ -604,12 +614,12 @@ if (DISCORD_PLUGIN_ENABLED) {
       .map((opt) => String(opt.value));
 
     const cappedArgs =
-      command === "delete" && config.triggerPrefix
+      command === 'delete' && config.triggerPrefix
         ? [String(Math.min(1, parseInt(args[0]) || 1))]
         : args;
 
     dispatchCommand(
-      "discord",
+      'discord',
       interaction.channelId,
       command,
       cappedArgs,
@@ -620,7 +630,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     // Ephemeral also prevents messageCreate from seeing this echo as a new "/" message.
     await interaction
       .reply({
-        content: `✓ ${command}${args.length ? " " + args.join(" ") : ""}`,
+        content: `✓ ${command}${args.length ? ' ' + args.join(' ') : ''}`,
         flags: [MessageFlags.Ephemeral],
       })
       .catch(() => {});
@@ -645,10 +655,10 @@ if (DISCORD_PLUGIN_ENABLED) {
     if (!history.length) channelMessageHistory.delete(channelId);
     recentRoleplayMessages.delete(message.id);
     // Only dispatch to ST when the deleted message was the most recent one.
-    if (isNewest) dispatchCommand("discord", channelId, "delete", ["1"], null);
+    if (isNewest) dispatchCommand('discord', channelId, 'delete', ['1'], null);
   });
 
-  client.on("messageCreate", (message) => {
+  client.on('messageCreate', (message) => {
     if (message.author.bot) return;
     if (
       config.allowedUserIds?.length > 0 &&
@@ -662,20 +672,22 @@ if (DISCORD_PLUGIN_ENABLED) {
       return;
 
     let content = message.content;
+    let shouldTrackForDelete = !config.triggerPrefix;
 
     if (config.triggerPrefix) {
       if (!content.startsWith(config.triggerPrefix)) return;
       content = content.slice(config.triggerPrefix.length).trimStart();
+      shouldTrackForDelete = true;
     }
 
-    if (content.startsWith("/")) {
-      const [command, ...args] = content.slice(1).split(" ");
+    if (content.startsWith('/')) {
+      const [command, ...args] = content.slice(1).split(' ');
       const cappedArgs =
-        command === "delete" && config.triggerPrefix
+        command === 'delete' && config.triggerPrefix
           ? [String(Math.min(1, parseInt(args[0]) || 1))]
           : args;
       dispatchCommand(
-        "discord",
+        'discord',
         message.channel.id,
         command,
         cappedArgs,
@@ -686,25 +698,30 @@ if (DISCORD_PLUGIN_ENABLED) {
 
     const stClient = getSillyTavernClient();
     if (!stClient) {
-      message.reply(t("disc.notConnected")).catch(() => {});
+      message.reply(t('disc.notConnected')).catch(() => {});
       return;
     }
 
-    const conversationId = resolveConversationId("discord", message.channel.id);
-    addRoute(conversationId, "discord", message.channel.id);
-    const mappedPersona = getPersonaForUser("discord", message.author.id);
-    const userLocale = getLangForUser("discord", message.author.id) || null;
+    const conversationId = resolveConversationId('discord', message.channel.id);
+    addRoute(conversationId, 'discord', message.channel.id);
+    const mappedPersona = getPersonaForUser('discord', message.author.id);
+    const userLocale = getLangForUser('discord', message.author.id) || null;
     stClient.send(
       JSON.stringify({
-        type: "user_message",
+        type: 'user_message',
         text: content,
         chatId: conversationId,
         userId: message.author.id,
-        platform: "discord",
+        platform: 'discord',
         ...(mappedPersona ? { mappedPersona } : {}),
         ...(userLocale ? { userLocale } : {}),
       }),
     );
+    // Track user prompts too so /delete N can mirror full ST deletions on
+    // Discord (including user messages) instead of only bot replies.
+    if (shouldTrackForDelete) {
+      trackRoleplayMessage(message.channel.id, message);
+    }
 
     // Cross-relay to other platforms in the same conversation.
     if (!isCrossRelayEnabled()) return;
@@ -718,7 +735,7 @@ if (DISCORD_PLUGIN_ENABLED) {
       const frontend = getFrontend(targetPlatform);
       if (!frontend?.sendText) continue;
       frontend.sendText(targetChatId, relayText).catch((err) => {
-        log("warn", `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
+        log('warn', `[Bridge] Cross-relay to ${route} failed: ${err.message}`);
       });
     }
   });
@@ -780,7 +797,7 @@ async function sendGeneratedImage(channelId, images, caption) {
     if (placeholderMessages[channelId]) {
       clearTimeout(placeholderMessages[channelId].timerId);
       await placeholderMessages[channelId].msg.delete().catch((err) => {
-        log("warn", `[Images] Could not delete placeholder: ${err.message}`);
+        log('warn', `[Images] Could not delete placeholder: ${err.message}`);
       });
       delete placeholderMessages[channelId];
     }
@@ -806,7 +823,7 @@ async function sendExpression(
           tl(exprKey) !== exprKey ? tl(exprKey) : expression;
         enqueue(channelId, async () => {
           await channel.send(
-            tl("disc.expressionMessage", {
+            tl('disc.expressionMessage', {
               name: ownerName,
               expression: translatedExpr,
             }),
@@ -842,6 +859,11 @@ async function sendRecap(channelId, entries, userId, userLocale) {
   const tl = userLocale ? makeTranslator(userLocale) : t;
 
   enqueue(channelId, async () => {
+    // Recaps are a context boundary (e.g. after /switchchat or reconnect).
+    // Clear tracked live-message history so subsequent /delete mirroring
+    // cannot delete older unrelated Discord messages from before the recap.
+    clearTrackedRoleplayHistory(channelId);
+
     let isFirst = true;
     for (const entry of entries) {
       const label = entry.name ? `**${entry.name}**` : null;
@@ -857,7 +879,7 @@ async function sendRecap(channelId, entries, userId, userLocale) {
           .setDescription(description);
 
         if (isFirst) {
-          embed.setTitle(tl("disc.recapTitle"));
+          embed.setTitle(tl('disc.recapTitle'));
           isFirst = false;
         }
 
@@ -872,20 +894,20 @@ async function streamChunk(channelId, payload) {
   if (!channel) return;
 
   const streamId = `${channelId}:${payload?.streamId || channelId}`;
-  const rawText = payload?.text || "";
+  const rawText = payload?.text || '';
   if (!rawText.trim()) return;
 
   const activeName = payload.characterName || null;
   let processedText = rawText;
   if (activeName) {
-    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, "i"), "");
+    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, 'i'), '');
   }
 
   if (!streamSessions[streamId]) {
     streamSessions[streamId] = {
       streamMessage: null,
-      pendingText: "",
+      pendingText: '',
       characterName: activeName,
       editInFlight: false,
       nextEdit: false,
@@ -921,12 +943,12 @@ async function streamEnd(channelId, payload) {
   }
 
   const rawText =
-    payload?.finalText != null ? payload.finalText : s.pendingText || "";
+    payload?.finalText != null ? payload.finalText : s.pendingText || '';
   const activeName = payload?.characterName || null;
   let processedText = rawText;
   if (activeName) {
-    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, "i"), "");
+    const escaped = activeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    processedText = rawText.replace(new RegExp(`^${escaped}:\\s*`, 'i'), '');
   }
 
   const finalText = activeName
