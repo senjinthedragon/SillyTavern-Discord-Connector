@@ -238,7 +238,8 @@ async function handleBridgePacket(data, deps) {
 
     case "messages_deleted": {
       const count = Math.max(1, parseInt(data.count) || 1);
-      await fanout(conversationId, "deleteRoleplayMessages", count);
+      const deleteMode = data.deleteMode === "ai_only" ? "ai_only" : "any";
+      await fanout(conversationId, "deleteRoleplayMessages", count, deleteMode);
       break;
     }
 

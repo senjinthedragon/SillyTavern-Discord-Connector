@@ -1134,7 +1134,15 @@ export async function handleExecuteCommand(data) {
 
         // Tell the server to delete the corresponding platform message before
         // the new response arrives so the old one disappears cleanly.
-        safeSend({ type: 'messages_deleted', chatId: data.chatId, count: 1 });
+        // ai_only: if the previous AI response never reached Discord (e.g. due
+        // to memory consolidation delay), skip user messages rather than
+        // deleting the wrong message and causing a desync.
+        safeSend({
+          type: 'messages_deleted',
+          chatId: data.chatId,
+          count: 1,
+          deleteMode: 'ai_only',
+        });
 
         // Set up streaming for the regenerated response, mirroring the core
         // of handleUserMessage but without injecting a new user message.

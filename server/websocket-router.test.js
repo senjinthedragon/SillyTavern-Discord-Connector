@@ -371,8 +371,8 @@ test("handleBridgePacket send_images fans out full images array", async () => {
 test("handleBridgePacket messages_deleted fans out deleteRoleplayMessages with count", async () => {
   const deps = createDeps();
   const seen = [];
-  deps.fanout = async (_conv, fnName, count) => {
-    seen.push([fnName, count]);
+  deps.fanout = async (_conv, fnName, count, mode) => {
+    seen.push([fnName, count, mode]);
     return [];
   };
 
@@ -381,14 +381,14 @@ test("handleBridgePacket messages_deleted fans out deleteRoleplayMessages with c
     deps,
   );
 
-  assert.deepEqual(seen, [["deleteRoleplayMessages", 3]]);
+  assert.deepEqual(seen, [["deleteRoleplayMessages", 3, "any"]]);
 });
 
 test("handleBridgePacket messages_deleted defaults count to 1 when missing", async () => {
   const deps = createDeps();
   const seen = [];
-  deps.fanout = async (_conv, fnName, count) => {
-    seen.push([fnName, count]);
+  deps.fanout = async (_conv, fnName, count, mode) => {
+    seen.push([fnName, count, mode]);
     return [];
   };
 
@@ -397,5 +397,21 @@ test("handleBridgePacket messages_deleted defaults count to 1 when missing", asy
     deps,
   );
 
-  assert.deepEqual(seen, [["deleteRoleplayMessages", 1]]);
+  assert.deepEqual(seen, [["deleteRoleplayMessages", 1, "any"]]);
+});
+
+test("handleBridgePacket messages_deleted forwards ai_only mode", async () => {
+  const deps = createDeps();
+  const seen = [];
+  deps.fanout = async (_conv, fnName, count, mode) => {
+    seen.push([fnName, count, mode]);
+    return [];
+  };
+
+  await handleBridgePacket(
+    { type: "messages_deleted", chatId: "conv1", count: 1, deleteMode: "ai_only" },
+    deps,
+  );
+
+  assert.deepEqual(seen, [["deleteRoleplayMessages", 1, "ai_only"]]);
 });

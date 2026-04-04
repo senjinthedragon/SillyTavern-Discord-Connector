@@ -358,7 +358,7 @@ const pendingAutocompletes = {};
 // ---------------------------------------------------------------------------
 
 const ROLEPLAY_MESSAGE_LIMIT = 50;
-// messageId -> channelId (fast lookup for MessageDelete events)
+// messageId -> { channelId, role } (fast lookup for MessageDelete events)
 const recentRoleplayMessages = new Map();
 // channelId -> messageId[] (ordered oldest→newest, for deleteRoleplayMessages)
 const channelMessageHistory = new Map();
@@ -372,9 +372,9 @@ function clearTrackedRoleplayHistory(channelId) {
   channelMessageHistory.delete(channelId);
 }
 
-function trackRoleplayMessage(channelId, msg) {
+function trackRoleplayMessage(channelId, msg, role = 'assistant') {
   if (!msg?.id) return;
-  recentRoleplayMessages.set(msg.id, channelId);
+  recentRoleplayMessages.set(msg.id, { channelId, role });
   if (!channelMessageHistory.has(channelId)) {
     channelMessageHistory.set(channelId, []);
   }
@@ -386,14 +386,31 @@ function trackRoleplayMessage(channelId, msg) {
   }
 }
 
-async function deleteRoleplayMessages(channelId, count) {
+async function deleteRoleplayMessages(channelId, count, mode = 'any') {
   const history = channelMessageHistory.get(channelId);
   if (!history?.length) return;
-  const n = Math.min(Math.max(1, count), history.length);
-  const toDelete = history.splice(-n);
-  for (const msgId of toDelete) {
-    recentRoleplayMessages.delete(msgId);
+  const maxDeletes = Math.max(1, count);
+  const toDelete = [];
+
+  if (mode === 'ai_only') {
+    for (let i = history.length - 1; i >= 0 && toDelete.length < maxDeletes; i--) {
+      const msgId = history[i];
+      const metadata = recentRoleplayMessages.get(msgId);
+      if (metadata?.role !== 'assistant') continue;
+      toDelete.push(msgId);
+      history.splice(i, 1);
+      recentRoleplayMessages.delete(msgId);
+    }
+  } else {
+    const n = Math.min(maxDeletes, history.length);
+    const removed = history.splice(-n);
+    for (const msgId of removed) {
+      toDelete.push(msgId);
+      recentRoleplayMessages.delete(msgId);
+    }
   }
+
+  if (!toDelete.length) return;
   if (!history.length) channelMessageHistory.delete(channelId);
   const channel = client.channels.cache.get(channelId);
   if (!channel) return;
@@ -720,7 +737,7 @@ if (DISCORD_PLUGIN_ENABLED) {
     // Track user prompts too so /delete N can mirror full ST deletions on
     // Discord (including user messages) instead of only bot replies.
     if (shouldTrackForDelete) {
-      trackRoleplayMessage(message.channel.id, message);
+      trackRoleplayMessage(message.channel.id, message, 'user');
     }
 
     // Cross-relay to other platforms in the same conversation.
@@ -753,7 +770,7 @@ async function sendText(channelId, text) {
       delete placeholderMessages[channelId];
     }
     const msg = await sendLong(channel, text);
-    trackRoleplayMessage(channelId, msg);
+    trackRoleplayMessage(channelId, msg, 'assistant');
   });
 }
 
@@ -960,7 +977,7 @@ async function streamEnd(channelId, payload) {
       await s.streamMessage.delete().catch(() => {});
     }
     const msg = await sendLong(channel, finalText);
-    trackRoleplayMessage(channelId, msg);
+    trackRoleplayMessage(channelId, msg, 'assistant');
   }
 
   delete streamSessions[streamId];
