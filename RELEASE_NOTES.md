@@ -16,11 +16,3 @@ You can now delete and swipe messages directly from Discord, and optionally requ
 **(Pro)**
 
 - Telegram plugin now mirrors `/delete` and `/swipe` to Telegram. The last N bot messages are tracked per chat and removed via the Telegram Bot API when a deletion is requested. Signal does not support server-side message deletion; the ST chat is still updated but no Signal-side deletion occurs.
-
----
-
-## v1.7.2 - Patch
-
-## Added
-
-- Added Bitcoin donation address as a privacy-friendly payment option. The address is now shown in the startup banner, support links, and `/sthelp` command across all 13 supported languages.
