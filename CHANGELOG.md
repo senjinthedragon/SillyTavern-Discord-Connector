@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.8.3] - 2026-05-30
+
+### Fixed
+
+- Resolved remaining npm dependency advisories in root devDependencies. `@xmldom/xmldom` and `brace-expansion` updated via lock file, clearing four XML injection/DoS advisories (GHSA-wh4c-j3r5-mjhp, GHSA-2v35-w6hq-6mfw, GHSA-f6ww-3ggp-fr8h, GHSA-x6wf-f3px-wcqx, GHSA-j759-j44w-7fr8) and one brace-expansion DoS advisory (GHSA-jxxr-4gwj-5jf2). Both within existing semver ranges.
+
 ## [1.8.2] - 2026-05-30
 
 ### Fixed
