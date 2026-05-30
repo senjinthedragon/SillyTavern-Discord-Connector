@@ -1,18 +1,5 @@
-# v1.8.0 - Take Control
-
-You can now delete and swipe messages directly from Discord, and optionally require a trigger prefix so the bot only responds when you address it.
-
-## Added
-
-- **`/delete [1-5]`** - Remove the last 1 to 5 messages from the chat. The bot messages disappear from Discord at the same time. Defaults to deleting 1 if you don't pass a number.
-- **`/swipe`** - Delete the last AI response and generate a new one. The old message is gone from Discord before the new reply arrives. Not available in group chats.
-- **Manual Discord deletion** - Deleting the most recent bot message directly in Discord (right-click > Delete Message) now removes the corresponding message from the SillyTavern chat automatically. Only the most recent tracked response triggers this - deleting older messages out of order has no effect on the ST side.
-- **`triggerPrefix` config option** - When set, the bot ignores any message that does not begin with the configured prefix (e.g. `!`) and strips it before forwarding. Useful for group chats where players talk amongst themselves and only want the bot to respond when addressed directly. Any string works, including multi-byte unicode characters. When the prefix is active, `/delete` is capped at 1 to avoid removing non-prefixed messages that the bot never tracked. Disabled by default - no prefix is required out of the box.
+# v1.8.1 - Patch
 
 ## Fixed
 
-- Patched lodash and undici npm advisory warnings. The remaining advisories are in `jimp`'s `file-type` dependency and cannot be resolved without a breaking downgrade.
-
-**(Pro)**
-
-- Telegram plugin now mirrors `/delete` and `/swipe` to Telegram. The last N bot messages are tracked per chat and removed via the Telegram Bot API when a deletion is requested. Signal does not support server-side message deletion; the ST chat is still updated but no Signal-side deletion occurs.
+- **Smart Memory recap unblocked** - If you have Smart Memory installed and its away recap was showing, incoming Discord messages would be silently dropped because the modal overlay prevents SillyTavern from processing anything. The bot now automatically dismisses the recap when a Discord message arrives, so it responds even while you are away from your computer. If Smart Memory is not installed nothing changes.

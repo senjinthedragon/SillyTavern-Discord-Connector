@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.8.1] - 2026-05-30
+
+### Fixed
+
+- Incoming Discord messages now automatically dismiss the Smart Memory away recap modal before processing. The recap overlay blocks SillyTavern's UI while visible, preventing the bot from responding when the user is away from their computer. Dispatching `smart_memory:dismiss_recap` at the start of the message handler clears the overlay as a silent side effect of the user interacting via Discord. If Smart Memory is not installed the dispatch is a no-op.
+
 ## [1.8.0] - 2026-04-04
 
 ### Added

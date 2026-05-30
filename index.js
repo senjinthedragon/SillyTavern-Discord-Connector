@@ -201,6 +201,7 @@ function connect() {
       }
 
       if (data.type === "user_message") {
+        $(document).trigger("smart_memory:dismiss_recap");
         await handleUserMessage(data);
         return;
       }
