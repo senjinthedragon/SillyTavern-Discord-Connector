@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.8.2] - 2026-05-30
+
+### Fixed
+
+- Resolved all outstanding npm dependency advisories. `jimp` updated to 1.6.1 and `ws` updated to 8.21.0, clearing the `file-type` infinite-loop (GHSA-5v7r-6r5c-r473) and `ws` uninitialized memory disclosure (GHSA-58qx-3vcg-4xpx) advisories. Both updates are within existing semver ranges and require no breaking changes.
+
 ## [1.8.1] - 2026-05-30
 
 ### Fixed
